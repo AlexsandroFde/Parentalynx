@@ -1,0 +1,4 @@
+# Capturas de tela de referencia. Gerar ou atualizar com:
+#   flutter test --update-goldens --tags screenshot
+tags:
+  screenshot:
