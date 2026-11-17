@@ -1,0 +1,21 @@
+# Dependencias e artefatos
+node_modules/
+backend/data/
+backend/.env
+*.log
+
+# Chaves de assinatura e segredos (nunca versionar)
+*.jks
+*.keystore
+app/android/key.properties
+
+# Sistema e editores
+.DS_Store
+Thumbs.db
+.idea/
+
+# Estado local do cliente de testes de ponta a ponta
+.plx-e2e-state.json
+
+# Imagens de diferenca geradas quando uma captura de tela de referencia nao bate
+app/test/**/failures/
