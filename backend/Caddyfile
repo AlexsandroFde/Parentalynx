@@ -1,0 +1,15 @@
+# O dominio vem da variavel DOMAIN (por exemplo api.exemplo.com.br).
+# O Caddy obtem e renova o certificado sozinho. As portas 80 e 443 precisam estar abertas e o
+# DNS do dominio precisa apontar para este servidor.
+
+{$DOMAIN} {
+	encode zstd gzip
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		-Server
+	}
+
+	# O WebSocket usa o mesmo proxy, sem configuracao extra.
+	reverse_proxy api:8080
+}

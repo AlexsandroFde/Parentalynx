@@ -1,0 +1,41 @@
+# Producao: a API fica so na rede interna e o Caddy termina o HTTPS com certificado automatico.
+#
+# Antes de subir, copie .env.example para .env e preencha DOMAIN e DATA_ENCRYPTION_KEY.
+#   docker compose up -d --build
+
+services:
+  api:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      NODE_ENV: production
+      HOST: 0.0.0.0
+      PORT: "8080"
+      DATABASE_PATH: /data/parentalynx.db
+      # O endereco do cliente vem do cabecalho posto pelo Caddy.
+      TRUST_PROXY: "true"
+    volumes:
+      - api_data:/data
+    expose:
+      - "8080"
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      DOMAIN: ${DOMAIN:?Defina DOMAIN no arquivo .env}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  api_data:
+  caddy_data:
+  caddy_config:
