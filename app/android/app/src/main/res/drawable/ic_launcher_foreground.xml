@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <!-- Orelhas do lince -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M37,37 L33,24 L46,33 Z M71,37 L75,24 L62,33 Z" />
+    <!-- Escudo -->
+    <path android:fillColor="#FFFFFFFF" android:pathData="M54,30 L74,37 L74,53 C74,66 65.5,76 54,80 C42.5,76 34,66 34,53 L34,37 Z" />
+    <!-- Relógio -->
+    <path android:fillColor="#FF3046C5" android:pathData="M54,43 C47.9,43 43,47.9 43,54 C43,60.1 47.9,65 54,65 C60.1,65 65,60.1 65,54 C65,47.9 60.1,43 54,43 Z M54,62 C49.6,62 46,58.4 46,54 C46,49.6 49.6,46 54,46 C58.4,46 62,49.6 62,54 C62,58.4 58.4,62 54,62 Z M55,48.5 L52.6,48.5 L52.6,55 L57.8,58.1 L59,56.1 L55,53.7 Z" />
+</vector>

@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ParentaLynx</string>
+    <string name="browser_label">Navegador ParentaLynx</string>
+
+    <!-- Serviço de acessibilidade: divulgação destacada do que ele faz e do que não faz. -->
+    <string name="accessibility_label">Controle parental ParentaLynx</string>
+    <string name="accessibility_summary">Identifica o app aberto para aplicar as regras definidas pelo responsável.</string>
+    <string name="accessibility_description">O ParentaLynx usa este serviço somente para saber qual aplicativo está aberto e para fechar um aplicativo bloqueado pelo responsável.\n\nEste serviço não lê o conteúdo das telas, não registra o que é digitado, não acessa senhas nem mensagens.\n\nSe ele for desativado, o responsável é avisado.</string>
+
+    <!-- Administrador do dispositivo. -->
+    <string name="device_admin_label">Controle parental ParentaLynx</string>
+    <string name="device_admin_description">Impede que o controle parental seja desinstalado sem o conhecimento do responsável.</string>
+    <string name="device_admin_explanation">Com o administrador ativo, o ParentaLynx só pode ser desinstalado depois de desativado aqui, e o responsável é avisado quando isso acontece.</string>
+    <string name="device_admin_disable_warning">Se você desativar o administrador, o controle parental poderá ser desinstalado. O responsável será avisado.</string>
+    <string name="owner_support_short">Bloqueado pelo controle parental ParentaLynx. Fale com o seu responsável.</string>
+    <string name="owner_support_long">Este aparelho é gerenciado pelo controle parental ParentaLynx. O aplicativo ou a configuração está bloqueado pelas regras definidas pelo responsável: limite diário de uso, horário permitido ou bloqueio do aplicativo. Para liberar, fale com o seu responsável.</string>
+    <string name="fgs_special_use">Controle parental: conta o tempo de uso e aplica as regras definidas pelo responsável.</string>
+
+    <!-- Canais de notificação. -->
+    <string name="channel_status_name">Controle parental ativo</string>
+    <string name="channel_status_description">Mostra que o controle parental está ativo e o tempo restante de hoje.</string>
+    <string name="channel_child_name">Avisos de tempo</string>
+    <string name="channel_child_description">Avisos de pouco tempo, limite atingido e respostas do responsável.</string>
+    <string name="channel_guardian_name">Alertas do responsável</string>
+    <string name="channel_guardian_description">Alertas sobre os aparelhos monitorados.</string>
+
+    <!-- Notificação permanente. -->
+    <string name="status_title">Controle parental ativo</string>
+    <string name="status_starting">Aplicando as regras definidas pelo responsável.</string>
+    <string name="status_remaining">Tempo restante hoje: %1$s</string>
+    <string name="status_no_limit">Sem limite de tempo hoje.</string>
+    <string name="status_limit">Limite de hoje atingido.</string>
+    <string name="status_limit_until">Limite de hoje atingido. Liberação %1$s.</string>
+    <string name="status_schedule">Fora do horário permitido.</string>
+    <string name="status_schedule_until">Fora do horário permitido. Liberação %1$s.</string>
+    <string name="status_manual_lock">Aparelho pausado pelo responsável.</string>
+    <string name="status_tamper_lock">Proteção desativada. Fale com o seu responsável.</string>
+    <string name="status_override">Uso liberado pelo responsável até %1$s.</string>
+
+    <!-- Avisos para a criança. -->
+    <string name="notify_low_title">O tempo está acabando</string>
+    <string name="notify_low_text">Restam %1$s de uso hoje.</string>
+    <string name="notify_limit_title">Limite diário atingido</string>
+    <string name="notify_limit_text">O tempo de uso de hoje acabou. Os apps liberados continuam disponíveis.</string>
+    <string name="notify_request_approved_title">Pedido aprovado</string>
+    <string name="notify_request_approved_text">Seu responsável liberou mais %1$d minutos.</string>
+    <string name="notify_request_denied_title">Pedido não aprovado</string>
+    <string name="notify_request_denied_text">Seu responsável não liberou mais tempo agora.</string>
+    <string name="notify_unlinked_title">Controle parental desativado</string>
+    <string name="notify_unlinked_revoked">O responsável removeu o vínculo deste aparelho.</string>
+    <string name="notify_unlinked_local">Este aparelho foi desvinculado pelo responsável.</string>
+
+    <!-- Tela de bloqueio. -->
+    <string name="block_title_daily_limit">Limite diário atingido</string>
+    <string name="block_message_daily_limit">O tempo de uso de hoje acabou.</string>
+    <string name="block_title_schedule">Fora do horário permitido</string>
+    <string name="block_message_schedule">O uso do aparelho está bloqueado neste horário.</string>
+    <string name="block_title_app_blocked">App bloqueado</string>
+    <string name="block_message_app_blocked">%1$s foi bloqueado pelo seu responsável.</string>
+    <string name="block_title_new_app">App aguardando aprovação</string>
+    <string name="block_message_new_app">%1$s precisa ser aprovado pelo seu responsável.</string>
+    <string name="block_title_app_limit">Limite deste app atingido</string>
+    <string name="block_message_app_limit">O tempo de hoje para %1$s acabou.</string>
+    <string name="block_title_manual_lock">Aparelho pausado</string>
+    <string name="block_message_manual_lock">Seu responsável pausou o uso do aparelho.</string>
+    <string name="block_title_tamper">Proteção desativada</string>
+    <string name="block_message_tamper">Uma permissão do controle parental foi desativada. Peça ajuda ao seu responsável.</string>
+    <string name="block_release">Liberação %1$s</string>
+    <string name="block_released">Liberado</string>
+    <string name="block_allowed_title">Continuam disponíveis</string>
+    <string name="block_allowed_empty">Chamadas e funções essenciais do aparelho continuam disponíveis.</string>
+    <string name="block_request_time">Pedir mais tempo</string>
+    <string name="block_request_release">Pedir liberação</string>
+    <string name="block_request_sent">Pedido registrado. Seu responsável será avisado.</string>
+    <string name="block_emergency">Chamada de emergência</string>
+    <string name="block_guardian">Sou o responsável</string>
+    <string name="block_home">Ir para a tela inicial</string>
+    <string name="block_footer">Controle parental ParentaLynx</string>
+    <string name="block_footer_guardian">Controle parental ParentaLynx. Responsável: %1$s</string>
+    <string name="block_icon_description">Bloqueio do controle parental</string>
+    <string name="request_dialog_title">Quanto tempo você quer pedir?</string>
+    <string name="request_15">15 minutos</string>
+    <string name="request_30">30 minutos</string>
+    <string name="request_60">1 hora</string>
+    <string name="request_release_message">Pedido de liberação do app %1$s</string>
+</resources>

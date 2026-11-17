@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="plx_primary">#3046C5</color>
+    <color name="plx_primary_dark">#1B2A7A</color>
+    <color name="plx_on_primary">#FFFFFF</color>
+    <color name="plx_on_primary_muted">#D6DBF7</color>
+    <color name="plx_surface">#FFFFFF</color>
+    <color name="plx_text">#1B1F3B</color>
+    <color name="plx_text_muted">#5B6180</color>
+    <color name="plx_outline">#66FFFFFF</color>
+</resources>
