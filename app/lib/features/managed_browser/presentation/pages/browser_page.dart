@@ -1,25 +1,28 @@
 import 'dart:async';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
-import '../../../../core/platform/native_providers.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
-import '../domain/browser_navigation.dart';
-import 'browser_controller.dart';
-import 'browser_engine.dart';
+import '../../domain/entities/blocked_page.dart';
+import '../../domain/entities/browser_settings.dart';
+import '../bloc/browser_bloc.dart';
+import '../engine/browser_engine.dart';
+import '../texts/browser_texts.dart';
 
 /// Tela do navegador gerenciado: barra de endereco, pagina e botoes de navegacao.
-class BrowserPage extends ConsumerStatefulWidget {
+///
+/// Precisa de um [BrowserBloc] e do [BrowserEngine] que ele comanda acima na arvore.
+class BrowserPage extends StatefulWidget {
   const BrowserPage({super.key});
 
   @override
-  ConsumerState<BrowserPage> createState() => _BrowserPageState();
+  State<BrowserPage> createState() => _BrowserPageState();
 }
 
-class _BrowserPageState extends ConsumerState<BrowserPage> with WidgetsBindingObserver {
+class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
   final TextEditingController _address = TextEditingController();
   final FocusNode _addressFocus = FocusNode();
 
@@ -43,14 +46,19 @@ class _BrowserPageState extends ConsumerState<BrowserPage> with WidgetsBindingOb
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      unawaited(ref.read(browserControllerProvider.notifier).refreshSettings());
+      _bloc.add(const BrowserSettingsRefreshRequested());
     }
   }
 
-  BrowserController get _controller => ref.read(browserControllerProvider.notifier);
+  BrowserBloc get _bloc => context.read<BrowserBloc>();
+
+  String get _currentUrl {
+    final BrowserState state = _bloc.state;
+    return state is BrowserReady ? state.url : '';
+  }
 
   void _onFocusChanged() {
-    final String url = ref.read(browserControllerProvider).url;
+    final String url = _currentUrl;
     if (_addressFocus.hasFocus) {
       // Em edicao mostra o endereco inteiro, ja selecionado para ser trocado.
       _address.value = TextEditingValue(
@@ -64,60 +72,71 @@ class _BrowserPageState extends ConsumerState<BrowserPage> with WidgetsBindingOb
 
   void _submit(String text) {
     _addressFocus.unfocus();
-    unawaited(_controller.submitAddress(text));
+    _bloc.add(BrowserAddressSubmitted(text));
   }
 
   Future<void> _handleBack() async {
-    final bool handled = await _controller.goBack();
-    if (!handled) {
+    final BrowserState state = _bloc.state;
+    if (state is BrowserReady && state.hasPage) {
+      _bloc.add(const BrowserBackRequested());
+    } else {
+      // Na pagina inicial nao ha para onde voltar: o navegador fecha.
       await SystemNavigator.pop();
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<BrowserState>(browserControllerProvider, (
-      BrowserState? previous,
-      BrowserState next,
-    ) {
-      if (!_addressFocus.hasFocus && previous?.url != next.url) {
-        _address.text = displayAddress(next.url);
-      }
-      final String? notice = next.notice;
-      if (notice != null && notice != previous?.notice) {
-        showAppSnackBar(context, notice, tone: Tone.info);
-        _controller.clearNotice();
-      }
-    });
-    // Endereco pedido por outro app (link tocado) ou pela tela da crianca.
-    ref.listen<String?>(browserOpenUrlProvider, (String? previous, String? next) {
-      _openRequested();
-    });
-    ref.listen<BrowserPhase>(
-      browserControllerProvider.select((BrowserState value) => value.phase),
-      (BrowserPhase? previous, BrowserPhase next) => _openRequested(),
-    );
-
-    final BrowserState state = ref.watch(browserControllerProvider);
-    if (state.phase == BrowserPhase.loading) {
-      return const Scaffold(
-        body: SafeArea(child: LoadingView(message: 'Abrindo o navegador...')),
-      );
-    }
-    if (state.phase == BrowserPhase.disabled) {
-      return const Scaffold(
-        body: SafeArea(
-          child: EmptyState(
-            icon: Icons.public_off_rounded,
-            title: 'Navegador indisponível',
-            message:
-                'O navegador seguro não está disponível agora. Ele pode ter sido desligado '
-                'pelo responsável, ou este aparelho ainda não foi vinculado.',
-          ),
+    return MultiBlocListener(
+      listeners: <BlocListener<BrowserBloc, BrowserState>>[
+        BlocListener<BrowserBloc, BrowserState>(
+          listenWhen: (BrowserState previous, BrowserState current) {
+            return _urlOf(previous) != _urlOf(current);
+          },
+          listener: (BuildContext context, BrowserState state) {
+            if (!_addressFocus.hasFocus) {
+              _address.text = displayAddress(_urlOf(state));
+            }
+          },
         ),
-      );
-    }
-    final BrowserSettings? settings = state.settings;
+        BlocListener<BrowserBloc, BrowserState>(
+          listenWhen: (BrowserState previous, BrowserState current) {
+            final String? notice = _noticeOf(current);
+            return notice != null && notice != _noticeOf(previous);
+          },
+          listener: (BuildContext context, BrowserState state) {
+            showAppSnackBar(context, _noticeOf(state)!, tone: Tone.info);
+            _bloc.add(const BrowserNoticeCleared());
+          },
+        ),
+      ],
+      child: BlocBuilder<BrowserBloc, BrowserState>(
+        builder: (BuildContext context, BrowserState state) {
+          return switch (state) {
+            BrowserLoading() => const Scaffold(
+              body: SafeArea(child: LoadingView(message: 'Abrindo o navegador...')),
+            ),
+            BrowserUnavailable() => const Scaffold(
+              body: SafeArea(
+                child: EmptyState(
+                  icon: Icons.public_off_rounded,
+                  title: 'Navegador indisponível',
+                  message:
+                      'O navegador seguro não está disponível agora. Ele pode ter sido desligado '
+                      'pelo responsável, ou este aparelho ainda não foi vinculado.',
+                ),
+              ),
+            ),
+            final BrowserReady ready => _buildBrowser(context, ready),
+          };
+        },
+      ),
+    );
+  }
+
+  Widget _buildBrowser(BuildContext context, BrowserReady state) {
+    final BrowserSettings settings = state.settings;
+    final BlockedPage? blocked = state.blocked;
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (bool didPop, Object? result) {
@@ -132,11 +151,7 @@ class _BrowserPageState extends ConsumerState<BrowserPage> with WidgetsBindingOb
               _AddressBar(
                 controller: _address,
                 focusNode: _addressFocus,
-                // O cadeado so aparece para uma pagina que abriu de fato.
-                secure:
-                    state.blocked == null &&
-                    state.loadError == null &&
-                    state.url.startsWith('https://'),
+                secure: state.isSecure,
                 onSubmitted: _submit,
               ),
               SizedBox(
@@ -147,28 +162,28 @@ class _BrowserPageState extends ConsumerState<BrowserPage> with WidgetsBindingOb
                       )
                     : null,
               ),
-              if (settings != null && settings.logHistory) const _HistoryNotice(),
+              if (settings.logHistory) const _HistoryNotice(),
               Expanded(
                 child: Stack(
                   fit: StackFit.expand,
                   children: <Widget>[
-                    ref.watch(browserEngineProvider).buildView(context),
+                    context.read<BrowserEngine>().buildView(context),
                     if (state.showStartPage) _StartPage(settings: settings),
-                    if (state.loadError != null && state.blocked == null)
+                    if (state.loadError != null && blocked == null)
                       _Overlay(
                         child: EmptyState(
                           icon: Icons.cloud_off_outlined,
                           title: 'A página não abriu',
                           message: state.loadError,
                           actionLabel: 'Tentar de novo',
-                          onAction: () => unawaited(_controller.reload()),
+                          onAction: () => _bloc.add(const BrowserReloadRequested()),
                         ),
                       ),
-                    if (state.blocked != null)
+                    if (blocked != null)
                       BlockedPageView(
-                        page: state.blocked!,
-                        onBack: () => unawaited(_controller.goBack()),
-                        onHome: () => unawaited(_controller.goHome()),
+                        page: blocked,
+                        onBack: () => _bloc.add(const BrowserBackRequested()),
+                        onHome: () => _bloc.add(const BrowserHomeRequested()),
                       ),
                   ],
                 ),
@@ -178,23 +193,18 @@ class _BrowserPageState extends ConsumerState<BrowserPage> with WidgetsBindingOb
         ),
         bottomNavigationBar: _NavigationBar(
           state: state,
-          onBack: () => unawaited(_controller.goBack()),
-          onForward: () => unawaited(_controller.goForward()),
-          onHome: () => unawaited(_controller.goHome()),
-          onReload: () => unawaited(_controller.reload()),
+          onBack: () => _bloc.add(const BrowserBackRequested()),
+          onForward: () => _bloc.add(const BrowserForwardRequested()),
+          onHome: () => _bloc.add(const BrowserHomeRequested()),
+          onReload: () => _bloc.add(const BrowserReloadRequested()),
         ),
       ),
     );
   }
 
-  void _openRequested() {
-    final String? url = ref.read(browserOpenUrlProvider);
-    if (url == null || ref.read(browserControllerProvider).phase != BrowserPhase.ready) {
-      return;
-    }
-    ref.read(browserOpenUrlProvider.notifier).consume();
-    unawaited(_controller.open(url));
-  }
+  static String _urlOf(BrowserState state) => state is BrowserReady ? state.url : '';
+
+  static String? _noticeOf(BrowserState state) => state is BrowserReady ? state.notice : null;
 }
 
 class _AddressBar extends StatelessWidget {
@@ -284,12 +294,11 @@ class _Overlay extends StatelessWidget {
 class _StartPage extends StatelessWidget {
   const _StartPage({required this.settings});
 
-  final BrowserSettings? settings;
+  final BrowserSettings settings;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final BrowserSettings? current = settings;
     return _Overlay(
       child: SingleChildScrollView(
         padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
@@ -317,14 +326,14 @@ class _StartPage extends StatelessWidget {
               style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
             ),
             const SizedBox(height: AppSpacing.xl),
-            if (current != null && current.allowlistMode) ...<Widget>[
+            if (settings.allowlistMode) ...<Widget>[
               const NoticeBanner(
                 icon: Icons.checklist_rounded,
                 message: 'Aqui só abrem os sites que o seu responsável escolheu.',
               ),
               const SizedBox(height: AppSpacing.md),
             ],
-            if (current != null && current.safeSearch) ...<Widget>[
+            if (settings.safeSearch) ...<Widget>[
               const NoticeBanner(
                 tone: Tone.success,
                 icon: Icons.verified_user_outlined,
@@ -332,7 +341,7 @@ class _StartPage extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
             ],
-            if (current != null && current.logHistory)
+            if (settings.logHistory)
               const NoticeBanner(
                 tone: Tone.neutral,
                 icon: Icons.visibility_outlined,
@@ -433,7 +442,7 @@ class _NavigationBar extends StatelessWidget {
     required this.onReload,
   });
 
-  final BrowserState state;
+  final BrowserReady state;
   final VoidCallback onBack;
   final VoidCallback onForward;
   final VoidCallback onHome;
@@ -441,7 +450,7 @@ class _NavigationBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool hasPage = state.url.isNotEmpty;
+    final bool hasPage = state.hasPage;
     return BottomAppBar(
       height: 64,
       padding: const EdgeInsets.symmetric(horizontal: 8),

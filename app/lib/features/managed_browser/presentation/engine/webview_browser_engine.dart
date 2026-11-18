@@ -1,46 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/widgets.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
-/// Quem recebe os eventos do motor de paginas.
-abstract interface class BrowserEngineDelegate {
-  /// Decide se uma navegacao pode prosseguir. Devolve falso para impedir.
-  Future<bool> onNavigationRequest(String url, {required bool isMainFrame});
-
-  void onPageStarted(String url);
-
-  void onPageFinished(String url);
-
-  void onProgress(int progress);
-
-  void onUrlChanged(String url);
-
-  void onMainFrameError(String description);
-}
-
-/// Motor que carrega e mostra as paginas. Existe como interface para que os testes troquem o
-/// WebView real, que so funciona em um aparelho.
-abstract interface class BrowserEngine {
-  void attach(BrowserEngineDelegate delegate);
-
-  Widget buildView(BuildContext context);
-
-  Future<void> load(String url);
-
-  Future<void> reload();
-
-  Future<void> goBack();
-
-  Future<void> goForward();
-
-  Future<bool> canGoBack();
-
-  Future<bool> canGoForward();
-
-  Future<String?> title();
-}
+import 'browser_engine.dart';
 
 /// Motor sobre o WebView do sistema.
 class WebViewBrowserEngine implements BrowserEngine {
@@ -115,7 +78,3 @@ class WebViewBrowserEngine implements BrowserEngine {
   @override
   Future<String?> title() => _controller.getTitle();
 }
-
-final Provider<BrowserEngine> browserEngineProvider = Provider<BrowserEngine>(
-  (Ref ref) => WebViewBrowserEngine(),
-);
