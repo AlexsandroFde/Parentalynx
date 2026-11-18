@@ -21,14 +21,14 @@
         android:paddingBottom="28dp">
 
         <FrameLayout
-            android:layout_width="104dp"
-            android:layout_height="104dp"
+            android:layout_width="72dp"
+            android:layout_height="72dp"
             android:background="@drawable/bg_block_icon">
 
             <ImageView
                 android:id="@+id/block_icon"
-                android:layout_width="52dp"
-                android:layout_height="52dp"
+                android:layout_width="36dp"
+                android:layout_height="36dp"
                 android:layout_gravity="center"
                 android:contentDescription="@string/block_icon_description"
                 android:src="@drawable/ic_block_lock" />
@@ -40,11 +40,11 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="24dp"
             android:accessibilityHeading="true"
-            android:fontFamily="@font/manrope_extrabold"
+            android:fontFamily="@font/manrope_bold"
             android:gravity="center"
             android:letterSpacing="-0.02"
             android:textColor="@color/plx_on_dark"
-            android:textSize="28sp" />
+            android:textSize="26sp" />
 
         <TextView
             android:id="@+id/block_message"
@@ -55,7 +55,7 @@
             android:gravity="center"
             android:lineSpacingExtra="4dp"
             android:textColor="@color/plx_on_dark_muted"
-            android:textSize="17sp" />
+            android:textSize="16sp" />
 
         <TextView
             android:id="@+id/block_release"
@@ -65,13 +65,13 @@
             android:background="@drawable/bg_chip"
             android:fontFamily="@font/manrope_bold"
             android:gravity="center"
-            android:minHeight="40dp"
-            android:paddingStart="20dp"
-            android:paddingTop="8dp"
-            android:paddingEnd="20dp"
-            android:paddingBottom="8dp"
+            android:minHeight="36dp"
+            android:paddingStart="14dp"
+            android:paddingTop="6dp"
+            android:paddingEnd="14dp"
+            android:paddingBottom="6dp"
             android:textColor="@color/plx_on_dark"
-            android:textSize="15sp"
+            android:textSize="14sp"
             android:visibility="gone" />
 
         <LinearLayout
