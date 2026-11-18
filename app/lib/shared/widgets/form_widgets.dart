@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../app/theme/app_theme.dart';
+import '../theme/app_theme.dart';
 
 /// Campo de senha com botao para mostrar e ocultar o texto.
 class PasswordField extends StatefulWidget {

@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../../app/theme/app_theme.dart';
-import '../../../../../core/time/formatters.dart';
+import '../../core/time/formatters.dart';
+import '../theme/app_theme.dart';
 
 /// Abre o seletor de duracao em horas e minutos, com passo de 1 minuto. Devolve o total em
 /// minutos, ou nulo se a pessoa cancelar.

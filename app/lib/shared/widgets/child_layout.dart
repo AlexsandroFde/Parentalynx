@@ -1,13 +1,9 @@
-import 'dart:typed_data';
-
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../app/theme/app_theme.dart';
-import '../../../core/errors/app_failure.dart';
-import '../../../shared/widgets/feedback_views.dart';
-import '../agent/data/child_agent_repository.dart';
-import 'no_retry.dart';
+import '../theme/app_theme.dart';
+
+/// Estrutura visual comum das telas do modo crianca: a tela do codigo (aqui) e as telas do
+/// aparelho vinculado (`child_mode`), que reaproveitam estes componentes.
 
 /// Corpo padrao das telas do modo crianca: coluna rolavel, largura limitada em telas largas.
 ///
@@ -74,74 +70,6 @@ class ChildHeader extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-/// Etiqueta permanente de que o controle parental esta ativo neste aparelho.
-class ActiveControlPill extends StatelessWidget {
-  const ActiveControlPill({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const StatusPill(
-      label: 'Controle parental ativo',
-      tone: Tone.info,
-      icon: Icons.shield_outlined,
-    );
-  }
-}
-
-/// Icone de um app instalado, em PNG, buscado uma vez por sessao no lado nativo.
-final appIconProvider = FutureProvider.family<Uint8List?, String>((
-  Ref ref,
-  String packageName,
-) async {
-  try {
-    return await ref.watch(childAgentRepositoryProvider).appIcon(packageName);
-  } on AppFailure {
-    return null;
-  }
-}, retry: noRetry);
-
-/// Mostra o icone de um app, com um icone generico enquanto carrega ou quando nao ha.
-class NativeAppIcon extends ConsumerWidget {
-  const NativeAppIcon({required this.packageName, this.size = 40, super.key});
-
-  final String packageName;
-  final double size;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final Uint8List? bytes = ref.watch(appIconProvider(packageName)).value;
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final BorderRadius radius = BorderRadius.circular(size * 0.24);
-    if (bytes == null || bytes.isEmpty) {
-      return Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: radius),
-        child: Icon(Icons.apps_rounded, size: size * 0.56, color: scheme.onSurfaceVariant),
-      );
-    }
-    return ClipRRect(
-      borderRadius: radius,
-      child: Image.memory(
-        bytes,
-        width: size,
-        height: size,
-        fit: BoxFit.cover,
-        gaplessPlayback: true,
-        excludeFromSemantics: true,
-        errorBuilder: (BuildContext context, Object error, StackTrace? stack) {
-          return Container(
-            width: size,
-            height: size,
-            color: scheme.surfaceContainerHighest,
-            child: Icon(Icons.apps_rounded, size: size * 0.56, color: scheme.onSurfaceVariant),
-          );
-        },
-      ),
     );
   }
 }

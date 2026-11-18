@@ -1,13 +1,13 @@
 import 'dart:convert';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 
 /// Copiar e compartilhar textos e arquivos pelo sistema.
 ///
-/// Fica atras de uma interface para que as telas possam ser testadas sem a area de
-/// transferencia e sem a folha de compartilhamento do Android.
+/// E um servico de interface (area de transferencia e folha de compartilhamento), entregue as
+/// telas pela arvore de widgets (`RepositoryProvider`). Fica atras de uma interface para que
+/// as telas possam ser testadas sem o Android.
 abstract interface class ShareService {
   Future<void> copy(String text);
 
@@ -50,7 +50,3 @@ class SystemShareService implements ShareService {
     );
   }
 }
-
-final Provider<ShareService> shareServiceProvider = Provider<ShareService>(
-  (Ref ref) => const SystemShareService(),
-);

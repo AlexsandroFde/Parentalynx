@@ -1,8 +1,7 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../app/theme/app_theme.dart';
 import '../../core/errors/app_failure.dart';
+import '../theme/app_theme.dart';
 
 /// Tom visual de um aviso.
 enum Tone { neutral, info, success, warning, danger }
@@ -166,36 +165,6 @@ class EmptyState extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-/// Renderiza um [AsyncValue] com os estados padrao de carregamento e erro.
-///
-/// Durante uma atualizacao mantem o dado anterior na tela, para nao piscar.
-class AsyncValueView<T> extends StatelessWidget {
-  const AsyncValueView({
-    required this.value,
-    required this.data,
-    this.onRetry,
-    this.loadingMessage,
-    super.key,
-  });
-
-  final AsyncValue<T> value;
-  final Widget Function(T data) data;
-  final VoidCallback? onRetry;
-  final String? loadingMessage;
-
-  @override
-  Widget build(BuildContext context) {
-    final AsyncValue<T> current = value;
-    if (current.hasValue) {
-      return data(current.requireValue);
-    }
-    if (current.hasError) {
-      return FailureView(error: current.error!, onRetry: onRetry);
-    }
-    return LoadingView(message: loadingMessage);
   }
 }
 
