@@ -102,6 +102,7 @@ class AppModeBridge(private val g: AgentGraph, private val consumeAction: () -> 
 /** Armazenamento cifrado. As chaves do agente nativo ficam fora do alcance do Dart. */
 class SecureStorageBridge(private val g: AgentGraph) : SecureStorageApi {
     private fun check(key: String) {
+        BridgeValidation.storageKey(key)
         if (key.startsWith(SecureStore.AGENT_PREFIX)) {
             throw FlutterError("forbidden_key", "Chave reservada ao agente nativo.", null)
         }
@@ -300,7 +301,8 @@ class ChildAgentBridge(private val g: AgentGraph) : ChildAgentApi {
             NativeAppInfo(packageName = it.appId, label = it.label, category = it.category, system = it.system, essential = it.essential)
         }
 
-    override fun getAppIcon(packageName: String): ByteArray? = g.icons.pngFor(packageName)
+    override fun getAppIcon(packageName: String): ByteArray? =
+        g.icons.pngFor(BridgeValidation.packageName(packageName))
 
     override suspend fun syncNow(): SyncOutcome {
         val result = withContext(Dispatchers.IO) { g.syncManager.syncBlocking("manual") }
@@ -308,7 +310,7 @@ class ChildAgentBridge(private val g: AgentGraph) : ChildAgentApi {
     }
 
     override fun submitTimeRequest(minutes: Long?, message: String?): String =
-        g.childOps.submitTimeRequest(minutes?.toInt(), message)
+        g.childOps.submitTimeRequest(BridgeValidation.requestMinutes(minutes), message)
 
     override fun getTimeRequests(): List<TimeRequestInfo> =
         g.timeRequests.recent(MAX_TIME_REQUESTS).map {
@@ -330,7 +332,10 @@ class ChildAgentBridge(private val g: AgentGraph) : ChildAgentApi {
 
     override fun isAdminAuthValid(): Boolean = g.adminAuth.isValid()
 
-    override fun grantLocalOverride(minutes: Long) = guarded { g.childOps.grantLocalOverride(minutes.toInt()) }
+    override fun grantLocalOverride(minutes: Long) {
+        val valid = BridgeValidation.overrideMinutes(minutes)
+        guarded { g.childOps.grantLocalOverride(valid) }
+    }
 
     override fun clearLocalOverride() = g.childOps.clearLocalOverride()
 
@@ -339,7 +344,8 @@ class ChildAgentBridge(private val g: AgentGraph) : ChildAgentApi {
 
     override fun openManagedBrowser(url: String?) = g.childOps.openManagedBrowser(url)
 
-    override fun launchApp(packageName: String): Boolean = g.childOps.launchApp(packageName)
+    override fun launchApp(packageName: String): Boolean =
+        g.childOps.launchApp(BridgeValidation.packageName(packageName))
 
     private companion object {
         const val MAX_TIME_REQUESTS = 20
