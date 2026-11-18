@@ -1,74 +1,45 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
+import '../../../../core/bloc/action_status.dart';
 import '../../../../core/time/formatters.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../auth/presentation/elevation.dart';
-import '../domain/time_request.dart';
-import 'time_requests_controller.dart';
+import '../../domain/entities/time_request.dart';
+import '../bloc/time_requests/time_requests_bloc.dart';
 
 /// Pedidos de tempo adicional: responder os pendentes e consultar os ja respondidos.
-class TimeRequestsPage extends ConsumerStatefulWidget {
+///
+/// Espera um [TimeRequestsBloc] acima na arvore, ja iniciado.
+class TimeRequestsPage extends StatelessWidget {
   const TimeRequestsPage({super.key});
 
-  @override
-  ConsumerState<TimeRequestsPage> createState() => _TimeRequestsPageState();
-}
-
-class _TimeRequestsPageState extends ConsumerState<TimeRequestsPage> {
-  /// Pedido com resposta em andamento, para desabilitar os botoes dele.
-  String? _resolving;
-
-  Future<void> _approve(TimeRequest request) async {
+  Future<void> _approve(BuildContext context, TimeRequest request) async {
+    final TimeRequestsBloc bloc = context.read<TimeRequestsBloc>();
     final int? minutes = await showModalBottomSheet<int>(
       context: context,
       isScrollControlled: true,
       useSafeArea: true,
       builder: (BuildContext context) => _GrantSheet(request: request),
     );
-    if (minutes == null || !mounted) {
-      return;
+    if (minutes != null) {
+      bloc.add(TimeRequestApproved(request: request, minutes: minutes));
     }
-    await _resolve(
-      request,
-      approve: true,
-      minutes: minutes,
-      success: '${formatMinutes(minutes)} a mais para ${_who(request)}.',
-    );
   }
 
-  Future<void> _deny(TimeRequest request) async {
+  Future<void> _deny(BuildContext context, TimeRequest request) async {
+    final TimeRequestsBloc bloc = context.read<TimeRequestsBloc>();
     final bool confirmed = await confirmAction(
       context,
       title: 'Negar o pedido?',
       message: '${_who(request)} será avisado de que o pedido de mais tempo foi negado.',
       confirmLabel: 'Negar',
     );
-    if (!confirmed || !mounted) {
-      return;
-    }
-    await _resolve(request, approve: false, success: 'Pedido negado.');
-  }
-
-  Future<void> _resolve(
-    TimeRequest request, {
-    required bool approve,
-    required String success,
-    int? minutes,
-  }) async {
-    setState(() => _resolving = request.id);
-    await guardedAction<TimeRequest>(
-      context,
-      ref,
-      () => ref
-          .read(timeRequestsProvider.notifier)
-          .resolve(request.id, approve: approve, minutes: minutes),
-      successMessage: success,
-    );
-    if (mounted) {
-      setState(() => _resolving = null);
+    if (confirmed) {
+      bloc.add(TimeRequestDenied(request));
     }
   }
 
@@ -76,26 +47,48 @@ class _TimeRequestsPageState extends ConsumerState<TimeRequestsPage> {
     return request.childName.isEmpty ? 'A criança' : request.childName;
   }
 
+  Future<void> _refresh(BuildContext context) {
+    final Completer<void> done = Completer<void>();
+    context.read<TimeRequestsBloc>().add(TimeRequestsRefreshRequested(completer: done));
+    return done.future;
+  }
+
+  void _onAction(BuildContext context, TimeRequestsState state) {
+    if (state is! TimeRequestsLoaded) {
+      return;
+    }
+    switch (state.action) {
+      case ActionSucceeded(:final String? message):
+        if (message != null) {
+          showAppSnackBar(context, message, tone: Tone.success);
+        }
+      case ActionFailed(:final failure):
+        showFailure(context, failure);
+      case ActionIdle() || ActionRunning():
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final AsyncValue<List<TimeRequest>> requests = ref.watch(timeRequestsProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('Pedidos de tempo')),
       body: RefreshIndicator(
-        onRefresh: () => ref.read(timeRequestsProvider.notifier).refresh(),
-        child: AsyncValueView<List<TimeRequest>>(
-          value: requests,
-          onRetry: () => ref.invalidate(timeRequestsProvider),
-          data: (List<TimeRequest> all) {
-            final List<TimeRequest> pending = all
-                .where((TimeRequest request) => request.isPending)
-                .toList();
-            final List<TimeRequest> resolved = all
-                .where((TimeRequest request) => !request.isPending)
-                .take(30)
-                .toList();
-            if (all.isEmpty) {
-              return ListView(
+        onRefresh: () => _refresh(context),
+        child: BlocConsumer<TimeRequestsBloc, TimeRequestsState>(
+          listenWhen: (TimeRequestsState previous, TimeRequestsState current) {
+            return current is TimeRequestsLoaded &&
+                (previous is! TimeRequestsLoaded || previous.action != current.action);
+          },
+          listener: _onAction,
+          builder: (BuildContext context, TimeRequestsState state) {
+            return switch (state) {
+              TimeRequestsLoading() => const LoadingView(),
+              TimeRequestsError(:final failure) => FailureView(
+                error: failure,
+                onRetry: () => context.read<TimeRequestsBloc>().add(const TimeRequestsStarted()),
+              ),
+              TimeRequestsEmpty() => ListView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 children: const <Widget>[
                   SizedBox(
@@ -109,49 +102,66 @@ class _TimeRequestsPageState extends ConsumerState<TimeRequestsPage> {
                     ),
                   ),
                 ],
-              );
-            }
-            return PageBody(
-              children: <Widget>[
-                Text('Aguardando resposta', style: Theme.of(context).textTheme.titleMedium),
-                const SizedBox(height: AppSpacing.md),
-                if (pending.isEmpty)
-                  const NoticeBanner(
-                    tone: Tone.success,
-                    message: 'Nenhum pedido aguardando resposta.',
-                  )
-                else
-                  for (final TimeRequest request in pending) ...<Widget>[
-                    _PendingRequestCard(
-                      request: request,
-                      busy: _resolving == request.id,
-                      enabled: _resolving == null,
-                      onApprove: () => _approve(request),
-                      onDeny: () => _deny(request),
-                    ),
-                    const SizedBox(height: AppSpacing.md),
-                  ],
-                if (resolved.isNotEmpty) ...<Widget>[
-                  const SizedBox(height: AppSpacing.lg),
-                  Text('Respondidos', style: Theme.of(context).textTheme.titleMedium),
-                  const SizedBox(height: AppSpacing.md),
-                  Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: Column(
-                      children: <Widget>[
-                        for (int index = 0; index < resolved.length; index++) ...<Widget>[
-                          if (index > 0) const Divider(height: 1),
-                          _ResolvedRequestTile(request: resolved[index]),
-                        ],
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            );
+              ),
+              TimeRequestsLoaded() => _Requests(
+                state: state,
+                onApprove: (TimeRequest request) => _approve(context, request),
+                onDeny: (TimeRequest request) => _deny(context, request),
+              ),
+            };
           },
         ),
       ),
+    );
+  }
+}
+
+class _Requests extends StatelessWidget {
+  const _Requests({required this.state, required this.onApprove, required this.onDeny});
+
+  final TimeRequestsLoaded state;
+  final ValueChanged<TimeRequest> onApprove;
+  final ValueChanged<TimeRequest> onDeny;
+
+  @override
+  Widget build(BuildContext context) {
+    final List<TimeRequest> pending = state.pending;
+    final List<TimeRequest> resolved = state.resolved;
+    final String? resolving = state.resolvingId;
+    return PageBody(
+      children: <Widget>[
+        Text('Aguardando resposta', style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpacing.md),
+        if (pending.isEmpty)
+          const NoticeBanner(tone: Tone.success, message: 'Nenhum pedido aguardando resposta.')
+        else
+          for (final TimeRequest request in pending) ...<Widget>[
+            _PendingRequestCard(
+              request: request,
+              busy: resolving == request.id,
+              enabled: resolving == null,
+              onApprove: () => onApprove(request),
+              onDeny: () => onDeny(request),
+            ),
+            const SizedBox(height: AppSpacing.md),
+          ],
+        if (resolved.isNotEmpty) ...<Widget>[
+          const SizedBox(height: AppSpacing.lg),
+          Text('Respondidos', style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.md),
+          Card(
+            clipBehavior: Clip.antiAlias,
+            child: Column(
+              children: <Widget>[
+                for (int index = 0; index < resolved.length; index++) ...<Widget>[
+                  if (index > 0) const Divider(height: 1),
+                  _ResolvedRequestTile(request: resolved[index]),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -299,14 +309,7 @@ class _GrantSheet extends StatefulWidget {
 class _GrantSheetState extends State<_GrantSheet> {
   static const List<int> _options = <int>[15, 30, 45, 60, 90, 120];
 
-  late int _minutes;
-
-  @override
-  void initState() {
-    super.initState();
-    final int? requested = widget.request.minutes;
-    _minutes = requested != null && requested >= 1 && requested <= 720 ? requested : 30;
-  }
+  late int _minutes = widget.request.suggestedGrantMinutes;
 
   @override
   Widget build(BuildContext context) {

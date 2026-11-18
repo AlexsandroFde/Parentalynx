@@ -1,39 +1,43 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../../../core/time/formatters.dart';
-import '../../../../shared/domain/policy.dart';
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/duration_picker.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import 'widgets/duration_picker.dart';
-import 'widgets/rule_scaffold.dart';
-
-/// Opcoes de aviso para a crianca, em minutos restantes.
-const List<int> _warningOptions = <int>[30, 15, 10, 5, 1];
+import '../../../child_device/domain/entities/child_device.dart';
+import '../../../device_policy/domain/entities/policy.dart';
+import '../../../device_policy/presentation/widgets/rule_editor_scaffold.dart';
+import '../../domain/services/daily_limit_editing.dart';
+import '../bloc/screen_time/screen_time_bloc.dart';
 
 /// Limite diario de uso: valor exato em horas e minutos, por dia da semana, horario de
 /// reinicio da contagem e avisos.
+///
+/// Espera um [ScreenTimeBloc] acima na arvore, ja iniciado para [device].
 class DailyLimitPage extends StatelessWidget {
-  const DailyLimitPage({super.key});
+  const DailyLimitPage({required this.device, super.key});
+
+  final ChildDevice device;
 
   @override
   Widget build(BuildContext context) {
-    return RuleEditorScaffold(
+    final ScreenTimeBloc bloc = context.read<ScreenTimeBloc>();
+    return RuleEditorScaffold<ScreenTimeBloc, DailyLimit>(
       title: 'Limite diário',
-      children: (BuildContext context, RuleEditing editing) {
-        final DailyLimit limit = editing.draft.dailyLimit;
-
-        void change(DailyLimit Function(DailyLimit current) update) {
-          editing.update((Policy policy) => policy.copyWith(dailyLimit: update(policy.dailyLimit)));
-        }
-
+      device: device,
+      onSave: () => bloc.add(const ScreenTimeSaveRequested()),
+      onDiscard: () => bloc.add(const ScreenTimeDiscardRequested()),
+      onRetry: () => bloc.add(ScreenTimeStarted(device.id)),
+      children: (BuildContext context, DailyLimit limit) {
         return <Widget>[
           SwitchCard(
             icon: Icons.timer_outlined,
             title: 'Limitar o tempo de uso por dia',
             subtitle: 'Quando o tempo acaba, só as exceções continuam disponíveis.',
             value: limit.enabled,
-            onChanged: (bool value) => change((DailyLimit d) => d.copyWith(enabled: value)),
+            onChanged: (bool value) => bloc.add(DailyLimitEnabledChanged(value)),
           ),
           const SizedBox(height: AppSpacing.md),
           if (!limit.enabled)
@@ -43,11 +47,11 @@ class DailyLimitPage extends StatelessWidget {
                   'os períodos de bloqueio e os apps bloqueados continuam valendo.',
             )
           else ...<Widget>[
-            _AmountCard(limit: limit, onChanged: change),
+            _AmountCard(limit: limit, bloc: bloc),
             const SizedBox(height: AppSpacing.md),
-            _ResetCard(limit: limit, onChanged: change),
+            _ResetCard(limit: limit, bloc: bloc),
             const SizedBox(height: AppSpacing.md),
-            _WarningsCard(limit: limit, onChanged: change),
+            _WarningsCard(limit: limit, bloc: bloc),
           ],
         ];
       },
@@ -55,13 +59,11 @@ class DailyLimitPage extends StatelessWidget {
   }
 }
 
-typedef _LimitChange = void Function(DailyLimit Function(DailyLimit current) update);
-
 class _AmountCard extends StatelessWidget {
-  const _AmountCard({required this.limit, required this.onChanged});
+  const _AmountCard({required this.limit, required this.bloc});
 
   final DailyLimit limit;
-  final _LimitChange onChanged;
+  final ScreenTimeBloc bloc;
 
   Future<void> _pickDefault(BuildContext context) async {
     final int? minutes = await showDurationPicker(
@@ -71,7 +73,7 @@ class _AmountCard extends StatelessWidget {
       initialMinutes: limit.minutes,
     );
     if (minutes != null) {
-      onChanged((DailyLimit d) => d.copyWith(minutes: minutes));
+      bloc.add(DailyLimitMinutesChanged(minutes));
     }
   }
 
@@ -82,21 +84,8 @@ class _AmountCard extends StatelessWidget {
       initialMinutes: limit.minutesFor(day),
     );
     if (minutes != null) {
-      onChanged(
-        (DailyLimit d) => d.copyWith(perWeekday: <int, int>{...d.perWeekday, day: minutes}),
-      );
+      bloc.add(DailyLimitWeekdayMinutesChanged(weekday: day, minutes: minutes));
     }
-  }
-
-  void _togglePerWeekday(bool value) {
-    onChanged((DailyLimit d) {
-      if (!value) {
-        return d.copyWith(perWeekday: const <int, int>{});
-      }
-      return d.copyWith(
-        perWeekday: <int, int>{for (int day = 1; day <= 7; day++) day: d.minutesFor(day)},
-      );
-    });
   }
 
   @override
@@ -140,7 +129,7 @@ class _AmountCard extends StatelessWidget {
             title: 'Limite diferente por dia da semana',
             subtitle: 'Por exemplo, mais tempo no sábado e no domingo.',
             value: perWeekday,
-            onChanged: _togglePerWeekday,
+            onChanged: (bool value) => bloc.add(DailyLimitPerWeekdayToggled(value)),
           ),
           if (perWeekday) ...<Widget>[
             const Divider(),
@@ -193,10 +182,10 @@ class _WeekdayRow extends StatelessWidget {
 }
 
 class _ResetCard extends StatelessWidget {
-  const _ResetCard({required this.limit, required this.onChanged});
+  const _ResetCard({required this.limit, required this.bloc});
 
   final DailyLimit limit;
-  final _LimitChange onChanged;
+  final ScreenTimeBloc bloc;
 
   Future<void> _pick(BuildContext context) async {
     final ({int hour, int minute})? picked = await pickTimeOfDay(
@@ -206,7 +195,7 @@ class _ResetCard extends StatelessWidget {
       helpText: 'Reinício da contagem',
     );
     if (picked != null) {
-      onChanged((DailyLimit d) => d.copyWith(resetTime: LocalTime(picked.hour, picked.minute)));
+      bloc.add(DailyLimitResetTimeChanged(LocalTime(picked.hour, picked.minute)));
     }
   }
 
@@ -244,28 +233,14 @@ class _ResetCard extends StatelessWidget {
 }
 
 class _WarningsCard extends StatelessWidget {
-  const _WarningsCard({required this.limit, required this.onChanged});
+  const _WarningsCard({required this.limit, required this.bloc});
 
   final DailyLimit limit;
-  final _LimitChange onChanged;
-
-  void _toggle(int minutes, bool selected) {
-    onChanged((DailyLimit d) {
-      final Set<int> next = <int>{...d.warnAtMinutes};
-      if (selected) {
-        next.add(minutes);
-      } else {
-        next.remove(minutes);
-      }
-      final List<int> sorted = next.toList()..sort((int a, int b) => b.compareTo(a));
-      return d.copyWith(warnAtMinutes: sorted);
-    });
-  }
+  final ScreenTimeBloc bloc;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final bool full = limit.warnAtMinutes.length >= 4;
     return SectionCard(
       title: 'Avisos para a criança',
       subtitle: 'O aparelho avisa quando faltar este tempo para o limite.',
@@ -276,13 +251,15 @@ class _WarningsCard extends StatelessWidget {
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.xs,
             children: <Widget>[
-              for (final int option in _warningOptions)
+              for (final int option in DailyLimitWarnings.options)
                 FilterChip(
                   label: Text(formatMinutes(option)),
                   selected: limit.warnAtMinutes.contains(option),
-                  onSelected: full && !limit.warnAtMinutes.contains(option)
-                      ? null
-                      : (bool selected) => _toggle(option, selected),
+                  onSelected: limit.canEnableWarning(option)
+                      ? (bool selected) {
+                          bloc.add(DailyLimitWarningToggled(minutes: option, enabled: selected));
+                        }
+                      : null,
                 ),
             ],
           ),
