@@ -2,14 +2,15 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../foundations/ds_context.dart';
 import '../../foundations/tone.dart';
-import '../../tokens/radius.dart';
 import '../../tokens/sizes.dart';
 import '../../tokens/spacing.dart';
 
-/// Etiqueta curta de estado ("Online", "Bloqueado", "Aguardando resposta").
+/// Indicador curto de estado ("Online", "Bloqueado", "Aguardando resposta"): um marcador na cor
+/// do tom e o texto, sem caixa em volta.
 ///
-/// Sempre com texto e icone, nunca so cor. Por padrao usa o icone do tom; passe [icon] para
-/// um mais especifico, ou [showIcon] falso quando a etiqueta ja esta ao lado de um icone.
+/// Sempre com texto, nunca so cor. Por padrao o marcador e um ponto; passe [icon] quando um
+/// icone especifico ajuda a reconhecer o estado (bateria, conexao), ou [showIcon] falso quando
+/// o indicador ja esta ao lado de um icone.
 class StatusBadge extends StatelessWidget {
   const StatusBadge({
     required this.label,
@@ -26,28 +27,25 @@ class StatusBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Color foreground = tone.foreground(context);
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm + 2, vertical: AppSpacing.xs),
-      decoration: BoxDecoration(
-        color: tone.background(context),
-        borderRadius: BorderRadius.circular(AppRadius.pill),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (showIcon) ...<Widget>[
-            Icon(icon ?? tone.icon, size: AppSizes.iconSm, color: foreground),
-            const SizedBox(width: AppSpacing.xs + 1),
-          ],
-          Flexible(
-            child: Text(
-              label,
-              style: context.text.labelMedium?.copyWith(color: tone.onBackground(context)),
+    final Color color = tone.foreground(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        if (showIcon) ...<Widget>[
+          if (icon != null)
+            Icon(icon, size: AppSizes.iconSm, color: color)
+          else
+            Container(
+              width: AppSizes.statusDot,
+              height: AppSizes.statusDot,
+              decoration: BoxDecoration(color: color, shape: BoxShape.circle),
             ),
-          ),
+          SizedBox(width: icon != null ? AppSpacing.xs + AppSpacing.xxs : AppSpacing.sm),
         ],
-      ),
+        Flexible(
+          child: Text(label, style: context.text.labelMedium?.copyWith(color: color)),
+        ),
+      ],
     );
   }
 }

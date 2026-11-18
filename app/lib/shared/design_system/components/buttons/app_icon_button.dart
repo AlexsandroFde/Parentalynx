@@ -1,5 +1,9 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../foundations/ds_context.dart';
+
+/// Peso do botao de icone: [standard] sem fundo, [tonal] contornado (acao de apoio ao lado de
+/// um conteudo) e [filled] na cor de acao.
 enum AppIconButtonVariant { standard, tonal, filled }
 
 /// Botao so com icone. O [tooltip] e obrigatorio: e o nome que o leitor de tela anuncia e a
@@ -31,15 +35,24 @@ class AppIconButton extends StatelessWidget {
         color: color,
         onPressed: onPressed,
       ),
-      AppIconButtonVariant.tonal => IconButton.filledTonal(
+      AppIconButtonVariant.tonal => IconButton.outlined(
         icon: Icon(icon),
         tooltip: tooltip,
         onPressed: onPressed,
+        style: IconButton.styleFrom(
+          foregroundColor: context.colors.textPrimary,
+          backgroundColor: context.colors.surface,
+          side: BorderSide(color: context.colors.border),
+          shape: RoundedRectangleBorder(borderRadius: context.shapes.controlRadius),
+        ),
       ),
       AppIconButtonVariant.filled => IconButton.filled(
         icon: Icon(icon),
         tooltip: tooltip,
         onPressed: onPressed,
+        style: IconButton.styleFrom(
+          shape: RoundedRectangleBorder(borderRadius: context.shapes.controlRadius),
+        ),
       ),
     };
   }

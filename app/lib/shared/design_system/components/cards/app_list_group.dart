@@ -6,22 +6,19 @@ import '../../foundations/tone.dart';
 import '../../tokens/sizes.dart';
 import '../../tokens/spacing.dart';
 
-/// Lista agrupada: varias linhas em um unico painel, separadas por linhas finas.
+/// Lista agrupada: varias linhas em um unico painel com contorno fino, separadas por linhas
+/// finas de ponta a ponta.
 ///
-/// Substitui o "um cartao por item": menos bordas, mais conteudo visivel e uma leitura de
+/// Substitui o "um cartao por item": menos caixas, mais conteudo visivel e uma leitura de
 /// cima para baixo. [footer] explica o grupo (regras, consequencias) abaixo dele.
 class AppListGroup extends StatelessWidget {
-  const AppListGroup({
-    required this.children,
-    this.footer,
-    this.dividerIndent = AppSpacing.lg + AppSizes.iconTile + AppSpacing.md,
-    super.key,
-  });
+  const AppListGroup({required this.children, this.footer, this.dividerIndent = 0, super.key});
 
   final List<Widget> children;
   final String? footer;
 
-  /// Recuo do divisor: alinha com o texto das linhas que tem icone a esquerda.
+  /// Recuo do divisor a esquerda. Por padrao os divisores vao de ponta a ponta, o que funciona
+  /// com qualquer conteudo a esquerda das linhas (icone, icone de app, avatar ou nada).
   final double dividerIndent;
 
   @override
@@ -39,18 +36,16 @@ class AppListGroup extends StatelessWidget {
       children: <Widget>[
         Material(
           color: context.colors.surface,
-          borderRadius: context.shapes.containerRadius,
+          shape: RoundedRectangleBorder(
+            borderRadius: context.shapes.containerRadius,
+            side: BorderSide(color: context.colors.hairline, width: AppSizes.hairline),
+          ),
           clipBehavior: Clip.antiAlias,
           child: Column(mainAxisSize: MainAxisSize.min, children: rows),
         ),
         if (footer != null)
           Padding(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.xs,
-              AppSpacing.sm,
-              AppSpacing.xs,
-              AppSpacing.none,
-            ),
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
             child: Text(footer!, style: context.text.bodySmall),
           ),
       ],
@@ -111,7 +106,7 @@ class AppListRow extends StatelessWidget {
                   Text(
                     title,
                     style:
-                        titleStyle ?? context.text.bodyLarge?.copyWith(fontWeight: FontWeight.w700),
+                        titleStyle ?? context.text.bodyLarge?.copyWith(fontWeight: FontWeight.w500),
                   ),
                   if (subtitle != null)
                     Padding(
@@ -131,8 +126,12 @@ class AppListRow extends StatelessWidget {
             ),
             if (trailing != null) ...<Widget>[const SizedBox(width: AppSpacing.md), trailing!],
             if (chevron) ...<Widget>[
-              const SizedBox(width: AppSpacing.xs),
-              Icon(AppIcons.chevronRight, color: secondary, size: AppSizes.iconLg),
+              const SizedBox(width: AppSpacing.sm),
+              Icon(
+                AppIcons.chevronRight,
+                color: context.colors.textTertiary,
+                size: AppSizes.iconMd,
+              ),
             ],
           ],
         ),
@@ -146,17 +145,50 @@ class AppListRow extends StatelessWidget {
   }
 }
 
-/// Quadrado com icone usado a esquerda das linhas. O tom indica o significado (por exemplo,
-/// [Tone.rest] para horarios de descanso).
+/// Icone a esquerda das linhas, desenhado sem fundo. O tom indica o significado: atencao,
+/// erro e confirmacao ficam coloridos; os demais usam o cinza do texto de apoio
+/// ([ToneColors.iconColor]).
 class AppIconTile extends StatelessWidget {
   const AppIconTile({
     required this.icon,
     this.tone = Tone.info,
-    this.size = AppSizes.iconTile,
+    this.size = AppSizes.rowIcon,
     super.key,
   });
 
   final IconData icon;
+  final Tone tone;
+
+  /// Largura reservada para o icone. O desenho fica no tamanho padrao dos icones de linha.
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final double glyph = size <= AppSizes.rowIcon ? AppSizes.iconMd + AppSpacing.xxs : size * 0.55;
+    return ExcludeSemantics(
+      child: SizedBox.square(
+        dimension: size,
+        child: Center(
+          child: Icon(icon, size: glyph, color: tone.iconColor(context)),
+        ),
+      ),
+    );
+  }
+}
+
+/// Icone em destaque: um quadrado com contorno fino e o icone no centro. Fica no topo de
+/// estados vazios, dialogos e cabecalhos de telas curtas, nunca dentro de listas.
+class IconMedallion extends StatelessWidget {
+  const IconMedallion({
+    required this.icon,
+    this.tone = Tone.neutral,
+    this.size = AppSizes.medallion,
+    super.key,
+  });
+
+  final IconData icon;
+
+  /// Cor do icone ([ToneColors.foreground]). O fundo continua neutro.
   final Tone tone;
   final double size;
 
@@ -166,12 +198,13 @@ class AppIconTile extends StatelessWidget {
       child: Container(
         width: size,
         height: size,
-        decoration: BoxDecoration(
-          color: tone.background(context),
-          borderRadius: context.shapes.tileRadius,
-        ),
         alignment: Alignment.center,
-        child: Icon(icon, size: size * 0.52, color: tone.foreground(context)),
+        decoration: BoxDecoration(
+          color: context.colors.surface,
+          borderRadius: BorderRadius.circular(context.shapes.container),
+          border: Border.all(color: context.colors.border, width: AppSizes.hairline),
+        ),
+        child: Icon(icon, size: size * 0.46, color: tone.foreground(context)),
       ),
     );
   }

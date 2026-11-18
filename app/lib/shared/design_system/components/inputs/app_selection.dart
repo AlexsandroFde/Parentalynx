@@ -4,6 +4,10 @@ import 'package:material_ui/material_ui.dart';
 import '../../foundations/app_icons.dart';
 import '../../foundations/ds_context.dart';
 import '../../foundations/tone.dart';
+import '../../tokens/colors.dart';
+import '../../tokens/elevation.dart';
+import '../../tokens/motion.dart';
+import '../../tokens/sizes.dart';
 import '../../tokens/spacing.dart';
 import '../cards/app_list_group.dart';
 
@@ -59,7 +63,12 @@ class AppChoiceChips<T> extends StatelessWidget {
   }
 }
 
-/// Escolha unica entre poucas opcoes lado a lado (de 2 a 4).
+/// Escolha unica entre poucas opcoes lado a lado (de 2 a 4): um trilho neutro com a opcao
+/// escolhida destacada sobre ele.
+///
+/// Cada opcao ocupa a altura toda do trilho (48), entao a area de toque e completa mesmo com o
+/// destaque visual menor. O leitor de tela anuncia cada opcao como botao, com o estado
+/// "selecionado".
 class AppSegmentedControl<T> extends StatelessWidget {
   const AppSegmentedControl({
     required this.segments,
@@ -76,25 +85,116 @@ class AppSegmentedControl<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget control = SegmentedButton<T>(
-      segments: <ButtonSegment<T>>[
-        for (final AppChoice<T> segment in segments)
-          ButtonSegment<T>(
-            value: segment.value,
-            label: Text(segment.label, textAlign: TextAlign.center),
-            icon: segment.icon == null ? null : Icon(segment.icon),
-          ),
-      ],
-      selected: <T>{selected},
-      showSelectedIcon: false,
-      onSelectionChanged: onChanged == null
-          ? null
-          : (Set<T> values) {
-              HapticFeedback.selectionClick();
-              onChanged!(values.first);
-            },
+    final AppColors c = context.colors;
+    final bool dark = Theme.of(context).brightness == Brightness.dark;
+    final double radius = context.shapes.control;
+    final Widget control = Container(
+      decoration: BoxDecoration(
+        color: dark ? c.surfaceMuted : c.surfaceStrong,
+        borderRadius: BorderRadius.circular(radius),
+      ),
+      child: IntrinsicHeight(
+        child: Row(
+          mainAxisSize: expand ? MainAxisSize.max : MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            for (final AppChoice<T> segment in segments)
+              _wrap(
+                expand,
+                _Segment(
+                  label: segment.label,
+                  icon: segment.icon,
+                  selected: segment.value == selected,
+                  radius: radius,
+                  thumb: dark ? c.surfaceStrong : c.surface,
+                  onTap: onChanged == null
+                      ? null
+                      : () {
+                          if (segment.value == selected) {
+                            return;
+                          }
+                          HapticFeedback.selectionClick();
+                          onChanged!(segment.value);
+                        },
+                ),
+              ),
+          ],
+        ),
+      ),
     );
     return expand ? SizedBox(width: double.infinity, child: control) : control;
+  }
+
+  static Widget _wrap(bool expand, Widget child) => expand ? Expanded(child: child) : child;
+}
+
+class _Segment extends StatelessWidget {
+  const _Segment({
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.radius,
+    required this.thumb,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData? icon;
+  final bool selected;
+  final double radius;
+  final Color thumb;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final AppColors c = context.colors;
+    final Color foreground = selected ? c.textPrimary : c.textSecondary;
+    final TextStyle? style = context.text.titleSmall?.copyWith(color: foreground);
+    // O destaque fica 3 pontos para dentro do trilho; o toque vale na altura toda.
+    const double inset = AppSpacing.xxs + 1;
+    return Semantics(
+      container: true,
+      button: true,
+      selected: selected,
+      inMutuallyExclusiveGroup: true,
+      enabled: onTap != null,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(radius),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: AppSizes.minTapTarget),
+          child: Padding(
+            padding: const EdgeInsets.all(inset),
+            child: AnimatedContainer(
+              duration: AppMotion.resolve(context, AppMotion.fast),
+              curve: AppMotion.standard,
+              alignment: Alignment.center,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.md,
+                vertical: AppSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: selected ? thumb : Colors.transparent,
+                borderRadius: BorderRadius.circular(radius - inset),
+                boxShadow: selected ? AppElevation.raised(c) : AppElevation.none,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (icon != null) ...<Widget>[
+                    Icon(icon, size: AppSizes.iconSm, color: foreground),
+                    const SizedBox(width: AppSpacing.xs + AppSpacing.xxs),
+                  ],
+                  Flexible(
+                    child: Text(label, textAlign: TextAlign.center, style: style),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
   }
 }
 

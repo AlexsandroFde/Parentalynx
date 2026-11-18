@@ -5,7 +5,8 @@ import '../../tokens/motion.dart';
 import '../../tokens/radius.dart';
 import '../../tokens/sizes.dart';
 
-/// Barra fina de uso (por exemplo, minutos de cada app em relacao ao mais usado).
+/// Barra fina de uso (por exemplo, minutos de cada app em relacao ao mais usado), sobre um
+/// trilho neutro.
 ///
 /// Decorativa para o leitor de tela: a informacao vem do texto ao lado (o valor em minutos).
 class UsageBar extends StatelessWidget {

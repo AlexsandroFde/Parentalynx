@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../foundations/app_icons.dart';
 import '../../foundations/ds_context.dart';
+import '../../tokens/colors.dart';
 import '../../tokens/sizes.dart';
 import '../../tokens/spacing.dart';
 
@@ -53,7 +54,7 @@ class _Step extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final bool active = state != _StepState.upcoming;
+    final AppColors c = context.colors;
     final String status = switch (state) {
       _StepState.done => ', concluído',
       _StepState.current => ', passo atual',
@@ -65,21 +66,29 @@ class _Step extends StatelessWidget {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
+            // Marcador: concluido e preenchido com a cor de acao; o atual tem o contorno na
+            // cor de acao; os proximos, contorno neutro.
             ExcludeSemantics(
               child: Container(
-                width: AppSizes.iconXl,
-                height: AppSizes.iconXl,
+                width: AppSizes.iconLg + AppSpacing.xs,
+                height: AppSizes.iconLg + AppSpacing.xs,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: active ? context.colors.primary : context.colors.surfaceMuted,
+                  color: state == _StepState.done ? c.primary : c.surface,
+                  border: Border.all(
+                    color: state == _StepState.upcoming ? c.border : c.primary,
+                    width: state == _StepState.current ? AppSizes.focusRing : AppSizes.hairline,
+                  ),
                 ),
                 child: state == _StepState.done
-                    ? Icon(AppIcons.check, size: AppSizes.iconSm, color: context.colors.onPrimary)
+                    ? Icon(AppIcons.check, size: AppSizes.iconSm, color: c.onPrimary)
                     : Text(
                         '$number',
-                        style: context.text.labelLarge?.copyWith(
-                          color: active ? context.colors.onPrimary : context.colors.textPrimary,
+                        textScaler: TextScaler.noScaling,
+                        style: context.text.labelMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: state == _StepState.current ? c.primary : c.textSecondary,
                         ),
                       ),
               ),
@@ -87,7 +96,7 @@ class _Step extends StatelessWidget {
             const SizedBox(width: AppSpacing.md),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.only(top: AppSpacing.xs),
+                padding: const EdgeInsets.only(top: AppSpacing.xxs),
                 child: Text(text, style: context.text.bodyLarge),
               ),
             ),

@@ -28,8 +28,8 @@ class LoadingState extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               const SizedBox.square(
-                dimension: AppSizes.iconXl - 4,
-                child: CircularProgressIndicator(strokeWidth: 3),
+                dimension: AppSizes.iconLg,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
               ),
               if (message != null) ...<Widget>[
                 const SizedBox(height: AppSpacing.lg),
@@ -129,6 +129,7 @@ class SkeletonListGroup extends StatelessWidget {
         decoration: BoxDecoration(
           color: context.colors.surface,
           borderRadius: context.shapes.containerRadius,
+          border: Border.all(color: context.colors.hairline, width: AppSizes.hairline),
         ),
         child: Column(
           children: <Widget>[
@@ -138,8 +139,8 @@ class SkeletonListGroup extends StatelessWidget {
                 child: Row(
                   children: <Widget>[
                     SkeletonBox(
-                      width: AppSizes.iconTile,
-                      height: AppSizes.iconTile,
+                      width: AppSizes.rowIcon,
+                      height: AppSizes.rowIcon,
                       radius: context.shapes.tile,
                     ),
                     const SizedBox(width: AppSpacing.md),
@@ -183,6 +184,7 @@ class SkeletonPanel extends StatelessWidget {
         decoration: BoxDecoration(
           color: context.colors.surface,
           borderRadius: context.shapes.containerRadius,
+          border: Border.all(color: context.colors.hairline, width: AppSizes.hairline),
         ),
         padding: AppSpacing.panel,
         child: const Column(

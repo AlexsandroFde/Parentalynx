@@ -2,7 +2,6 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../foundations/ds_context.dart';
 import '../../foundations/tone.dart';
-import '../../tokens/sizes.dart';
 import '../../tokens/spacing.dart';
 
 /// Valor numerico com rotulo ("1h 10min" / "Usado hoje"). Algarismos de largura fixa, para o
@@ -66,7 +65,7 @@ class MetricTile extends StatelessWidget {
   }
 }
 
-/// Linha de metricas lado a lado, separadas por linhas finas.
+/// Linha de metricas lado a lado, separadas por espaco.
 class MetricRow extends StatelessWidget {
   const MetricRow({required this.metrics, super.key});
 
@@ -77,18 +76,10 @@ class MetricRow extends StatelessWidget {
     final List<Widget> children = <Widget>[];
     for (int i = 0; i < metrics.length; i++) {
       if (i > 0) {
-        children.add(
-          Container(
-            width: AppSizes.hairline,
-            margin: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
-            color: context.colors.hairline,
-          ),
-        );
+        children.add(const SizedBox(width: AppSpacing.lg));
       }
       children.add(Expanded(child: metrics[i]));
     }
-    return IntrinsicHeight(
-      child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: children),
-    );
+    return Row(crossAxisAlignment: CrossAxisAlignment.start, children: children);
   }
 }

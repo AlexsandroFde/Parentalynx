@@ -7,7 +7,8 @@ import '../../tokens/spacing.dart';
 ///
 /// Diz onde a pessoa esta e sobre o que (por exemplo, "Regras de Joao" com o aparelho logo
 /// abaixo), para nao depender da memoria de telas anteriores. [eyebrow] e um rotulo curto
-/// acima do titulo; [trailing] fica alinhado a direita (um avatar, uma acao).
+/// acima do titulo, em caixa normal ("Hoje", "Passo 1 de 3"); [trailing] fica alinhado a
+/// direita (um avatar, uma acao).
 class AppPageHeader extends StatelessWidget {
   const AppPageHeader({
     required this.title,
@@ -36,8 +37,8 @@ class AppPageHeader extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 if (eyebrow != null) ...<Widget>[
-                  Text(eyebrow!.toUpperCase(), style: context.textStyles.eyebrow),
-                  const SizedBox(height: AppSpacing.xs),
+                  Text(eyebrow!, style: context.textStyles.eyebrow),
+                  const SizedBox(height: AppSpacing.xxs),
                 ],
                 Semantics(header: true, child: Text(title, style: context.text.headlineMedium)),
                 if (subtitle != null) ...<Widget>[

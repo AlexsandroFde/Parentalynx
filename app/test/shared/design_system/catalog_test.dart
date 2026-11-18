@@ -97,7 +97,11 @@ class _FoundationsPage extends StatelessWidget {
         width: 108,
         height: 64,
         padding: const EdgeInsets.all(AppSpacing.sm),
-        decoration: BoxDecoration(color: color, borderRadius: context.shapes.controlRadius),
+        decoration: BoxDecoration(
+          color: color,
+          borderRadius: context.shapes.controlRadius,
+          border: Border.all(color: c.hairline),
+        ),
         alignment: Alignment.bottomLeft,
         child: Text(name, style: context.text.labelMedium?.copyWith(color: on)),
       );
@@ -108,7 +112,7 @@ class _FoundationsPage extends StatelessWidget {
       children: <Widget>[
         const Row(children: <Widget>[BrandLockup(markSize: 48), Spacer(), BrandMark(size: 32)]),
         const SectionGap(),
-        Text('APARELHO DE JOÃO', style: context.textStyles.eyebrow),
+        Text('Aparelho de João', style: context.textStyles.eyebrow),
         Text('Regras de João', style: context.text.headlineMedium),
         Text('Tempo de hoje', style: context.text.titleLarge),
         Text('Mais usados hoje', style: context.text.titleMedium),
@@ -131,15 +135,24 @@ class _FoundationsPage extends StatelessWidget {
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.sm,
           children: <Widget>[
-            swatch('Marca', c.primary, c.onPrimary),
-            swatch('Destaque', c.primaryContainer, c.onPrimaryContainer),
+            swatch('Ação', c.primary, c.onPrimary),
             swatch('Fundo', c.canvas, c.textPrimary),
             swatch('Superfície', c.surface, c.textPrimary),
             swatch('Apoio', c.surfaceMuted, c.textPrimary),
-            swatch('Permitido', c.successContainer, c.onSuccessContainer),
-            swatch('Atenção', c.warningContainer, c.onWarningContainer),
-            swatch('Erro', c.dangerContainer, c.onDangerContainer),
-            swatch('Descanso', c.restContainer, c.onRestContainer),
+            swatch('Texto', c.textPrimary, c.surface),
+            swatch('Texto de apoio', c.textSecondary, c.surface),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        const Wrap(
+          spacing: AppSpacing.lg,
+          runSpacing: AppSpacing.sm,
+          children: <Widget>[
+            StatusBadge(label: 'Permitido', tone: Tone.success),
+            StatusBadge(label: 'Atenção', tone: Tone.warning),
+            StatusBadge(label: 'Erro', tone: Tone.danger),
+            StatusBadge(label: 'Descanso', tone: Tone.rest),
+            StatusBadge(label: 'Informação', tone: Tone.info),
           ],
         ),
         const SectionGap(),
@@ -159,6 +172,17 @@ class _FoundationsPage extends StatelessWidget {
             Icon(AppIcons.sync),
             Icon(AppIcons.extraTime),
             Icon(AppIcons.alerts),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.lg),
+        const Wrap(
+          spacing: AppSpacing.md,
+          runSpacing: AppSpacing.md,
+          children: <Widget>[
+            IconMedallion(icon: AppIcons.devices),
+            IconMedallion(icon: AppIcons.link, tone: Tone.info),
+            IconMedallion(icon: AppIcons.check, tone: Tone.success),
+            IconMedallion(icon: AppIcons.unlink, tone: Tone.danger),
           ],
         ),
       ],
@@ -493,7 +517,7 @@ class _ChildPage extends StatelessWidget {
                   TimeRing(
                     progress: 0.47,
                     size: 220,
-                    strokeWidth: 16,
+                    strokeWidth: AppSpacing.md,
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: <Widget>[

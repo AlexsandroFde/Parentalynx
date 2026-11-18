@@ -1,7 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../foundations/ds_context.dart';
-import '../../tokens/elevation.dart';
 import '../../tokens/sizes.dart';
 import '../../tokens/spacing.dart';
 
@@ -20,7 +19,6 @@ class StickyActionBar extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: context.colors.surface,
-        boxShadow: AppElevation.raised(context.colors),
         border: Border(
           top: BorderSide(color: context.colors.hairline, width: AppSizes.hairline),
         ),

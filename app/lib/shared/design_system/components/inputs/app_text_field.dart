@@ -2,12 +2,14 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../foundations/ds_context.dart';
+import '../../tokens/spacing.dart';
 
 /// Campo de texto do Design System.
 ///
-/// O rotulo fica sempre visivel acima do texto digitado (nunca some ao comecar a digitar),
-/// [isRequired] marca o campo como obrigatorio (com asterisco na tela e "obrigatorio" no
-/// leitor de tela) e [hint]/[helper] mostram o formato esperado antes do erro acontecer.
+/// O rotulo fica acima do contorno, sempre visivel (nunca some ao comecar a digitar), e o
+/// leitor de tela o anuncia como o nome do campo. [isRequired] marca o campo como obrigatorio
+/// (com asterisco na tela e "obrigatorio" no leitor de tela) e [hint]/[helper] mostram o
+/// formato esperado antes do erro acontecer.
 class AppTextField extends StatelessWidget {
   const AppTextField({
     required this.label,
@@ -76,9 +78,9 @@ class AppTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget labelWidget = Semantics(
-      label: isRequired ? '$label, obrigatório' : label,
-      child: ExcludeSemantics(
+    final Widget labelWidget = ExcludeSemantics(
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: AppSpacing.xs + AppSpacing.xxs),
         child: Text.rich(
           TextSpan(
             text: label,
@@ -90,10 +92,14 @@ class AppTextField extends StatelessWidget {
                 ),
             ],
           ),
+          style: context.text.labelMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+            color: enabled ? context.colors.textPrimary : context.colors.textSecondary,
+          ),
         ),
       ),
     );
-    return TextField(
+    final Widget field = TextField(
       controller: controller,
       focusNode: focusNode,
       enabled: enabled,
@@ -116,14 +122,21 @@ class AppTextField extends StatelessWidget {
       textAlign: textAlign,
       style: style,
       decoration: InputDecoration(
-        label: labelWidget,
-        floatingLabelBehavior: FloatingLabelBehavior.always,
         hintText: hint,
         helperText: helper,
         errorText: errorText,
         prefixIcon: prefixIcon == null ? null : Icon(prefixIcon),
         suffixIcon: suffix,
       ),
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        labelWidget,
+        // O nome do campo para o leitor de tela, no lugar do rotulo visual.
+        Semantics(label: isRequired ? '$label, obrigatório' : label, child: field),
+      ],
     );
   }
 }

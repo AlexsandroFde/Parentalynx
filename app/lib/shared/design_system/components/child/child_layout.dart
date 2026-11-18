@@ -4,6 +4,7 @@ import '../../foundations/ds_context.dart';
 import '../../foundations/tone.dart';
 import '../../tokens/sizes.dart';
 import '../../tokens/spacing.dart';
+import '../cards/app_list_group.dart';
 
 /// Estrutura comum das telas do modo crianca: a tela do codigo e as telas do aparelho
 /// vinculado. Dentro de um `AppExperienceScope(experience: AppExperience.child)` tudo fica
@@ -46,7 +47,7 @@ class ChildPageBody extends StatelessWidget {
   }
 }
 
-/// Cabecalho de tela com um icone em destaque, titulo e texto de apoio.
+/// Cabecalho de tela com um icone em destaque ([IconMedallion]), titulo e texto de apoio.
 class ChildHeader extends StatelessWidget {
   const ChildHeader({
     required this.icon,
@@ -66,17 +67,7 @@ class ChildHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        ExcludeSemantics(
-          child: Container(
-            width: AppSizes.avatarLg + AppSpacing.sm,
-            height: AppSizes.avatarLg + AppSpacing.sm,
-            decoration: BoxDecoration(
-              color: tone.background(context),
-              borderRadius: BorderRadius.circular(context.shapes.container),
-            ),
-            child: Icon(icon, color: tone.foreground(context), size: AppSizes.iconXl),
-          ),
-        ),
+        IconMedallion(icon: icon, tone: tone, size: AppSizes.medallion + AppSpacing.xs),
         const SizedBox(height: AppSpacing.lg),
         Semantics(header: true, child: Text(title, style: context.text.headlineMedium)),
         if (message != null) ...<Widget>[
@@ -93,7 +84,8 @@ class ChildHeader extends StatelessWidget {
 
 /// Linha de uma explicacao com marcador ("Tempo por dia: 2h 30min").
 ///
-/// O marcador e um icone em um circulo suave com o tom do assunto (descanso, permitido...).
+/// O marcador e um icone sem fundo; so os tons de atencao, erro e confirmacao o colorem
+/// ([ToneColors.iconColor]).
 class BulletLine extends StatelessWidget {
   const BulletLine({
     required this.text,
@@ -118,24 +110,13 @@ class BulletLine extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           ExcludeSemantics(
-            child: Container(
-              width: AppSizes.iconXl,
-              height: AppSizes.iconXl,
-              decoration: BoxDecoration(color: tone.background(context), shape: BoxShape.circle),
-              child: Icon(
-                icon,
-                size: AppSizes.iconSm + 2,
-                color: color ?? tone.foreground(context),
-              ),
+            child: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xxs),
+              child: Icon(icon, size: AppSizes.iconMd, color: color ?? tone.iconColor(context)),
             ),
           ),
           const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xs + 1),
-              child: Text(text, style: context.text.bodyLarge),
-            ),
-          ),
+          Expanded(child: Text(text, style: context.text.bodyLarge)),
         ],
       ),
     );

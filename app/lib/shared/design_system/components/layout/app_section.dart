@@ -51,24 +51,21 @@ class AppSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
               Expanded(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Semantics(header: true, child: Text(title!, style: context.text.titleMedium)),
-                      if (subtitle != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: AppSpacing.xxs),
-                          child: Text(
-                            subtitle!,
-                            style: context.text.bodyMedium?.copyWith(
-                              color: context.colors.textSecondary,
-                            ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Semantics(header: true, child: Text(title!, style: context.text.titleMedium)),
+                    if (subtitle != null)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                        child: Text(
+                          subtitle!,
+                          style: context.text.bodyMedium?.copyWith(
+                            color: context.colors.textSecondary,
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+                  ],
                 ),
               ),
               ?side,

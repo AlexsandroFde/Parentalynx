@@ -55,7 +55,7 @@ extension SyncStateStyle on SyncState {
   };
 }
 
-/// Linha de estado de sincronizacao: icone, rotulo e um detalhe opcional
+/// Linha de estado de sincronizacao: icone na cor do estado, rotulo e um detalhe opcional
 /// ("O aparelho confirmou a versao atual ha 2 min").
 ///
 /// O leitor de tela anuncia quando o estado muda.
@@ -72,38 +72,26 @@ class SyncStatusLine extends StatelessWidget {
   Widget build(BuildContext context) {
     final Tone tone = state.tone;
     final Widget icon = Icon(state.icon, size: AppSizes.iconMd, color: tone.foreground(context));
+    final TextStyle? labelStyle = context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w600);
     return Semantics(
       liveRegion: true,
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Container(
-            width: AppSizes.iconXl,
-            height: AppSizes.iconXl,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(color: tone.background(context), shape: BoxShape.circle),
-            child: state == SyncState.sending ? _Spin(child: icon) : icon,
-          ),
+          // O icone tem a altura da linha do rotulo: os dois ficam alinhados no topo.
+          if (state == SyncState.sending) _Spin(child: icon) else icon,
           const SizedBox(width: AppSpacing.md),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xs + 1),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(label ?? state.label, style: context.text.titleSmall),
-                  if (detail != null)
-                    Padding(
-                      padding: const EdgeInsets.only(top: AppSpacing.xxs),
-                      child: Text(
-                        detail!,
-                        style: context.text.bodyMedium?.copyWith(
-                          color: context.colors.textSecondary,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(label ?? state.label, style: labelStyle),
+                if (detail != null)
+                  Padding(
+                    padding: const EdgeInsets.only(top: AppSpacing.xxs),
+                    child: Text(detail!, style: context.text.bodySmall),
+                  ),
+              ],
             ),
           ),
         ],

@@ -7,6 +7,7 @@ import '../../foundations/tone.dart';
 import '../../tokens/sizes.dart';
 import '../../tokens/spacing.dart';
 import '../buttons/app_button.dart';
+import '../cards/app_list_group.dart';
 
 /// Pede confirmacao antes de uma acao importante. Devolve verdadeiro se confirmada.
 ///
@@ -60,7 +61,7 @@ class _ConfirmDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Tone tone = destructive ? Tone.danger : Tone.info;
+    final Tone tone = destructive ? Tone.danger : Tone.neutral;
     return Dialog(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: AppSpacing.maxFormWidth),
@@ -72,19 +73,10 @@ class _ConfirmDialog extends StatelessWidget {
             children: <Widget>[
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: ExcludeSemantics(
-                  child: Container(
-                    width: AppSizes.avatarLg - 8,
-                    height: AppSizes.avatarLg - 8,
-                    decoration: BoxDecoration(
-                      color: tone.background(context),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon ?? (destructive ? AppIcons.warning : AppIcons.help),
-                      color: tone.foreground(context),
-                    ),
-                  ),
+                child: IconMedallion(
+                  icon: icon ?? (destructive ? AppIcons.warning : AppIcons.help),
+                  tone: tone,
+                  size: AppSizes.avatarLg - AppSpacing.sm,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -99,7 +91,7 @@ class _ConfirmDialog extends StatelessWidget {
                 Text(
                   consequence!,
                   style: context.text.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                    fontWeight: FontWeight.w600,
                     color: destructive ? context.colors.danger : context.colors.textPrimary,
                   ),
                 ),

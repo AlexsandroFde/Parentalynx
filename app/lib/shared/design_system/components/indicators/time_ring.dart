@@ -18,7 +18,7 @@ class TimeRing extends StatelessWidget {
     required this.progress,
     required this.child,
     this.size = 200,
-    this.strokeWidth = 14,
+    this.strokeWidth = 10,
     this.color,
     this.semanticLabel,
     super.key,
@@ -60,7 +60,7 @@ class TimeRing extends StatelessWidget {
           },
           child: Center(
             child: Padding(
-              padding: EdgeInsets.all(strokeWidth + 10),
+              padding: EdgeInsets.all(strokeWidth + 12),
               child: FittedBox(fit: BoxFit.scaleDown, child: child),
             ),
           ),

@@ -5,6 +5,7 @@ import '../../foundations/tone.dart';
 import '../../tokens/sizes.dart';
 import '../../tokens/spacing.dart';
 import '../buttons/app_button.dart';
+import '../cards/app_list_group.dart';
 
 /// Estado vazio: o que apareceria ali e, quando faz sentido, o proximo passo
 /// ("Nenhum aparelho vinculado" + "Vincular aparelho").
@@ -32,17 +33,13 @@ class EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final double blob = compact ? AppSizes.avatarLg : AppSizes.illustration + AppSpacing.lg;
     final Widget content = Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        ExcludeSemantics(
-          child: Container(
-            width: blob,
-            height: blob,
-            decoration: BoxDecoration(color: tone.background(context), shape: BoxShape.circle),
-            child: Icon(icon, size: blob * 0.45, color: tone.foreground(context)),
-          ),
+        IconMedallion(
+          icon: icon,
+          tone: tone,
+          size: compact ? AppSizes.avatarLg - AppSpacing.sm : AppSizes.medallion,
         ),
         SizedBox(height: compact ? AppSpacing.md : AppSpacing.lg),
         Semantics(
@@ -54,7 +51,7 @@ class EmptyState extends StatelessWidget {
           ),
         ),
         if (message != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.sm),
+          const SizedBox(height: AppSpacing.xs + AppSpacing.xxs),
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: AppSpacing.maxFormWidth),
             child: Text(
