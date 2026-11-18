@@ -1,44 +1,27 @@
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
-import '../../../../core/config/app_config.dart';
-import '../../../../core/network/network_providers.dart';
-import '../../../../core/platform/native_providers.dart';
+import '../../../../core/constants/app_constants.dart';
+import '../../../../core/constants/route_paths.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../alerts/presentation/alerts_center_page.dart';
-import '../../auth/domain/guardian_account.dart';
-import '../../auth/presentation/session_controller.dart';
-import '../../devices/presentation/devices_providers.dart';
-import '../../guardian_paths.dart';
-import '../../time_requests/presentation/time_requests_controller.dart';
-
-/// Subcaminhos da aba Mais.
-abstract final class SettingsPaths {
-  static const String account = '${GuardianPaths.more}/account';
-  static const String sessions = '${GuardianPaths.more}/sessions';
-  static const String security = '${GuardianPaths.more}/security';
-  static const String privacy = '${GuardianPaths.more}/privacy';
-  static const String audit = '${GuardianPaths.more}/audit';
-}
-
-/// Versao do app instalada, lida do lado nativo.
-final FutureProvider<String?> appVersionProvider = FutureProvider<String?>((Ref ref) async {
-  try {
-    return (await ref.watch(deviceApiProvider).getDeviceInfo()).appVersion;
-  } on PlatformException {
-    return null;
-  }
-});
+import '../../../authentication/domain/entities/guardian_account.dart';
+import '../../../authentication/presentation/bloc/auth/auth_bloc.dart';
+import '../../../child_device/presentation/bloc/devices/devices_bloc.dart';
+import '../../domain/entities/devices_overview.dart';
+import '../bloc/more/more_bloc.dart';
+import '../texts/settings_texts.dart';
 
 /// Aba Mais: aparelhos, conta, alertas, dados e saida.
-class MorePage extends ConsumerWidget {
+///
+/// Espera acima na arvore o [AuthBloc] (conta e saida), o [DevicesBloc] (contagens dos
+/// aparelhos) e o [MoreBloc] (servidor e versao do app).
+class MorePage extends StatelessWidget {
   const MorePage({super.key});
 
-  Future<void> _signOut(BuildContext context, WidgetRef ref) async {
+  Future<void> _signOut(BuildContext context) async {
     final bool confirmed = await confirmAction(
       context,
       title: 'Sair da conta?',
@@ -47,20 +30,25 @@ class MorePage extends ConsumerWidget {
           'das crianças continuam vinculados e as regras continuam valendo.',
       confirmLabel: 'Sair',
     );
-    if (!confirmed) {
+    if (!confirmed || !context.mounted) {
       return;
     }
-    await ref.read(guardianSessionProvider.notifier).signOut();
+    context.read<AuthBloc>().add(const AuthSignOutRequested());
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final GuardianAccount? account = ref.watch(guardianAccountProvider);
-    final int deviceCount = ref.watch(activeDevicesProvider).length;
-    final int pendingLinks = ref.watch(pendingDevicesProvider).length;
-    final int pendingRequests = ref.watch(pendingTimeRequestsCountProvider);
-    final String serverUrl = ref.watch(serverUrlProvider);
-    final String? version = ref.watch(appVersionProvider).value;
+  Widget build(BuildContext context) {
+    final GuardianAccount? account = context.select<AuthBloc, GuardianAccount?>(
+      (AuthBloc bloc) => switch (bloc.state) {
+        AuthReady(:final GuardianAccount account) => account,
+        AuthSignedOut() || AuthLocked() => null,
+      },
+    );
+    final DevicesOverview devices = context.select<DevicesBloc, DevicesOverview>(
+      (DevicesBloc bloc) =>
+          DevicesOverview.of(active: bloc.state.active, pending: bloc.state.pending),
+    );
+    final MoreState more = context.watch<MoreBloc>().state;
     return Scaffold(
       appBar: AppBar(title: const Text('Mais')),
       body: PageBody(
@@ -73,20 +61,14 @@ class MorePage extends ConsumerWidget {
               _Item(
                 icon: Icons.add_link,
                 title: 'Vincular aparelho',
-                subtitle: pendingLinks > 0
-                    ? '$pendingLinks pedido(s) aguardando aprovação'
-                    : 'Gerar código para o aparelho da criança',
-                highlight: pendingLinks > 0,
+                subtitle: pendingLinksLabel(devices.pendingLinks),
+                highlight: devices.pendingLinks > 0,
                 onTap: () => context.push(GuardianPaths.pairing),
               ),
               _Item(
                 icon: Icons.devices_other_outlined,
                 title: 'Aparelhos vinculados',
-                subtitle: deviceCount == 0
-                    ? 'Nenhum aparelho ativo'
-                    : deviceCount == 1
-                    ? '1 aparelho ativo'
-                    : '$deviceCount aparelhos ativos',
+                subtitle: activeDevicesLabel(devices.activeDevices),
                 onTap: () => context.push(GuardianPaths.devices),
               ),
             ],
@@ -98,19 +80,19 @@ class MorePage extends ConsumerWidget {
                 icon: Icons.person_outline,
                 title: 'Conta e senha',
                 subtitle: 'Nome, senha administrativa e chave de recuperação',
-                onTap: () => context.go(SettingsPaths.account),
+                onTap: () => context.go(GuardianPaths.account),
               ),
               _Item(
                 icon: Icons.phonelink_lock_outlined,
                 title: 'Sessões conectadas',
                 subtitle: 'Aparelhos de responsáveis com acesso à conta',
-                onTap: () => context.go(SettingsPaths.sessions),
+                onTap: () => context.go(GuardianPaths.sessions),
               ),
               _Item(
                 icon: Icons.lock_clock_outlined,
                 title: 'Bloqueio do painel',
                 subtitle: 'Quando pedir a senha de novo',
-                onTap: () => context.go(SettingsPaths.security),
+                onTap: () => context.go(GuardianPaths.security),
               ),
             ],
           ),
@@ -121,16 +103,14 @@ class MorePage extends ConsumerWidget {
                 icon: Icons.notifications_active_outlined,
                 title: 'Preferências de notificação',
                 subtitle: 'Escolher quais avisos notificar',
-                onTap: () => context.go(AlertsPaths.preferences),
+                onTap: () => context.go(GuardianPaths.notificationPrefs),
               ),
               _Item(
                 icon: Icons.more_time,
                 title: 'Pedidos de tempo',
-                subtitle: pendingRequests > 0
-                    ? '$pendingRequests aguardando resposta'
-                    : 'Nenhum pedido aguardando',
-                highlight: pendingRequests > 0,
-                onTap: () => context.go(AlertsPaths.timeRequests),
+                subtitle: pendingTimeRequestsLabel(devices.pendingTimeRequests),
+                highlight: devices.pendingTimeRequests > 0,
+                onTap: () => context.go(GuardianPaths.timeRequests),
               ),
             ],
           ),
@@ -141,13 +121,13 @@ class MorePage extends ConsumerWidget {
                 icon: Icons.privacy_tip_outlined,
                 title: 'Dados e privacidade',
                 subtitle: 'O que é coletado, retenção e limiares de alerta',
-                onTap: () => context.go(SettingsPaths.privacy),
+                onTap: () => context.go(GuardianPaths.privacy),
               ),
               _Item(
                 icon: Icons.history,
                 title: 'Registro de alterações',
                 subtitle: 'Quem mudou o quê e quando',
-                onTap: () => context.go(SettingsPaths.audit),
+                onTap: () => context.go(GuardianPaths.audit),
               ),
             ],
           ),
@@ -157,18 +137,18 @@ class MorePage extends ConsumerWidget {
               ListTile(
                 leading: const Icon(Icons.dns_outlined),
                 title: const Text('Servidor em uso'),
-                subtitle: Text(serverUrl.isEmpty ? 'Não configurado' : serverUrl),
+                subtitle: Text(serverAddressLabel(more.serverAddress)),
               ),
               ListTile(
                 leading: const Icon(Icons.info_outline),
-                title: const Text(AppConfig.appName),
-                subtitle: Text(version == null ? 'Controle parental' : 'Versão $version'),
+                title: const Text(AppConstants.appName),
+                subtitle: Text(appVersionLabel(more.appVersion)),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
           OutlinedButton.icon(
-            onPressed: () => _signOut(context, ref),
+            onPressed: () => _signOut(context),
             icon: const Icon(Icons.logout),
             label: const Text('Sair da conta'),
           ),
@@ -187,7 +167,7 @@ class _AccountHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final String name = account.displayName.isEmpty ? 'Responsável' : account.displayName;
+    final String name = accountTitle(account);
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(AppSpacing.lg),
