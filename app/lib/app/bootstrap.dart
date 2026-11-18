@@ -14,6 +14,7 @@ import '../core/storage/secure_store.dart';
 import '../features/notifications/domain/services/alert_polling_coordinator.dart';
 import '../features/user_role/data/repositories/native_user_role_repository.dart';
 import '../features/user_role/domain/entities/user_role.dart';
+import '../shared/design_system/foundations/app_assets.dart';
 import 'config/app_config.dart';
 import 'di/injection.dart';
 
@@ -75,6 +76,7 @@ Future<GetIt> bootstrapBrowser() async {
 /// plataforma, a localizacao de datas e o observador dos BLoCs.
 Future<void> _prepareEngine() async {
   WidgetsFlutterBinding.ensureInitialized();
+  AppAssets.registerLicenses();
   await initializeDateFormatting('pt_BR');
   Intl.defaultLocale = 'pt_BR';
   Bloc.observer = const AppBlocObserver(
