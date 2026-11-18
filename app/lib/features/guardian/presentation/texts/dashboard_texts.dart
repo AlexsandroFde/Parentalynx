@@ -46,13 +46,3 @@ library;
     _ => (title: 'Problema na proteção', message: 'O aparelho informou o problema "$issue".'),
   };
 }
-
-/// Nivel de consumo da cota, para a cor do anel de tempo.
-enum QuotaLevel { normal, attention, exhausted }
-
-QuotaLevel quotaLevel(double usedFraction) {
-  if (usedFraction >= 1) {
-    return QuotaLevel.exhausted;
-  }
-  return usedFraction >= 0.8 ? QuotaLevel.attention : QuotaLevel.normal;
-}
