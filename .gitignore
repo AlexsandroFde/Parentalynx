@@ -19,3 +19,6 @@ Thumbs.db
 
 # Imagens de diferenca geradas quando uma captura de tela de referencia nao bate
 app/test/**/failures/
+
+# Sessoes do daemon do compilador Kotlin (criadas pelo Gradle)
+app/android/.kotlin/
