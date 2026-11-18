@@ -170,46 +170,54 @@ class _GuardianShellState extends State<GuardianShell> {
             ),
           ],
         ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: current,
-          // Tocar na aba ja selecionada volta para a raiz dela.
-          onDestinationSelected: (int index) =>
-              widget.navigationShell.goBranch(index, initialLocation: index == current),
-          destinations: <Widget>[
-            const NavigationDestination(
-              icon: Icon(AppIcons.home),
-              selectedIcon: Icon(AppIcons.homeSelected),
-              label: 'Início',
+        // Linha fina no topo: a barra se separa do conteudo sem sombra.
+        bottomNavigationBar: DecoratedBox(
+          decoration: BoxDecoration(
+            border: Border(
+              top: BorderSide(color: context.colors.hairline, width: AppSizes.hairline),
             ),
-            const NavigationDestination(
-              icon: Icon(AppIcons.rules),
-              selectedIcon: Icon(AppIcons.rulesSelected),
-              label: 'Regras',
-            ),
-            const NavigationDestination(
-              icon: Icon(AppIcons.reports),
-              selectedIcon: Icon(AppIcons.reportsSelected),
-              label: 'Relatórios',
-            ),
-            NavigationDestination(
-              icon: _AlertsBadge(unread: unread, child: const Icon(AppIcons.alerts)),
-              selectedIcon: _AlertsBadge(
-                unread: unread,
-                child: const Icon(AppIcons.alertsSelected),
+          ),
+          child: NavigationBar(
+            selectedIndex: current,
+            // Tocar na aba ja selecionada volta para a raiz dela.
+            onDestinationSelected: (int index) =>
+                widget.navigationShell.goBranch(index, initialLocation: index == current),
+            destinations: <Widget>[
+              const NavigationDestination(
+                icon: Icon(AppIcons.home),
+                selectedIcon: Icon(AppIcons.homeSelected),
+                label: 'Início',
               ),
-              label: 'Alertas',
-              tooltip: unread == 0
-                  ? 'Alertas'
-                  : unread == 1
-                  ? 'Alertas, 1 não lido'
-                  : 'Alertas, $unread não lidos',
-            ),
-            const NavigationDestination(
-              icon: Icon(AppIcons.more),
-              selectedIcon: Icon(AppIcons.moreSelected),
-              label: 'Mais',
-            ),
-          ],
+              const NavigationDestination(
+                icon: Icon(AppIcons.rules),
+                selectedIcon: Icon(AppIcons.rulesSelected),
+                label: 'Regras',
+              ),
+              const NavigationDestination(
+                icon: Icon(AppIcons.reports),
+                selectedIcon: Icon(AppIcons.reportsSelected),
+                label: 'Relatórios',
+              ),
+              NavigationDestination(
+                icon: _AlertsBadge(unread: unread, child: const Icon(AppIcons.alerts)),
+                selectedIcon: _AlertsBadge(
+                  unread: unread,
+                  child: const Icon(AppIcons.alertsSelected),
+                ),
+                label: 'Alertas',
+                tooltip: unread == 0
+                    ? 'Alertas'
+                    : unread == 1
+                    ? 'Alertas, 1 não lido'
+                    : 'Alertas, $unread não lidos',
+              ),
+              const NavigationDestination(
+                icon: Icon(AppIcons.more),
+                selectedIcon: Icon(AppIcons.moreSelected),
+                label: 'Mais',
+              ),
+            ],
+          ),
         ),
       ),
     );

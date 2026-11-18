@@ -57,7 +57,7 @@ class DashboardTimeSection extends StatelessWidget {
                 children: <Widget>[
                   if (today.hasLimit) _Remaining(today: today) else _UsedWithoutLimit(today),
                   if (today.hasLimit) ...<Widget>[
-                    const SizedBox(height: AppSpacing.xl),
+                    const SizedBox(height: AppSpacing.lg),
                     MetricRow(
                       metrics: <MetricTile>[
                         MetricTile(value: formatDurationMs(today.usedMs), label: 'Usado'),
@@ -102,8 +102,8 @@ class DashboardTimeSection extends StatelessWidget {
   }
 }
 
-/// Anel com o tempo que falta. Com fonte ampliada, o numero dentro do anel diminui para caber,
-/// entao o mesmo valor aparece tambem em texto logo abaixo.
+/// O tempo que falta em destaque e uma barra com a parte do limite ja usada. Com fonte ampliada,
+/// a frase completa aparece logo abaixo.
 class _Remaining extends StatelessWidget {
   const _Remaining({required this.today});
 
@@ -122,32 +122,39 @@ class _Remaining extends StatelessWidget {
     final String sentence =
         'Restam ${formatDurationMs(remaining)} de ${formatDurationMs(limit)} hoje.';
     final bool largeText = MediaQuery.textScalerOf(context).scale(1) > 1.3;
-    return Column(
-      children: <Widget>[
-        TimeRing(
-          progress: today.fraction,
-          color: color,
-          size: 184,
-          semanticLabel: sentence,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
+    return Semantics(
+      container: true,
+      label: sentence,
+      excludeSemantics: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Wrap(
+            spacing: AppSpacing.sm,
+            crossAxisAlignment: WrapCrossAlignment.end,
             children: <Widget>[
               Text(
                 formatDurationMs(remaining),
                 key: const ValueKey<String>('dashboard-headline'),
                 style: context.textStyles.metricLarge,
               ),
-              Text('restam hoje', style: context.text.bodySmall),
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xs + AppSpacing.xxs),
+                child: Text(
+                  'restam hoje',
+                  style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary),
+                ),
+              ),
             ],
           ),
-        ),
-        if (largeText) ...<Widget>[
           const SizedBox(height: AppSpacing.md),
-          ExcludeSemantics(
-            child: Text(sentence, textAlign: TextAlign.center, style: context.text.titleSmall),
-          ),
+          UsageBar(fraction: today.fraction, color: color, height: AppSpacing.xs + AppSpacing.xxs),
+          if (largeText) ...<Widget>[
+            const SizedBox(height: AppSpacing.md),
+            Text(sentence, style: context.text.titleSmall),
+          ],
         ],
-      ],
+      ),
     );
   }
 }

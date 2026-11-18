@@ -43,11 +43,10 @@ class DashboardDeviceHeader extends StatelessWidget {
           eyebrow: 'Hoje',
           title: device.displayName,
           subtitle: device.hardwareLabel,
-          trailing: InitialAvatar(name: device.displayName, size: AppSizes.avatarLg),
           bottomSpacing: AppSpacing.md,
         ),
         Wrap(
-          spacing: AppSpacing.sm,
+          spacing: AppSpacing.lg,
           runSpacing: AppSpacing.sm,
           children: <Widget>[
             StatusBadge(label: status.label, tone: status.tone, icon: status.icon),

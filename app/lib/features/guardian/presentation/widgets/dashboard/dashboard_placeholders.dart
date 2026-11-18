@@ -28,11 +28,6 @@ class DashboardSkeleton extends StatelessWidget {
                   ],
                 ),
               ),
-              SkeletonBox(
-                width: AppSizes.avatarLg,
-                height: AppSizes.avatarLg,
-                radius: AppRadius.pill,
-              ),
             ],
           ),
         ),
@@ -123,17 +118,9 @@ class _Lead extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const double blob = AppSizes.illustration + AppSpacing.lg;
     return Column(
       children: <Widget>[
-        ExcludeSemantics(
-          child: Container(
-            width: blob,
-            height: blob,
-            decoration: BoxDecoration(color: Tone.info.background(context), shape: BoxShape.circle),
-            child: Icon(icon, size: blob * 0.45, color: Tone.info.foreground(context)),
-          ),
-        ),
+        IconMedallion(icon: icon, tone: Tone.info, size: AppSizes.illustration),
         const SizedBox(height: AppSpacing.lg),
         Semantics(
           header: true,
