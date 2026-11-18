@@ -192,7 +192,7 @@ class DeviceBridge(private val g: AgentGraph, private val activity: Activity) : 
         g.engine.requestPermissionCheck()
     }
 
-    override fun requestDeviceAdmin() = g.settingsIntents.requestDeviceAdmin()
+    override fun requestDeviceAdmin() = g.settingsIntents.requestDeviceAdmin(activity)
 
     override fun removeDeviceAdmin() =
         guarded {

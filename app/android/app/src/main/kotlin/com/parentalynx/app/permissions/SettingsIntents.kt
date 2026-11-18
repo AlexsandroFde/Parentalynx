@@ -1,6 +1,7 @@
 package com.parentalynx.app.permissions
 
 import android.annotation.SuppressLint
+import android.app.Activity
 import android.app.admin.DevicePolicyManager
 import android.content.ActivityNotFoundException
 import android.content.ComponentName
@@ -65,13 +66,24 @@ class SettingsIntents(context: Context) {
 
     fun openAppDetails(): Boolean = start(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, packageUri))
 
-    /** Abre o pedido do sistema para ativar o ParentaLynx como administrador do dispositivo. */
-    fun requestDeviceAdmin() {
+    /**
+     * Abre o pedido do sistema para ativar o ParentaLynx como administrador do dispositivo.
+     *
+     * Precisa partir de uma Activity e sem `FLAG_ACTIVITY_NEW_TASK`: a tela do sistema
+     * (`DeviceAdminAdd`) se fecha sozinha, sem erro, quando é aberta como nova tarefa.
+     */
+    fun requestDeviceAdmin(activity: Activity) {
         val intent =
             Intent(DevicePolicyManager.ACTION_ADD_DEVICE_ADMIN)
                 .putExtra(DevicePolicyManager.EXTRA_DEVICE_ADMIN, ComponentName(context, AdminReceiver::class.java))
                 .putExtra(DevicePolicyManager.EXTRA_ADD_EXPLANATION, context.getString(R.string.device_admin_explanation))
-        start(intent)
+        try {
+            activity.startActivity(intent)
+        } catch (e: ActivityNotFoundException) {
+            AppLog.w(TAG, "tela de administrador do dispositivo indisponível")
+        } catch (e: SecurityException) {
+            AppLog.w(TAG, "tela de administrador do dispositivo protegida")
+        }
     }
 
     /**
