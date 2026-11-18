@@ -44,7 +44,7 @@ void main() {
 
   setUp(() => backend = FakeBackend());
 
-  testWidgets('mostra as duas opcoes de modo e o aviso de transparencia', (
+  testWidgets('mostra as duas opcoes de papel, o aviso de transparencia e o servidor', (
     WidgetTester tester,
   ) async {
     await pumpWelcome(tester, build());
@@ -52,7 +52,8 @@ void main() {
     expect(find.text('Sou o responsável'), findsOneWidget);
     expect(find.text('Este é o aparelho da criança'), findsOneWidget);
     expect(find.text('Controle transparente'), findsOneWidget);
-    expect(find.text('Configurar servidor'), findsOneWidget);
+    // O servidor em uso aparece antes da escolha, com a troca a um toque.
+    expect(find.text('https://servidor.teste'), findsOneWidget);
   });
 
   testWidgets('escolher responsavel grava o modo no lado nativo', (WidgetTester tester) async {
@@ -83,10 +84,13 @@ void main() {
     final TestDependencies deps = build(serverUrl: '');
     await pumpWelcome(tester, deps);
 
+    // Antes da escolha, a tela ja avisa que falta o servidor.
+    expect(find.text('Servidor não configurado'), findsOneWidget);
+
     await tester.tap(find.text('Sou o responsável'));
     await tester.pumpAndSettle();
 
-    expect(find.text('Servidor'), findsOneWidget);
+    expect(find.textContaining('Endereço do servidor ParentaLynx da sua família'), findsOneWidget);
     expect(find.text('Salvar'), findsOneWidget);
     verifyNever(() => deps.native.mode.setMode(any()));
   });
@@ -136,12 +140,76 @@ void main() {
     await tester.tap(find.text('Sou o responsável'));
     await tester.pumpAndSettle();
 
+    expect(find.text('Não foi possível definir o papel deste aparelho'), findsOneWidget);
     expect(find.text('Autenticação do responsável necessária.'), findsOneWidget);
     expect(deps.di<IUserRoleRepository>().current, UserRole.unset);
   });
 
+  Future<void> pumpStyled(
+    WidgetTester tester, {
+    Brightness brightness = Brightness.light,
+    double textScale = 1,
+    Size size = phoneSize,
+  }) {
+    final TestDependencies deps = build();
+    return pumpWidgetInApp(
+      tester,
+      MultiBlocProvider(
+        providers: <BlocProvider<Object?>>[
+          BlocProvider<ServerConfigBloc>(
+            create: (BuildContext context) => deps.di<ServerConfigBloc>(),
+          ),
+          BlocProvider<OnboardingBloc>(create: (BuildContext context) => deps.di<OnboardingBloc>()),
+        ],
+        child: const WelcomePage(),
+      ),
+      di: deps.di,
+      brightness: brightness,
+      textScale: textScale,
+      size: size,
+    );
+  }
+
   testWidgets('captura da tela de boas-vindas', tags: 'screenshot', (WidgetTester tester) async {
-    await pumpWelcome(tester, build());
+    await pumpStyled(tester);
     await expectScreenshot(tester, 'onboarding_welcome');
   });
+
+  testWidgets('captura da tela de boas-vindas no tema escuro', tags: 'screenshot', (
+    WidgetTester tester,
+  ) async {
+    await pumpStyled(tester, brightness: Brightness.dark);
+    await expectScreenshot(tester, 'onboarding_welcome_escuro');
+  });
+
+  testWidgets('boas-vindas funciona com a fonte no maior tamanho', (WidgetTester tester) async {
+    await pumpStyled(tester, textScale: 2, size: const Size(392, 3200));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('boas-vindas segue as diretrizes de acessibilidade', (WidgetTester tester) async {
+    await pumpStyled(tester, size: const Size(392, 1600));
+    await expectAccessible(tester);
+  });
+
+  testWidgets(
+    'folha do servidor: explica o formato e mostra a falha sem gravar',
+    tags: 'screenshot',
+    (WidgetTester tester) async {
+      backend.onError('GET', '/v1/meta', status: 404, code: 'not_found');
+      final TestDependencies deps = build();
+      await pumpWelcome(tester, deps);
+
+      await tester.tap(find.text('https://servidor.teste'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('começando com https://'), findsOneWidget);
+
+      await tester.enterText(find.byType(TextField), 'https://errado.teste');
+      await tester.tap(find.text('Salvar'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('não como um servidor ParentaLynx'), findsOneWidget);
+      expect(find.textContaining('Nada foi alterado.'), findsOneWidget);
+      await expectScreenshot(tester, 'onboarding_server_sheet');
+    },
+  );
 }

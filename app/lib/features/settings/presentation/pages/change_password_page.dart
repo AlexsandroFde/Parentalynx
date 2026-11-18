@@ -3,16 +3,15 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/form_status.dart';
 import '../../../../core/security/password_policy.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../../authentication/presentation/widgets/auth_widgets.dart';
 import '../../domain/entities/password_change_errors.dart';
 import '../bloc/change_password/change_password_bloc.dart';
 
 /// Troca da senha administrativa.
 ///
-/// Espera um [ChangePasswordBloc] acima na arvore. Com a senha trocada, a tela fecha.
+/// Espera um [ChangePasswordBloc] acima na arvore. Com a senha trocada, a tela fecha e avisa
+/// o que mudou nos outros celulares.
 class ChangePasswordPage extends StatefulWidget {
   const ChangePasswordPage({super.key});
 
@@ -56,7 +55,11 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         return previous.status != current.status && current.status == FormStatus.succeeded;
       },
       listener: (BuildContext context, ChangePasswordState state) {
-        showAppSnackBar(context, 'Senha alterada.', tone: Tone.success);
+        showAppSnackBar(
+          context,
+          'Senha alterada. Os outros celulares conectados precisam entrar de novo.',
+          tone: Tone.success,
+        );
         Navigator.of(context).pop();
       },
       builder: (BuildContext context, ChangePasswordState state) {
@@ -70,43 +73,64 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
         );
         return AuthScaffold(
           title: 'Trocar senha',
-          subtitle: 'Os outros aparelhos conectados à conta precisam entrar de novo.',
+          subtitle:
+              'Confirme a senha atual e escolha a nova senha administrativa. Este celular '
+              'continua conectado.',
           children: <Widget>[
-            if (formError != null) ...<Widget>[
-              NoticeBanner(message: formError, tone: Tone.danger),
-              const SizedBox(height: AppSpacing.lg),
-            ],
-            PasswordField(
+            AppPasswordField(
               controller: _current,
-              enabled: !busy,
               label: 'Senha atual',
+              isRequired: true,
+              enabled: !busy,
               errorText: errors.current,
               textInputAction: TextInputAction.next,
+              onChanged: (_) => _edited(PasswordChangeField.current),
+              onSubmitted: (_) => focusNextAfterPassword(),
             ),
             const SizedBox(height: AppSpacing.lg),
-            PasswordField(
+            AppPasswordField(
               controller: _next,
-              enabled: !busy,
               label: 'Nova senha',
+              isRequired: true,
+              enabled: !busy,
               errorText: errors.next,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.newPassword],
               onChanged: (_) => _edited(PasswordChangeField.next),
+              onSubmitted: (_) => focusNextAfterPassword(),
             ),
             const SizedBox(height: AppSpacing.md),
             PasswordStrengthMeter(password: _next.text, check: check),
             const SizedBox(height: AppSpacing.lg),
-            PasswordField(
+            AppPasswordField(
               controller: _confirm,
-              enabled: !busy,
               label: 'Repita a nova senha',
+              isRequired: true,
+              enabled: !busy,
               errorText: errors.confirmation,
               autofillHints: const <String>[AutofillHints.newPassword],
               onChanged: (_) => _edited(PasswordChangeField.confirmation),
               onSubmitted: (_) => _submit(),
             ),
             const SizedBox(height: AppSpacing.xl),
-            BusyButton(label: 'Trocar senha', busy: busy, onPressed: _submit),
+            const AppBanner(
+              tone: Tone.warning,
+              title: 'Depois da troca',
+              message:
+                  'Os outros celulares conectados à conta saem e precisam entrar com a senha '
+                  'nova. As regras e os aparelhos das crianças não mudam.',
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            if (formError != null) ...<Widget>[
+              AppBanner(
+                tone: Tone.danger,
+                title: 'Não foi possível trocar a senha',
+                message: '$formError A senha atual continua valendo.',
+                liveRegion: true,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            AppButton.primary(label: 'Trocar senha', busy: busy, expand: true, onPressed: _submit),
           ],
         );
       },

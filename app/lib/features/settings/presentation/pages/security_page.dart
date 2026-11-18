@@ -1,18 +1,25 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../../authentication/domain/entities/app_lock_timeout.dart';
 import '../../../authentication/presentation/bloc/auth/auth_bloc.dart';
 import '../bloc/security/security_settings_bloc.dart';
 
-/// Bloqueio do painel: quando pedir a senha administrativa de novo.
+/// Bloqueio do painel: quando pedir a senha administrativa de novo e o bloqueio imediato.
 ///
 /// Espera acima na arvore o [SecuritySettingsBloc] e o [AuthBloc] (bloquear agora).
 class SecurityPage extends StatelessWidget {
   const SecurityPage({super.key});
+
+  /// O que cada tempo significa no dia a dia.
+  static String? _detail(AppLockTimeout option) {
+    return switch (option) {
+      AppLockTimeout.immediately => 'Pede a senha sempre que você sai do app',
+      AppLockTimeout.oneMinute => 'Padrão. Dá para consultar outro app sem digitar a senha',
+      AppLockTimeout.fiveMinutes || AppLockTimeout.fifteenMinutes => null,
+    };
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -21,45 +28,42 @@ class SecurityPage extends StatelessWidget {
     );
     return Scaffold(
       appBar: AppBar(title: const Text('Bloqueio do painel')),
-      body: PageBody(
+      body: AppPageBody(
         children: <Widget>[
-          const NoticeBanner(
-            icon: Icons.lock_outline,
-            message:
-                'O painel pede a senha administrativa sempre que o app é aberto e quando ele '
-                'volta do segundo plano depois do tempo escolhido. Assim, quem pegar o seu '
-                'aparelho desbloqueado não consegue mudar as regras.',
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          SectionCard(
+          AppSection(
             title: 'Pedir a senha de novo após',
-            padding: const EdgeInsets.only(top: AppSpacing.lg, bottom: AppSpacing.sm),
-            child: RadioGroup<AppLockTimeout>(
-              groupValue: selected,
-              onChanged: (AppLockTimeout? value) {
-                if (value != null) {
-                  context.read<SecuritySettingsBloc>().add(AppLockTimeoutSelected(value));
-                }
-              },
-              child: Column(
-                children: <Widget>[
-                  for (final AppLockTimeout option in AppLockTimeout.values)
-                    RadioListTile<AppLockTimeout>(
-                      value: option,
-                      title: Text(option.label),
-                      subtitle: option == AppLockTimeout.immediately
-                          ? const Text('Bloqueia sempre que você sai do app')
-                          : null,
-                    ),
-                ],
-              ),
+            subtitle:
+                'Tempo que o app pode ficar em segundo plano antes de pedir a senha '
+                'administrativa. Assim, quem pegar o seu celular desbloqueado não muda as regras.',
+            child: AppListGroup(
+              dividerIndent: AppSpacing.lg + AppSizes.iconLg + AppSpacing.md,
+              footer: 'O painel também pede a senha sempre que o app é aberto.',
+              children: <Widget>[
+                for (final AppLockTimeout option in AppLockTimeout.values)
+                  AppRadioRow<AppLockTimeout>(
+                    title: option.label,
+                    subtitle: _detail(option),
+                    value: option,
+                    groupValue: selected,
+                    onChanged: (AppLockTimeout value) {
+                      context.read<SecuritySettingsBloc>().add(AppLockTimeoutSelected(value));
+                    },
+                  ),
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          OutlinedButton.icon(
-            onPressed: () => context.read<AuthBloc>().add(const AuthLockRequested()),
-            icon: const Icon(Icons.lock_outline),
-            label: const Text('Bloquear agora'),
+          const SectionGap(),
+          AppSection(
+            title: 'Bloqueio imediato',
+            subtitle:
+                'Antes de emprestar o celular, bloqueie o painel. Para voltar, digite a senha '
+                'administrativa.',
+            child: AppButton.secondary(
+              label: 'Bloquear agora',
+              icon: AppIcons.lock,
+              expand: true,
+              onPressed: () => context.read<AuthBloc>().add(const AuthLockRequested()),
+            ),
           ),
         ],
       ),

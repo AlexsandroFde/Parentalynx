@@ -2,8 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/form_status.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../bloc/server_config_bloc.dart';
 
 /// Abre a folha para informar o endereco do servidor. Devolve verdadeiro se um endereco
@@ -51,7 +50,6 @@ class _ServerSheetState extends State<_ServerSheet> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     return BlocConsumer<ServerConfigBloc, ServerConfigState>(
       listenWhen: (ServerConfigState previous, ServerConfigState current) {
         return previous.status != current.status && current.status == FormStatus.succeeded;
@@ -59,44 +57,35 @@ class _ServerSheetState extends State<_ServerSheet> {
       listener: (BuildContext context, ServerConfigState state) => Navigator.of(context).pop(true),
       builder: (BuildContext context, ServerConfigState state) {
         final bool busy = state.status.isSubmitting;
-        return Padding(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + AppSpacing.xl,
-          ),
+        return AppSheetFrame(
+          title: 'Servidor',
+          subtitle:
+              'Endereço do servidor ParentaLynx da sua família. O seu celular e o da criança '
+              'precisam usar o mesmo endereço.',
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              Text('Servidor', style: theme.textTheme.titleLarge),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Endereço do servidor ParentaLynx da sua família. Os dois aparelhos precisam '
-                'usar o mesmo endereço.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              TextField(
+              AppTextField(
                 controller: _controller,
+                label: 'Endereço do servidor',
+                isRequired: true,
+                hint: 'https://controle.exemplo.com',
+                // Enquanto confere, o texto de apoio diz o que esta acontecendo.
+                helper: busy
+                    ? 'Conferindo se há um servidor ParentaLynx nesse endereço…'
+                    : 'Endereço completo, começando com https://. Quem instalou o servidor '
+                          'informa o endereço.',
+                errorText: state.error,
                 keyboardType: TextInputType.url,
                 autocorrect: false,
+                enableSuggestions: false,
                 enabled: !busy,
                 textInputAction: TextInputAction.done,
                 onSubmitted: (_) => _save(),
-                decoration: InputDecoration(
-                  labelText: 'Endereço',
-                  hintText: 'https://controle.exemplo.com',
-                  errorText: state.error,
-                  errorMaxLines: 4,
-                  prefixIcon: const Icon(Icons.dns_outlined),
-                ),
               ),
-              const SizedBox(height: AppSpacing.lg),
-              BusyButton(label: 'Salvar', busy: busy, onPressed: _save),
+              const SizedBox(height: AppSpacing.xl),
+              AppButton.primary(label: 'Salvar', busy: busy, expand: true, onPressed: _save),
             ],
           ),
         );

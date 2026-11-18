@@ -2,17 +2,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/form_status.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../../authentication/presentation/widgets/auth_widgets.dart';
 import '../../domain/services/account_rules.dart';
 import '../bloc/delete_account/delete_account_bloc.dart';
 
 /// Exclusao da conta e de todos os dados, com senha e confirmacao digitada.
 ///
-/// Espera um [DeleteAccountBloc] acima na arvore. Com a conta excluida, a sessao termina e o
-/// roteador leva as telas de conta.
+/// A palavra digitada e a confirmacao (mais forte que um dialogo): o botao so libera com a
+/// senha e a palavra. Espera um [DeleteAccountBloc] acima na arvore. Com a conta excluida, a
+/// sessao termina e o roteador leva as telas de conta.
 class DeleteAccountPage extends StatefulWidget {
   const DeleteAccountPage({super.key});
 
@@ -46,7 +45,6 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
     return BlocConsumer<DeleteAccountBloc, DeleteAccountState>(
       listenWhen: (DeleteAccountState previous, DeleteAccountState current) {
         return previous.status != current.status && current.status == FormStatus.succeeded;
@@ -56,21 +54,26 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
       },
       builder: (BuildContext context, DeleteAccountState state) {
         final bool busy = state.status != FormStatus.editing;
+        final String? email = state.email;
         return AuthScaffold(
+          icon: AppIcons.deleteForever,
           title: 'Excluir conta',
-          subtitle: 'Esta ação apaga tudo e não pode ser desfeita.',
+          subtitle: email == null
+              ? 'Esta ação apaga tudo e não pode ser desfeita.'
+              : 'A conta $email e tudo o que está nela serão apagados. Não pode ser desfeito.',
           children: <Widget>[
-            const NoticeBanner(
+            const AppBanner(
               tone: Tone.danger,
               title: 'O que será apagado',
               message:
                   'A conta, todos os aparelhos vinculados, as regras, os relatórios, o histórico '
-                  'de navegação e os alertas. Os aparelhos das crianças deixam de ser controlados '
-                  'na próxima sincronização.',
+                  'de navegação e os alertas. Os aparelhos das crianças deixam de ser '
+                  'controlados na próxima sincronização.',
             ),
-            const SizedBox(height: AppSpacing.lg),
-            PasswordField(
+            const SizedBox(height: AppSpacing.xl),
+            AppPasswordField(
               controller: _password,
+              isRequired: true,
               enabled: !busy,
               errorText: state.error,
               textInputAction: TextInputAction.next,
@@ -79,33 +82,48 @@ class _DeleteAccountPageState extends State<DeleteAccountPage> {
                 setState(() {});
                 context.read<DeleteAccountBloc>().add(const DeleteAccountPasswordEdited());
               },
+              onSubmitted: (_) => focusNextAfterPassword(),
             ),
             const SizedBox(height: AppSpacing.lg),
-            TextField(
+            AppTextField(
               controller: _word,
+              label: 'Palavra de confirmação',
+              isRequired: true,
+              hint: DeleteAccountPage.confirmationWord,
+              helper: 'Digite ${DeleteAccountPage.confirmationWord} para liberar a exclusão.',
               enabled: !busy,
               autocorrect: false,
+              enableSuggestions: false,
               textCapitalization: TextCapitalization.characters,
+              textInputAction: TextInputAction.done,
               onChanged: (_) => setState(() {}),
-              onSubmitted: (_) => _submit(),
-              decoration: const InputDecoration(
-                labelText: 'Digite ${DeleteAccountPage.confirmationWord} para confirmar',
-                prefixIcon: Icon(Icons.warning_amber_rounded),
-              ),
+              onSubmitted: (_) {
+                if (_canSubmit) {
+                  _submit();
+                }
+              },
             ),
             const SizedBox(height: AppSpacing.xl),
-            FilledButton(
-              style: FilledButton.styleFrom(
-                backgroundColor: scheme.error,
-                foregroundColor: scheme.onError,
+            if (state.formError case final String formError) ...<Widget>[
+              AppBanner(
+                tone: Tone.danger,
+                title: 'A conta não foi excluída',
+                message: '$formError Nada foi apagado.',
+                liveRegion: true,
               ),
-              onPressed: _canSubmit && !busy ? _submit : null,
-              child: busy
-                  ? const SizedBox.square(
-                      dimension: 22,
-                      child: CircularProgressIndicator(strokeWidth: 2.5),
-                    )
-                  : const Text('Excluir conta e todos os dados'),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            AppButton.danger(
+              label: 'Excluir conta e todos os dados',
+              busy: busy,
+              expand: true,
+              onPressed: _canSubmit ? _submit : null,
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            AppButton.tertiary(
+              label: 'Cancelar',
+              expand: true,
+              onPressed: busy ? null : () => Navigator.of(context).maybePop(),
             ),
           ],
         );

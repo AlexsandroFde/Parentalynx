@@ -86,7 +86,20 @@ void main() {
     });
 
     blocTest<ServerConfigBloc, ServerConfigState>(
-      'falha de conexao explica o motivo e mantem o formulario',
+      'sem conexao pede para conferir o endereco e a internet',
+      setUp: () => backend.on('GET', '/v1/meta', (_) => throw const NetworkFailure()),
+      build: () => deps.di<ServerConfigBloc>(),
+      act: (ServerConfigBloc bloc) => bloc.add(const ServerAddressSubmitted('https://x.teste')),
+      wait: const Duration(milliseconds: 10),
+      verify: (ServerConfigBloc bloc) {
+        expect(bloc.state.status, FormStatus.editing);
+        expect(bloc.state.error, startsWith('Não foi possível conectar a esse endereço.'));
+        expect(bloc.state.error, endsWith('Nada foi alterado.'));
+      },
+    );
+
+    blocTest<ServerConfigBloc, ServerConfigState>(
+      'resposta de outro servidor explica o motivo, o que fazer e que nada mudou',
       setUp: () => backend.onError('GET', '/v1/meta', status: 500, code: 'internal'),
       build: () => deps.di<ServerConfigBloc>(),
       act: (ServerConfigBloc bloc) => bloc.add(const ServerAddressSubmitted('https://x.teste')),
@@ -95,9 +108,10 @@ void main() {
         expect(bloc.state.status, FormStatus.editing);
         expect(
           bloc.state.error,
-          startsWith('Não foi possível falar com o servidor nesse endereço.'),
+          startsWith('Esse endereço respondeu, mas não como um servidor ParentaLynx.'),
         );
         expect(bloc.state.isConfigured, isFalse);
+        expect(bloc.state.error, endsWith('Nada foi alterado.'));
       },
     );
 

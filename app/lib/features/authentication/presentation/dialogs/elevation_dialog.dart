@@ -2,10 +2,10 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/form_status.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/services/i_elevation_prompter.dart';
 import '../bloc/elevation/elevation_bloc.dart';
+import '../widgets/auth_widgets.dart';
 
 /// Implementacao de [IElevationPrompter] com um dialogo.
 ///
@@ -38,7 +38,7 @@ class DialogElevationPrompter implements IElevationPrompter {
 }
 
 /// Pede a senha administrativa para liberar uma operacao. Fecha com verdadeiro quando a
-/// senha foi aceita e com falso quando a pessoa desiste.
+/// senha foi aceita e com falso quando a pessoa desiste (a operacao nao acontece).
 class ElevationDialog extends StatefulWidget {
   const ElevationDialog({super.key});
 
@@ -59,7 +59,6 @@ class _ElevationDialogState extends State<ElevationDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     return BlocConsumer<ElevationBloc, ElevationState>(
       listenWhen: (ElevationState previous, ElevationState current) {
         return previous.status != current.status && current.status == FormStatus.succeeded;
@@ -67,36 +66,24 @@ class _ElevationDialogState extends State<ElevationDialog> {
       listener: (BuildContext context, ElevationState state) => Navigator.of(context).pop(true),
       builder: (BuildContext context, ElevationState state) {
         final bool busy = state.status != FormStatus.editing;
-        return AlertDialog(
-          icon: const Icon(Icons.lock_outline),
-          title: const Text('Confirme sua senha'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                'Para alterar regras e dados, confirme a senha administrativa.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              PasswordField(
-                controller: _password,
-                autofocus: true,
-                enabled: !busy,
-                errorText: state.error,
-                onSubmitted: (_) => _confirm(),
-              ),
-            ],
+        return FormDialogFrame(
+          icon: AppIcons.lock,
+          title: 'Confirme sua senha',
+          message:
+              'Por segurança, mudanças nas regras e nos dados da conta pedem a senha '
+              'administrativa de novo.',
+          consequence: 'Se você cancelar, nada é alterado.',
+          busy: busy,
+          confirmLabel: 'Confirmar',
+          onConfirm: _confirm,
+          onCancel: () => Navigator.of(context).pop(false),
+          field: AppPasswordField(
+            controller: _password,
+            autofocus: true,
+            enabled: !busy,
+            errorText: state.error,
+            onSubmitted: (_) => _confirm(),
           ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: busy ? null : () => Navigator.of(context).pop(false),
-              child: const Text('Cancelar'),
-            ),
-            BusyButton(label: 'Confirmar', busy: busy, expand: false, onPressed: _confirm),
-          ],
         );
       },
     );

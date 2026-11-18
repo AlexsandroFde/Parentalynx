@@ -31,7 +31,8 @@ class UnlockBloc extends Bloc<UnlockEvent, UnlockState> {
   Future<void> _onStarted(UnlockStarted event, Emitter<UnlockState> emit) async {
     final GuardianSessionState session = _session.current;
     if (session is SessionLocked && session.account != null) {
-      emit(state.copyWith(email: session.account!.email));
+      final String name = session.account!.displayName.trim();
+      emit(state.copyWith(email: session.account!.email, displayName: name.isEmpty ? null : name));
       return;
     }
     final String? stored = await _defaults.storedEmail();

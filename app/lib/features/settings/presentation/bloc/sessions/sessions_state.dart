@@ -23,17 +23,28 @@ final class SessionsError extends SessionsState {
 }
 
 final class SessionsLoaded extends SessionsState {
-  const SessionsLoaded({required this.sessions, this.action = const ActionIdle()});
+  const SessionsLoaded({required this.sessions, this.action = const ActionIdle(), this.revokingId});
 
   final List<GuardianSessionInfo> sessions;
 
   /// Andamento do encerramento de uma sessao.
   final ActionStatus action;
 
-  SessionsLoaded copyWith({List<GuardianSessionInfo>? sessions, ActionStatus? action}) {
-    return SessionsLoaded(sessions: sessions ?? this.sessions, action: action ?? this.action);
+  /// Sessao sendo encerrada agora, para a tela mostrar o andamento na linha certa.
+  final String? revokingId;
+
+  SessionsLoaded copyWith({
+    List<GuardianSessionInfo>? sessions,
+    ActionStatus? action,
+    String? revokingId,
+  }) {
+    return SessionsLoaded(
+      sessions: sessions ?? this.sessions,
+      action: action ?? this.action,
+      revokingId: revokingId,
+    );
   }
 
   @override
-  List<Object?> get props => <Object?>[sessions, action];
+  List<Object?> get props => <Object?>[sessions, action, revokingId];
 }

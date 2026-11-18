@@ -3,9 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/form_status.dart';
 import '../../../../core/security/password_policy.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/entities/credential_errors.dart';
 import '../bloc/register/register_bloc.dart';
 import '../widgets/auth_widgets.dart';
@@ -29,6 +27,27 @@ class _RegisterPageState extends State<RegisterPage> {
   final TextEditingController _deviceName = TextEditingController();
 
   bool _deviceNameFilled = false;
+
+  static const List<HelpTopic> _help = <HelpTopic>[
+    HelpTopic(
+      title: 'O que a senha administrativa protege',
+      body:
+          'As regras, os relatórios e a desvinculação dos aparelhos. Ela também é pedida no '
+          'aparelho da criança para mexer no controle, por isso não a compartilhe com ela.',
+    ),
+    HelpTopic(
+      title: 'E se eu esquecer a senha?',
+      body:
+          'Logo depois de criar a conta, o app mostra uma chave de recuperação. Ela é a única '
+          'forma de trocar a senha esquecida: guarde em papel ou em um gerenciador de senhas.',
+    ),
+    HelpTopic(
+      title: 'Outro responsável pode usar a conta?',
+      body:
+          'Pode. Ele entra com o mesmo e-mail e a mesma senha no celular dele, e esse aparelho '
+          'aparece em Mais, Sessões conectadas.',
+    ),
+  ];
 
   @override
   void initState() {
@@ -90,82 +109,95 @@ class _RegisterPageState extends State<RegisterPage> {
         _fillDeviceName(state.suggestedDeviceName);
       },
       builder: (BuildContext context, RegisterState state) {
+        // Depois de aceito, continua inativo ate o roteador sair da tela.
         final bool busy = state.status != FormStatus.editing;
         final CredentialErrors errors = state.errors;
         final String? formError = errors.form;
         return AuthScaffold(
+          eyebrow: 'Passo 1 de 3',
           title: 'Criar conta',
           subtitle:
-              'Esta é a identidade administrativa da família. A senha protege todas as regras '
-              'e os relatórios.',
+              'É a conta administrativa da família. A senha protege as regras e os '
+              'relatórios.',
+          trailing: const HelpButton(title: 'Conta da família', topics: _help),
           children: <Widget>[
-            if (formError != null) ...<Widget>[
-              NoticeBanner(message: formError, tone: Tone.danger),
-              const SizedBox(height: AppSpacing.lg),
-            ],
-            TextField(
+            AppTextField(
               controller: _name,
+              label: 'Seu nome',
+              isRequired: true,
               enabled: !busy,
+              errorText: errors.name,
               textCapitalization: TextCapitalization.words,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.name],
-              decoration: InputDecoration(
-                labelText: 'Seu nome',
-                errorText: errors.name,
-                prefixIcon: const Icon(Icons.person_outline),
-              ),
+              onChanged: (_) => _edited(CredentialField.name),
             ),
             const SizedBox(height: AppSpacing.lg),
-            TextField(
+            AppTextField(
               controller: _email,
+              label: 'E-mail',
+              isRequired: true,
+              hint: 'maria@exemplo.com',
+              helper: 'Usado para entrar na conta em outros aparelhos.',
               enabled: !busy,
+              errorText: errors.email,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.email],
-              decoration: InputDecoration(
-                labelText: 'E-mail',
-                helperText: 'Usado para entrar na conta em outros aparelhos.',
-                errorText: errors.email,
-                errorMaxLines: 3,
-                prefixIcon: const Icon(Icons.alternate_email),
-              ),
+              onChanged: (_) => _edited(CredentialField.email),
             ),
             const SizedBox(height: AppSpacing.lg),
-            PasswordField(
+            AppPasswordField(
               controller: _password,
+              isRequired: true,
               enabled: !busy,
               errorText: errors.password,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.newPassword],
               onChanged: (_) => _edited(CredentialField.password),
+              onSubmitted: (_) => focusNextAfterPassword(),
             ),
             const SizedBox(height: AppSpacing.md),
             PasswordStrengthMeter(password: _password.text, check: check),
             const SizedBox(height: AppSpacing.lg),
-            PasswordField(
+            AppPasswordField(
               controller: _confirm,
-              enabled: !busy,
               label: 'Repita a senha',
+              isRequired: true,
+              enabled: !busy,
               errorText: errors.confirmation,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.newPassword],
               onChanged: (_) => _edited(CredentialField.confirmation),
+              onSubmitted: (_) => focusNextAfterPassword(),
             ),
             const SizedBox(height: AppSpacing.lg),
-            TextField(
+            AppTextField(
               controller: _deviceName,
+              label: 'Nome deste aparelho',
+              helper: 'Aparece na lista de sessões conectadas da conta.',
               enabled: !busy,
               textInputAction: TextInputAction.done,
               onSubmitted: (_) => _submit(),
-              decoration: const InputDecoration(
-                labelText: 'Nome deste aparelho',
-                helperText: 'Aparece na lista de aparelhos conectados à conta.',
-                prefixIcon: Icon(Icons.smartphone_outlined),
-              ),
             ),
             const SizedBox(height: AppSpacing.xl),
-            BusyButton(label: 'Criar conta', busy: busy, onPressed: _submit),
+            if (formError != null) ...<Widget>[
+              AppBanner(
+                tone: Tone.danger,
+                title: 'Não foi possível criar a conta',
+                message: formError,
+                liveRegion: true,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            AppButton.primary(label: 'Criar conta', busy: busy, expand: true, onPressed: _submit),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Em seguida, você guarda a chave de recuperação e vincula o aparelho da criança.',
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall,
+            ),
           ],
         );
       },

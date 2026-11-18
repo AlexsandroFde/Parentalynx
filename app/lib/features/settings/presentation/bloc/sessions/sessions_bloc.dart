@@ -39,7 +39,7 @@ class SessionsBloc extends Bloc<SessionsEvent, SessionsState> {
     if (current is! SessionsLoaded) {
       return;
     }
-    emit(current.copyWith(action: const ActionRunning()));
+    emit(current.copyWith(action: const ActionRunning(), revokingId: event.sessionId));
     final Result<void> result = await _revokeSession(event.sessionId);
     if (result case Err<void>(:final AppFailure failure)) {
       emit(current.copyWith(action: actionStatusForFailure(failure)));

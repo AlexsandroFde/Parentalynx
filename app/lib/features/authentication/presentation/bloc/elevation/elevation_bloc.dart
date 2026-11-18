@@ -5,8 +5,8 @@ import '../../../../../core/bloc/event_transformers.dart';
 import '../../../../../core/bloc/form_status.dart';
 import '../../../../../core/errors/app_failure.dart';
 import '../../../../../core/result/result.dart';
-import '../../../../../core/time/formatters.dart';
 import '../../../domain/usecases/elevate_session.dart';
+import '../../messages/auth_messages.dart';
 
 part 'elevation_event.dart';
 part 'elevation_state.dart';
@@ -34,16 +34,7 @@ class ElevationBloc extends Bloc<ElevationEvent, ElevationState> {
     }
   }
 
-  static String _messageFor(AppFailure failure) {
-    if (failure is ApiFailure) {
-      if (failure.code == 'invalid_credentials') {
-        return 'Senha incorreta.';
-      }
-      final int? retry = failure.retryAfterSec;
-      if (failure.isLocked && retry != null) {
-        return 'Muitas tentativas. Tente de novo em ${formatMinutes((retry / 60).ceil())}.';
-      }
-    }
-    return failure.message;
-  }
+  /// Mesmo texto do desbloqueio do painel: senha incorreta, espera depois de muitas
+  /// tentativas (em minutos legiveis) ou o motivo da falha de conexao.
+  static String _messageFor(AppFailure failure) => unlockErrorFor(failure);
 }

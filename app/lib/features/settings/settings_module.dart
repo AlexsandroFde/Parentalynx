@@ -108,7 +108,8 @@ void registerSettingsModule(GetIt di) {
       ),
     )
     ..registerFactory<DeleteAccountBloc>(
-      () => DeleteAccountBloc(deleteAccount: di<DeleteAccount>()),
+      () =>
+          DeleteAccountBloc(deleteAccount: di<DeleteAccount>(), account: di<WatchCurrentAccount>()),
     )
     ..registerFactory<SessionsBloc>(
       () => SessionsBloc(

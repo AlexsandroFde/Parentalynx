@@ -10,6 +10,7 @@ import 'package:parentalynx/features/authentication/presentation/bloc/auth/auth_
 import 'package:parentalynx/features/child_device/presentation/bloc/devices/devices_bloc.dart';
 import 'package:parentalynx/features/settings/settings_module.dart';
 import 'package:parentalynx/features/settings/settings_routes.dart';
+import 'package:parentalynx/shared/design_system/design_system.dart';
 
 import '../../../support/fake_backend.dart';
 import '../../../support/guardian_api_fixtures.dart' show pumpGuardianRoutes, settle;
@@ -54,12 +55,18 @@ void main() {
     );
   });
 
-  Future<GoRouter> pumpMore(WidgetTester tester) {
+  Future<GoRouter> pumpMore(
+    WidgetTester tester, {
+    Brightness brightness = Brightness.light,
+    Size size = phoneSize,
+  }) {
     return pumpGuardianRoutes(
       tester,
       routes: settingsRoutes(deps.di),
       location: GuardianPaths.more,
       deps: deps,
+      brightness: brightness,
+      size: size,
       wrap: (Widget app) => MultiBlocProvider(
         providers: <BlocProvider<Object?>>[
           BlocProvider<AuthBloc>.value(value: deps.di<AuthBloc>()),
@@ -110,5 +117,36 @@ void main() {
     expect(router.state.matchedLocation, GuardianPaths.sessions);
     expect(find.text('Galaxy da Maria'), findsOneWidget);
     expect(find.text('Atual'), findsOneWidget);
+  });
+
+  testWidgets('aba Mais no tema escuro', tags: 'screenshot', (WidgetTester tester) async {
+    await pumpMore(tester, brightness: Brightness.dark);
+    await expectScreenshot(tester, 'guardian_more_escuro');
+  });
+
+  testWidgets('aba Mais funciona com a fonte no maior tamanho', (WidgetTester tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpMore(tester, size: const Size(392, 5200));
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('aba Mais segue as diretrizes de acessibilidade', (WidgetTester tester) async {
+    await pumpMore(tester, size: const Size(392, 2600));
+    await expectAccessible(tester);
+  });
+
+  testWidgets('pedido de tempo esperando destaca o item com o texto do que falta', (
+    WidgetTester tester,
+  ) async {
+    await pumpMore(tester);
+    final AppIconTile tile = tester.widget(
+      find.descendant(
+        of: find.ancestor(of: find.text('Pedidos de tempo'), matching: find.byType(AppListRow)),
+        matching: find.byType(AppIconTile),
+      ),
+    );
+    expect(tile.tone, Tone.warning);
+    expect(find.text('1 aguardando resposta'), findsOneWidget);
   });
 }

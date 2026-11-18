@@ -4,16 +4,17 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/form_status.dart';
 import '../../../../core/constants/route_paths.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
+import '../bloc/auth/auth_bloc.dart';
 import '../bloc/unlock/unlock_bloc.dart';
 import '../widgets/auth_widgets.dart';
 
 /// Tela de bloqueio do painel. Pede a senha administrativa na abertura do app e quando ele
 /// volta do segundo plano depois do tempo configurado.
 ///
-/// Espera um [UnlockBloc] acima na arvore. Ao desbloquear, o roteador leva de volta para onde
-/// a pessoa estava.
+/// Mostra de quem e a conta, o motivo do bloqueio e as saidas: recuperar o acesso ou entrar
+/// com outra conta. Espera acima na arvore o [UnlockBloc] e o [AuthBloc]. Ao desbloquear, o
+/// roteador leva de volta para onde a pessoa estava.
 class UnlockPage extends StatefulWidget {
   const UnlockPage({super.key});
 
@@ -32,6 +33,26 @@ class _UnlockPageState extends State<UnlockPage> {
 
   void _unlock() => context.read<UnlockBloc>().add(UnlockSubmitted(_password.text));
 
+  Future<void> _useAnotherAccount(String? email) async {
+    final bool confirmed = await showConfirmDialog(
+      context,
+      title: 'Entrar com outra conta?',
+      message: email == null
+          ? 'Este aparelho sai da conta atual.'
+          : 'Este aparelho sai da conta $email.',
+      consequence:
+          'Os aparelhos das crianças e as regras continuam como estão. Para voltar, entre com '
+          'o e-mail e a senha administrativa.',
+      confirmLabel: 'Sair da conta',
+      destructive: true,
+      icon: AppIcons.signOut,
+    );
+    if (!confirmed || !mounted) {
+      return;
+    }
+    context.read<AuthBloc>().add(const AuthSignOutRequested());
+  }
+
   @override
   Widget build(BuildContext context) {
     return BlocBuilder<UnlockBloc, UnlockState>(
@@ -40,13 +61,17 @@ class _UnlockPageState extends State<UnlockPage> {
         final String? email = state.email;
         return AuthScaffold(
           showAppBar: false,
-          icon: Icons.lock_outline,
+          icon: AppIcons.lock,
           title: 'Painel bloqueado',
-          subtitle: email == null
-              ? 'Digite a senha administrativa para abrir o painel.'
-              : 'Conta $email. Digite a senha administrativa para abrir o painel.',
+          subtitle:
+              'Por segurança, o painel pede a senha administrativa ao abrir o app e depois de '
+              'um tempo sem uso.',
           children: <Widget>[
-            PasswordField(
+            if (email != null) ...<Widget>[
+              _AccountRow(email: email, name: state.displayName),
+              const SizedBox(height: AppSpacing.xl),
+            ],
+            AppPasswordField(
               controller: _password,
               autofocus: true,
               enabled: !busy,
@@ -55,22 +80,48 @@ class _UnlockPageState extends State<UnlockPage> {
               onSubmitted: (_) => _unlock(),
             ),
             const SizedBox(height: AppSpacing.xl),
-            BusyButton(
+            AppButton.primary(
               label: 'Desbloquear',
-              icon: Icons.lock_open_outlined,
+              icon: AppIcons.unlock,
               busy: busy,
+              expand: true,
               onPressed: _unlock,
             ),
             const SizedBox(height: AppSpacing.sm),
-            Center(
-              child: TextButton(
-                onPressed: busy ? null : () => context.push(GuardianPaths.recover),
-                child: const Text('Esqueci a senha'),
-              ),
+            AppButton.tertiary(
+              label: 'Esqueci a senha',
+              expand: true,
+              onPressed: busy ? null : () => context.push(GuardianPaths.recover),
+            ),
+            AppButton.tertiary(
+              label: 'Entrar com outra conta',
+              expand: true,
+              onPressed: busy ? null : () => _useAnotherAccount(email),
             ),
           ],
         );
       },
+    );
+  }
+}
+
+/// De quem e a conta que esta pedindo a senha.
+class _AccountRow extends StatelessWidget {
+  const _AccountRow({required this.email, this.name});
+
+  final String email;
+  final String? name;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppListGroup(
+      children: <Widget>[
+        AppListRow(
+          leading: InitialAvatar(name: name ?? email),
+          title: name ?? email,
+          subtitle: name == null ? 'Conta conectada neste aparelho' : email,
+        ),
+      ],
     );
   }
 }

@@ -56,10 +56,16 @@ class ServerConfigBloc extends Bloc<ServerConfigEvent, ServerConfigState> {
     }
   }
 
+  /// O que deu errado e o que fazer. O endereco recusado nunca e gravado: o anterior continua.
   static String _messageFor(AppFailure failure) {
-    if (failure is ValidationFailure) {
-      return failure.message;
-    }
-    return 'Não foi possível falar com o servidor nesse endereço. ${failure.message}';
+    return switch (failure) {
+      ValidationFailure(:final String message) => message,
+      NetworkFailure() =>
+        'Não foi possível conectar a esse endereço. Confira se ele está certo e se o aparelho '
+            'tem internet. Nada foi alterado.',
+      _ =>
+        'Esse endereço respondeu, mas não como um servidor ParentaLynx. Confira o endereço com '
+            'quem instalou o servidor. Nada foi alterado.',
+    };
   }
 }

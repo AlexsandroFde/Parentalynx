@@ -279,7 +279,7 @@ void main() {
     );
 
     blocTest<ChangePasswordBloc, ChangePasswordState>(
-      'senha atual errada vira a mensagem geral; voltar a digitar nao apaga',
+      'senha atual errada marca o campo dela; digitar em outro campo nao apaga',
       setUp: () {
         when(() => changePassword(currentPassword: 'antiga', newPassword: 'Girassol-azul-42'))
             .thenAnswer((_) async => const Err<void>(_wrongPassword));
@@ -298,7 +298,9 @@ void main() {
       },
       expect: () => <ChangePasswordState>[
         initial.copyWith(status: FormStatus.submitting),
-        initial.copyWith(errors: const PasswordChangeErrors(form: 'A senha atual está incorreta.')),
+        initial.copyWith(
+          errors: const PasswordChangeErrors(current: 'A senha atual está incorreta.'),
+        ),
       ],
     );
 
@@ -367,6 +369,20 @@ void main() {
     setUp(() => deleteAccount = _MockDeleteAccount());
 
     DeleteAccountBloc build() => DeleteAccountBloc(deleteAccount: deleteAccount);
+
+    blocTest<DeleteAccountBloc, DeleteAccountState>(
+      'falha de conexao avisa no formulario que nada foi apagado, sem marcar a senha',
+      setUp: () {
+        when(() => deleteAccount('senha')).thenAnswer((_) async => const Err<void>(_offline));
+      },
+      build: build,
+      act: (DeleteAccountBloc bloc) =>
+          bloc.add(const DeleteAccountSubmitted(password: 'senha', word: 'EXCLUIR')),
+      expect: () => <DeleteAccountState>[
+        const DeleteAccountState(status: FormStatus.submitting),
+        DeleteAccountState(formError: _offline.message),
+      ],
+    );
 
     blocTest<DeleteAccountBloc, DeleteAccountState>(
       'sem a palavra de confirmacao nada e enviado',
@@ -463,7 +479,7 @@ void main() {
       seed: () => SessionsLoaded(sessions: both),
       act: (SessionsBloc bloc) => bloc.add(const SessionRevokeRequested('s2')),
       expect: () => <SessionsState>[
-        SessionsLoaded(sessions: both, action: const ActionRunning()),
+        SessionsLoaded(sessions: both, action: const ActionRunning(), revokingId: 's2'),
         SessionsLoaded(
           sessions: onlyCurrent,
           action: const ActionSucceeded(message: 'Sessão encerrada.'),
@@ -482,7 +498,7 @@ void main() {
       seed: () => SessionsLoaded(sessions: both),
       act: (SessionsBloc bloc) => bloc.add(const SessionRevokeRequested('s2')),
       expect: () => <SessionsState>[
-        SessionsLoaded(sessions: both, action: const ActionRunning()),
+        SessionsLoaded(sessions: both, action: const ActionRunning(), revokingId: 's2'),
         SessionsLoaded(
           sessions: onlyCurrent,
           action: const ActionSucceeded(message: 'Sessão encerrada.'),
@@ -499,7 +515,7 @@ void main() {
       seed: () => SessionsLoaded(sessions: both),
       act: (SessionsBloc bloc) => bloc.add(const SessionRevokeRequested('s2')),
       expect: () => <SessionsState>[
-        SessionsLoaded(sessions: both, action: const ActionRunning()),
+        SessionsLoaded(sessions: both, action: const ActionRunning(), revokingId: 's2'),
         SessionsLoaded(sessions: both, action: const ActionFailed(_offline)),
       ],
     );

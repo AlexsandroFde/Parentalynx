@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../shared/design_system/design_system.dart';
+import '../../../authentication/presentation/widgets/auth_widgets.dart';
 import '../../domain/services/account_rules.dart';
 
 /// Pede o nome de exibicao. Devolve o nome digitado, sem espacos nas pontas, ou nulo.
@@ -40,23 +42,29 @@ class _DisplayNameDialogState extends State<_DisplayNameDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Seu nome'),
-      content: TextField(
+    return FormDialogFrame(
+      icon: AppIcons.person,
+      title: 'Seu nome',
+      message: 'É o nome da conta da família, mostrado no topo da aba Mais.',
+      confirmLabel: 'Salvar',
+      onConfirm: _submit,
+      onCancel: () => Navigator.of(context).pop(),
+      field: AppTextField(
         controller: _name,
+        label: 'Nome',
+        isRequired: true,
+        helper: 'Até ${AccountRules.maxDisplayNameLength} caracteres.',
+        errorText: _error,
         autofocus: true,
         textCapitalization: TextCapitalization.words,
+        textInputAction: TextInputAction.done,
+        onChanged: (_) {
+          if (_error != null) {
+            setState(() => _error = null);
+          }
+        },
         onSubmitted: (_) => _submit(),
-        decoration: InputDecoration(labelText: 'Nome', errorText: _error),
       ),
-      actions: <Widget>[
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar')),
-        FilledButton(
-          style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
-          onPressed: _submit,
-          child: const Text('Salvar'),
-        ),
-      ],
     );
   }
 }

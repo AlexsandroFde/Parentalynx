@@ -4,17 +4,15 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/action_status.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../../authentication/domain/entities/guardian_account.dart';
+import '../../../authentication/presentation/widgets/auth_widgets.dart';
 import '../../../authentication/presentation/widgets/recovery_key_view.dart';
 import '../bloc/account/account_bloc.dart';
 import '../bloc/change_password/change_password_bloc.dart';
 import '../bloc/delete_account/delete_account_bloc.dart';
 import '../dialogs/display_name_dialog.dart';
 import '../dialogs/password_prompt_dialog.dart';
-import '../messages/settings_messages.dart';
 import 'change_password_page.dart';
 import 'delete_account_page.dart';
 
@@ -36,38 +34,37 @@ class AccountPage extends StatelessWidget {
     context.read<AccountBloc>().add(AccountNameSubmitted(name));
   }
 
+  /// O pedido de senha cuida da recusa; com a chave gerada, ela aparece em tela cheia.
   Future<void> _newRecoveryKey(BuildContext context) async {
-    final String? password = await showPasswordPrompt(
-      context,
-      title: 'Gerar nova chave',
-      message:
-          'A chave de recuperação atual deixa de valer. Confirme a senha administrativa para '
-          'gerar outra.',
-      confirmLabel: 'Gerar',
-    );
-    if (password == null || !context.mounted) {
+    final bool generated = await showRecoveryKeyPrompt(context);
+    if (!generated || !context.mounted) {
       return;
     }
-    context.read<AccountBloc>().add(AccountRecoveryKeyRequested(password));
+    final AccountBloc bloc = context.read<AccountBloc>();
+    final String? recoveryKey = bloc.state.recoveryKey;
+    if (recoveryKey == null) {
+      return;
+    }
+    bloc.add(const AccountRecoveryKeyShown());
+    await _showRecoveryKey(context, recoveryKey);
   }
 
   void _onAction(BuildContext context, AccountState state) {
+    // A chave nova e tratada pelo proprio pedido de senha.
+    if (state.command != AccountCommand.rename) {
+      return;
+    }
     switch (state.action) {
       case ActionSucceeded(:final String? message):
         if (message != null) {
           showAppSnackBar(context, message, tone: Tone.success);
         }
-        final String? recoveryKey = state.recoveryKey;
-        if (recoveryKey != null) {
-          context.read<AccountBloc>().add(const AccountRecoveryKeyShown());
-          unawaited(_showRecoveryKey(context, recoveryKey));
-        }
       case ActionFailed(:final failure):
-        if (state.command == AccountCommand.recoveryKey) {
-          showAppSnackBar(context, passwordConfirmationErrorFor(failure), tone: Tone.danger);
-        } else {
-          showFailure(context, failure);
-        }
+        showAppSnackBar(
+          context,
+          'Não foi possível alterar o nome. O nome anterior continua. ${failure.message}',
+          tone: Tone.danger,
+        );
       case ActionIdle() || ActionRunning():
         break;
     }
@@ -81,6 +78,7 @@ class AccountPage extends StatelessWidget {
         builder: (BuildContext pageContext) => PopScope(
           canPop: false,
           child: RecoveryKeyView(
+            eyebrow: 'Nova chave gerada',
             recoveryKey: recoveryKey,
             onDone: () => Navigator.of(pageContext).pop(),
           ),
@@ -122,81 +120,96 @@ class AccountPage extends StatelessWidget {
         return previous.action != current.action;
       },
       listener: _onAction,
-      buildWhen: (AccountState previous, AccountState current) {
-        return previous.account != current.account;
-      },
       builder: (BuildContext context, AccountState state) {
         final GuardianAccount? account = state.account;
+        final bool renaming = state.command == AccountCommand.rename && state.action.isRunning;
         return Scaffold(
           appBar: AppBar(title: const Text('Conta e senha')),
-          body: account == null
-              ? const LoadingView()
-              : PageBody(
-                  children: <Widget>[
-                    SectionCard(
-                      title: 'Seus dados',
-                      padding: const EdgeInsets.only(top: AppSpacing.lg, bottom: AppSpacing.sm),
-                      child: Column(
-                        children: <Widget>[
-                          ListTile(
-                            leading: const Icon(Icons.person_outline),
-                            title: const Text('Nome'),
-                            subtitle: Text(
-                              account.displayName.isEmpty ? 'Não informado' : account.displayName,
-                            ),
-                            trailing: const Icon(Icons.edit_outlined),
-                            onTap: () => _editName(context, account),
+          body: StateSwitcher(
+            child: account == null
+                ? const KeyedSubtree(key: ValueKey<String>('carregando'), child: LoadingState())
+                : KeyedSubtree(
+                    key: const ValueKey<String>('conta'),
+                    child: AppPageBody(
+                      children: <Widget>[
+                        AppSection(
+                          title: 'Seus dados',
+                          child: AppListGroup(
+                            footer: 'O e-mail é usado para entrar na conta e não muda por aqui.',
+                            children: <Widget>[
+                              AppListRow(
+                                leading: const AppIconTile(icon: AppIcons.person),
+                                title: 'Nome',
+                                subtitle: account.displayName.isEmpty
+                                    ? 'Não informado'
+                                    : account.displayName,
+                                trailing: renaming
+                                    ? const InlineProgress(label: 'Salvando o nome')
+                                    : ExcludeSemantics(
+                                        child: Icon(
+                                          AppIcons.edit,
+                                          color: context.colors.textSecondary,
+                                        ),
+                                      ),
+                                onTap: renaming ? null : () => _editName(context, account),
+                              ),
+                              AppListRow(
+                                leading: const AppIconTile(icon: AppIcons.email),
+                                title: 'E-mail',
+                                subtitle: account.email,
+                              ),
+                            ],
                           ),
-                          ListTile(
-                            leading: const Icon(Icons.alternate_email),
-                            title: const Text('E-mail'),
-                            subtitle: Text(account.email),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    SectionCard(
-                      title: 'Senha administrativa',
-                      subtitle:
-                          'Protege as regras, os relatórios e a desvinculação no aparelho da '
-                          'criança. Ao trocar, os outros aparelhos conectados à conta precisam '
-                          'entrar de novo.',
-                      child: OutlinedButton.icon(
-                        onPressed: () => _openChangePassword(context),
-                        icon: const Icon(Icons.password),
-                        label: const Text('Trocar senha'),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    SectionCard(
-                      title: 'Chave de recuperação',
-                      subtitle:
-                          'É a única forma de recuperar o acesso se você esquecer a senha. Se '
-                          'perdeu a chave ou alguém a viu, gere outra.',
-                      child: OutlinedButton.icon(
-                        onPressed: () => _newRecoveryKey(context),
-                        icon: const Icon(Icons.key_outlined),
-                        label: const Text('Gerar nova chave'),
-                      ),
-                    ),
-                    const SizedBox(height: AppSpacing.lg),
-                    SectionCard(
-                      title: 'Excluir conta',
-                      subtitle:
-                          'Apaga a conta, os aparelhos vinculados, as regras e todo o histórico. '
-                          'Os aparelhos das crianças deixam de ser controlados.',
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: Theme.of(context).colorScheme.error,
                         ),
-                        onPressed: () => _openDeleteAccount(context),
-                        icon: const Icon(Icons.delete_forever_outlined),
-                        label: const Text('Excluir conta e dados'),
-                      ),
+                        const SectionGap(),
+                        AppSection(
+                          title: 'Acesso',
+                          child: AppListGroup(
+                            footer:
+                                'Ao trocar a senha, os outros celulares conectados à conta '
+                                'precisam entrar de novo.',
+                            children: <Widget>[
+                              AppListRow(
+                                leading: const AppIconTile(icon: AppIcons.password),
+                                title: 'Trocar senha',
+                                subtitle:
+                                    'A senha administrativa protege as regras e os relatórios.',
+                                onTap: () => _openChangePassword(context),
+                              ),
+                              AppListRow(
+                                leading: const AppIconTile(icon: AppIcons.key),
+                                title: 'Gerar nova chave',
+                                subtitle:
+                                    'Chave de recuperação para quando a senha for esquecida. '
+                                    'Gere outra se perdeu a atual ou alguém a viu.',
+                                onTap: () => _newRecoveryKey(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SectionGap(),
+                        AppSection(
+                          title: 'Excluir conta',
+                          child: AppListGroup(
+                            children: <Widget>[
+                              AppListRow(
+                                leading: const AppIconTile(
+                                  icon: AppIcons.deleteForever,
+                                  tone: Tone.danger,
+                                ),
+                                title: 'Excluir conta e dados',
+                                subtitle:
+                                    'Apaga a conta, os aparelhos vinculados, as regras e todo o '
+                                    'histórico. Não pode ser desfeito.',
+                                onTap: () => _openDeleteAccount(context),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+          ),
         );
       },
     );

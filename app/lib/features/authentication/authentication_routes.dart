@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/route_paths.dart';
+import '../server_config/presentation/bloc/server_config_bloc.dart';
 import 'presentation/bloc/guardian_entry/guardian_entry_bloc.dart';
 import 'presentation/bloc/login/login_bloc.dart';
 import 'presentation/bloc/recover_access/recover_access_bloc.dart';
@@ -23,9 +24,17 @@ List<RouteBase> authenticationRoutes(GetIt di) {
     GoRoute(
       path: GuardianPaths.signIn,
       builder: (BuildContext context, GoRouterState state) {
-        return BlocProvider<GuardianEntryBloc>(
-          create: (BuildContext context) =>
-              di<GuardianEntryBloc>()..add(const GuardianEntryStarted()),
+        return MultiBlocProvider(
+          providers: <BlocProvider<Object?>>[
+            BlocProvider<GuardianEntryBloc>(
+              create: (BuildContext context) =>
+                  di<GuardianEntryBloc>()..add(const GuardianEntryStarted()),
+            ),
+            // Troca do servidor pela folha, sem voltar para a escolha do papel do aparelho.
+            BlocProvider<ServerConfigBloc>(
+              create: (BuildContext context) => di<ServerConfigBloc>(),
+            ),
+          ],
           child: const SignInPage(),
         );
       },

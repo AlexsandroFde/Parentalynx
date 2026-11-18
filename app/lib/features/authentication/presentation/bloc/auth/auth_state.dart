@@ -27,8 +27,11 @@ final class AuthSignedOut extends AuthState {
   /// Explica por que a sessao anterior terminou, quando nao foi a pessoa que saiu.
   String? get notice {
     return switch (reason) {
-      SessionEndReason.expired => 'Sua sessão foi encerrada. Entre de novo para continuar.',
-      SessionEndReason.accountDeleted => 'Sua conta e todos os dados foram excluídos.',
+      SessionEndReason.expired =>
+        'Sua sessão terminou por tempo ou foi encerrada em outro aparelho. Entre de novo para '
+            'continuar.',
+      SessionEndReason.accountDeleted =>
+        'A conta, os aparelhos vinculados, as regras e todo o histórico foram apagados.',
       SessionEndReason.signedOut || null => null,
     };
   }

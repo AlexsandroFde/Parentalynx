@@ -3,9 +3,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/form_status.dart';
 import '../../../../core/security/password_policy.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/entities/credential_errors.dart';
 import '../bloc/recover_access/recover_access_bloc.dart';
 import '../widgets/auth_widgets.dart';
@@ -28,6 +26,27 @@ class _RecoverPageState extends State<RecoverPage> {
   final TextEditingController _confirm = TextEditingController();
 
   bool _emailFilled = false;
+
+  static const List<HelpTopic> _help = <HelpTopic>[
+    HelpTopic(
+      title: 'Onde está a chave?',
+      body:
+          'Ela apareceu uma única vez, logo depois de criar a conta ou de gerar uma chave nova. '
+          'Procure no papel ou no gerenciador de senhas onde você a guardou.',
+    ),
+    HelpTopic(
+      title: 'Perdi a chave e a senha',
+      body:
+          'Por segurança, o servidor não guarda a chave e não há outra forma de trocar a '
+          'senha esquecida. Sem as duas, não é possível recuperar esta conta.',
+    ),
+    HelpTopic(
+      title: 'O que muda depois de recuperar',
+      body:
+          'A senha é trocada, uma chave nova é gerada e os outros aparelhos conectados à conta '
+          'precisam entrar de novo. As regras e os aparelhos das crianças continuam iguais.',
+    ),
+  ];
 
   @override
   void initState() {
@@ -87,72 +106,91 @@ class _RecoverPageState extends State<RecoverPage> {
         return AuthScaffold(
           title: 'Recuperar acesso',
           subtitle:
-              'Informe a chave de recuperação mostrada quando a conta foi criada e escolha uma '
-              'nova senha administrativa.',
+              'Use a chave de recuperação guardada quando a conta foi criada e escolha uma nova '
+              'senha administrativa.',
+          trailing: const HelpButton(title: 'Recuperar acesso', topics: _help),
           children: <Widget>[
-            if (formError != null) ...<Widget>[
-              NoticeBanner(message: formError, tone: Tone.danger),
-              const SizedBox(height: AppSpacing.lg),
-            ],
-            TextField(
+            AppTextField(
               controller: _email,
+              label: 'E-mail da conta',
+              isRequired: true,
+              hint: 'maria@exemplo.com',
               enabled: !busy,
+              errorText: errors.email,
               keyboardType: TextInputType.emailAddress,
               autocorrect: false,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.email],
-              decoration: InputDecoration(
-                labelText: 'E-mail da conta',
-                errorText: errors.email,
-                prefixIcon: const Icon(Icons.alternate_email),
-              ),
+              onChanged: (_) => _edited(CredentialField.email),
             ),
             const SizedBox(height: AppSpacing.lg),
-            TextField(
+            AppTextField(
               controller: _key,
+              label: 'Chave de recuperação',
+              isRequired: true,
+              hint: 'RK-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX',
+              helper: 'Letras e números em grupos de cinco. Espaços e minúsculas são aceitos.',
               enabled: !busy,
+              errorText: errors.recoveryKey,
               autocorrect: false,
               enableSuggestions: false,
               textCapitalization: TextCapitalization.characters,
               textInputAction: TextInputAction.next,
-              style: const TextStyle(letterSpacing: 0.8),
-              decoration: InputDecoration(
-                labelText: 'Chave de recuperação',
-                hintText: 'RK-XXXXX-XXXXX-XXXXX-XXXXX-XXXXX',
-                errorText: errors.recoveryKey,
-                prefixIcon: const Icon(Icons.key_outlined),
+              style: context.text.bodyLarge?.copyWith(
+                letterSpacing: 0.8,
+                fontFeatures: AppTypography.tabularFigures,
               ),
+              onChanged: (_) => _edited(CredentialField.recoveryKey),
             ),
             const SizedBox(height: AppSpacing.lg),
-            PasswordField(
+            AppPasswordField(
               controller: _password,
-              enabled: !busy,
               label: 'Nova senha administrativa',
+              isRequired: true,
+              enabled: !busy,
               errorText: errors.password,
               textInputAction: TextInputAction.next,
               autofillHints: const <String>[AutofillHints.newPassword],
               onChanged: (_) => _edited(CredentialField.password),
+              onSubmitted: (_) => focusNextAfterPassword(),
             ),
             const SizedBox(height: AppSpacing.md),
             PasswordStrengthMeter(password: _password.text, check: check),
             const SizedBox(height: AppSpacing.lg),
-            PasswordField(
+            AppPasswordField(
               controller: _confirm,
-              enabled: !busy,
               label: 'Repita a nova senha',
+              isRequired: true,
+              enabled: !busy,
               errorText: errors.confirmation,
               autofillHints: const <String>[AutofillHints.newPassword],
               onChanged: (_) => _edited(CredentialField.confirmation),
               onSubmitted: (_) => _submit(),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            const NoticeBanner(
-              message:
-                  'Ao recuperar, a senha é trocada, uma nova chave de recuperação é gerada e os '
-                  'outros aparelhos conectados à conta precisam entrar de novo.',
-            ),
             const SizedBox(height: AppSpacing.xl),
-            BusyButton(label: 'Recuperar acesso', busy: busy, onPressed: _submit),
+            const AppBanner(
+              tone: Tone.warning,
+              title: 'Ao recuperar',
+              message:
+                  'A senha é trocada, uma nova chave de recuperação é gerada e os outros '
+                  'aparelhos conectados à conta precisam entrar de novo.',
+            ),
+            const SizedBox(height: AppSpacing.lg),
+            if (formError != null) ...<Widget>[
+              AppBanner(
+                tone: Tone.danger,
+                title: 'Não foi possível recuperar o acesso',
+                message: '$formError A senha anterior continua valendo.',
+                liveRegion: true,
+              ),
+              const SizedBox(height: AppSpacing.lg),
+            ],
+            AppButton.primary(
+              label: 'Recuperar acesso',
+              busy: busy,
+              expand: true,
+              onPressed: _submit,
+            ),
           ],
         );
       },
