@@ -1,6 +1,7 @@
 # ADR 0002: Identidade visual própria e Design System "Lince"
 
-- **Status:** aceito
+- **Status:** aceito; cores, formas e pesos revistos pela
+  [ADR 0003](0003-revisao-visual-sobriedade.md)
 - **Data:** 17/11/2026
 - **Relacionado:** [ADR 0001](0001-bloc-clean-architecture.md) (arquitetura), diretriz de UI/UX
   com as 10 heurísticas de Nielsen

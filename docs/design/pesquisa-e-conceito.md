@@ -23,8 +23,9 @@ reproduzido: as referências serviram para entender decisões, não como modelo 
 
 1. **Um número em destaque por contexto.** O tempo restante é a resposta à pergunta mais comum
    dos dois perfis ("quanto falta?").
-2. **Espaço em vez de borda.** Os produtos mais bem acabados separam assuntos por espaço e
-   contraste de superfície; bordas ficam para o que é interativo (campos).
+2. **Espaço entre assuntos, contorno fino nas superfícies.** Os produtos mais bem acabados
+   separam assuntos por espaço e delimitam superfícies com uma linha fina e neutra, sem sombra
+   e sem fundo colorido (revisão da [ADR 0003](../adr/0003-revisao-visual-sobriedade.md)).
 3. **Estado sempre visível e com texto.** "Aplicado", "Aguardando", "Sem conexão" aparecem com
    ícone e texto, nunca só com cor.
 4. **Ações perto do que mudam.** Tempo extra fica junto do tempo de hoje; o pedido de tempo da
@@ -40,7 +41,7 @@ O lince enxerga longe e no escuro, sem alarde. O ParentaLynx deve transmitir a m
 | Atributo | No responsável | Na criança |
 | --- | --- | --- |
 | Tom | Confiança, controle, clareza | Acolhimento, simplicidade, transparência |
-| Forma | Raios médios (14 a 20), linhas firmes | Raios maiores (20 a 32), formas mais macias |
+| Forma | Raios contidos (8 a 16), contornos finos | Raios um pouco maiores (12 a 20) |
 | Texto | Escala padrão, hierarquia forte | Corpo e títulos 8% maiores, frases curtas |
 | Restrição | Estado com nome e regra que o causou | Explicação gentil do motivo e de quando volta |
 | Cor de restrição | Coral para erro e tentativa bloqueada; anil para descanso | Anil (descanso), nunca vermelho |
@@ -50,8 +51,9 @@ Os dois perfis usam os mesmos tokens e componentes; a diferença vem do tema do 
 
 ### Princípios visuais
 
-1. **Calma antes de alarme.** Fundo de areia quente, superfícies brancas sem borda e uma única
-   cor de ação. Vermelho só para erro e para o que é destrutivo.
+1. **Calma antes de alarme.** Fundo grafite neutro, superfícies brancas com contorno fino e uma
+   única cor de ação. Cores de estado só em ícones e textos curtos; vermelho só para erro e para
+   o que é destrutivo.
 2. **Uma cor, um significado.** Petróleo é ação e marca; verde é permitido/aplicado; ocre é
    atenção/pendente; coral é erro; anil é descanso. Âmbar aparece só no logotipo.
 3. **Hierarquia pela tipografia.** Título grande da página, títulos de seção pequenos e firmes,
@@ -69,10 +71,13 @@ Os dois perfis usam os mesmos tokens e componentes; a diferença vem do tema do 
 - **Petróleo (`#136874`)** como cor da marca e de tudo que é interativo. Fica entre o azul da
   confiança e o verde da calma, e se diferencia do azul genérico dos templates. Contraste de
   6,4:1 com texto branco.
-- **Areia** nos neutros do tema claro (`#F6F4EF` no fundo): um papel quente que tira a frieza do
-  branco puro e dá contraste suave com as superfícies brancas.
-- **Noite** nos neutros do tema escuro, levemente frios. O tema escuro não é uma inversão: cada
-  papel tem o seu valor próprio (por exemplo, petróleo claro `#9FD3D9` para ações).
+- **Grafite** nos neutros do tema claro (`#F6F6F7` no fundo): neutros levemente frios, sem
+  puxar para o bege, que deixam o petróleo como a única cor da interface. A primeira versão
+  usava areia quente; a [ADR 0003](../adr/0003-revisao-visual-sobriedade.md) trocou por grafite
+  para um visual mais sóbrio.
+- **Noite** nos neutros do tema escuro, da mesma família do grafite. O tema escuro não é uma
+  inversão: cada papel tem o seu valor próprio (por exemplo, petróleo claro `#6DBAC3` para
+  ações).
 - **Anil para descanso.** Hora de dormir e pausas são combinados, não erros; por isso têm uma
   cor própria, distinta do vermelho.
 - Todos os textos pequenos têm contraste de pelo menos 4,5:1 sobre o fundo e sobre a superfície
@@ -81,7 +86,8 @@ Os dois perfis usam os mesmos tokens e componentes; a diferença vem do tema do 
 ### Tipografia
 
 **Manrope**, embutida no app (licença SIL OFL 1.1, sem download em tempo de execução).
-Geométrica e humana: firme no painel e amigável para a criança. Tem algarismos tabulares
+Geométrica e humana: firme no painel e amigável para a criança. Títulos em 600 e texto corrido
+em 500: a hierarquia vem do tamanho e da cor, não do excesso de peso. Tem algarismos tabulares
 (`tnum`), usados em tempos e contagens para os números não "pularem" quando mudam, e todos os
 caracteres do português.
 

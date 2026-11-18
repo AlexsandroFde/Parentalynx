@@ -68,8 +68,9 @@ Para testar sem um segundo aparelho, o backend traz um simulador de aparelho da 
    - Interface: [Design System "Lince"](docs/design/design-system.md), com a
      [pesquisa e o conceito visual](docs/design/pesquisa-e-conceito.md), a
      [arquitetura de informação](docs/design/arquitetura-de-informacao.md), a
-     [avaliação de usabilidade por funcionalidade](docs/usabilidade/README.md) e o
-     [ADR 0002](docs/adr/0002-identidade-visual-e-design-system.md)
+     [avaliação de usabilidade por funcionalidade](docs/usabilidade/README.md), o
+     [ADR 0002](docs/adr/0002-identidade-visual-e-design-system.md) e a revisão visual do
+     [ADR 0003](docs/adr/0003-revisao-visual-sobriedade.md)
 3. [Protocolo: API, política, eventos e sincronização](docs/03-protocolo.md)
 4. [Instalação](docs/04-instalacao.md)
 5. [Modo Device Owner](docs/05-device-owner.md)

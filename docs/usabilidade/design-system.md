@@ -15,7 +15,7 @@ Perfil: os dois.
 | H5 Prevenção de erros | Botão ocupado ignora toques (sem envio duplo); campos com obrigatório marcado e formato esperado visível (`isRequired`, `hint`, `helper`); confirmação nomeia a ação ("Desvincular", não "OK"). |
 | H6 Reconhecimento | `AppPageHeader` com o contexto (criança, aparelho); rótulos de campo sempre visíveis. |
 | H7 Eficiência | `AppChoiceChips` e o seletor de duração com valores prontos. |
-| H8 Minimalismo | Seções separadas por espaço, listas agrupadas em um único painel, sem bordas e sombras em conteúdo. |
+| H8 Minimalismo | Seções separadas por espaço, listas agrupadas em um único painel com contorno fino, sem sombras e sem fundos coloridos; cor só no que é interativo e nos estados. |
 | H9 Erros | `ErrorState` e `AppBanner` seguem o modelo "o que aconteceu, o que foi salvo, o que fazer", com ação de recuperação. |
 | H10 Ajuda | `HelpButton`/`showHelpSheet` com perguntas e respostas curtas, ao lado do que explicam. |
 
@@ -37,6 +37,12 @@ Perfil: os dois.
 | 12 | Tela de bloqueio nativa | Título "App bloqueado"/"Limite diário atingido" em fundo índigo antigo, tom punitivo; "Liberação às 07:00". | H2, perfil da criança | Média | Fundo petróleo (anil nos descansos), Manrope, textos que explicam o motivo e quando volta ("O tempo de hoje acabou", "Hora de descansar", "Volta a funcionar amanhã às 07:00"); ícone de pausa para a pausa do responsável. | Compilação do APK; validação em aparelho pendente |
 | 13 | Tela de bloqueio nativa | "Pedido registrado. Seu responsável será avisado." prometia um aviso imediato mesmo offline. | H1 | Média | "Pedido registrado. Seu responsável recebe o aviso assim que o celular estiver conectado." | Revisão do fluxo (o pedido vai para a fila do agente) |
 | 14 | Ícone do app | Escudo com relógio no índigo antigo, sem relação com a marca. | H4, identidade | Baixa | Lince da marca em vetor, com versão monocromática para ícones temáticos. | Compilação do APK |
+| 15 | Visual geral | Aparência de interface gerada: fundos pastel em botões, avisos, etiquetas e ícones; cantos de 20 a 28; pílulas; sobretítulos em maiúsculas; pesos 700 e 800 em quase todos os títulos; fundo de areia. | H8, H4 | Média | Revisão da [ADR 0003](../adr/0003-revisao-visual-sobriedade.md): neutros grafite, contorno fino nas superfícies, cor só em ícones e textos de estado, raios de 8 a 16, títulos em 600, sobretítulo em caixa normal. | Capturas de referência regeneradas em todas as telas |
+| 16 | Botões | O secundário em petróleo claro (solução do item 2) disputava atenção com o primário e somava mais um fundo colorido à tela. | H8, H4 | Baixa | Secundário contornado sobre a superfície, com texto na cor do texto principal; o primário é o único botão preenchido. Desabilitado continua em cinza. | `ds_acoes_*.png` |
+| 17 | Campos | O rótulo ficava no recorte da borda, desenho padrão do Material. | H6 | Baixa | Rótulo acima do contorno, sempre visível e anunciado como nome do campo pelo leitor de tela. | Teste de acessibilidade dos formulários |
+| 18 | Listas | Um quadrado colorido atrás de cada ícone de linha e as letras dos apps em petróleo transformavam as listas em um mosaico. | H8 | Baixa | Ícone de linha sem fundo, em cinza, colorido só para confirmação, atenção e erro; letras dos apps em quadrado neutro. | `ds_conteudo_*.png`, regras, relatórios |
+| 19 | Painel do responsável | O anel do tempo ocupava boa parte da primeira tela e o avatar repetia o nome da criança. | H8 | Baixa | Tempo restante em número com barra de uso; cabeçalho sem avatar. | `dashboard_*.png` |
+| 20 | Tela de bloqueio nativa | Degradê, cantos de 20 a 28 e círculo translúcido destoavam do app. | H4 | Baixa | Fundo sólido (petróleo escuro ou anil escuro nos descansos), cantos de 12 a 16, ícone em quadro contornado, título em Bold. | Compilação do APK; validação em aparelho pendente |
 
 ## Pendências
 

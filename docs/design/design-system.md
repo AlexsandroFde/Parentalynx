@@ -8,8 +8,9 @@ import '../../../../shared/design_system/design_system.dart';
 ```
 
 O conceito, as referências e as decisões de identidade estão em
-[pesquisa-e-conceito.md](pesquisa-e-conceito.md). As capturas do catálogo, nos temas claro e
-escuro, ficam em `app/test/shared/design_system/screenshots/` (`ds_*.png`).
+[pesquisa-e-conceito.md](pesquisa-e-conceito.md); a revisão visual que deixou a interface mais
+sóbria está na [ADR 0003](../adr/0003-revisao-visual-sobriedade.md). As capturas do catálogo,
+nos temas claro e escuro, ficam em `app/test/shared/design_system/screenshots/` (`ds_*.png`).
 
 ```text
 shared/design_system/
@@ -47,12 +48,16 @@ Cada papel tem um único significado em todo o app. Use o papel, nunca a primiti
 
 | Papel | Significado | Claro | Escuro |
 | --- | --- | --- | --- |
-| `canvas` | Fundo das páginas | areia `#F6F4EF` | noite `#0F1112` |
-| `surface` | Painéis, listas, folhas, campos | `#FFFFFF` | `#1B1F21` |
-| `surfaceMuted` | Trilhos, chips, áreas de apoio | `#EEEBE4` | `#22272A` |
-| `textPrimary` / `textSecondary` | Texto principal / de apoio (4,5:1) | `#1C1C1B` / `#66635D` | `#E9ECEC` / `#A7B0B4` |
-| `primary` | Marca e tudo que é interativo | petróleo `#136874` | `#9FD3D9` |
-| `primaryContainer` | Ações secundárias, seleção | `#CDE9EC` | `#0C444D` |
+| `canvas` | Fundo das páginas | grafite `#F6F6F7` | noite `#0F0F11` |
+| `surface` | Painéis, listas, folhas, campos | `#FFFFFF` | `#18181B` |
+| `surfaceMuted` | Trilhos, avatares, áreas de apoio | `#F0F0F2` | `#1F1F23` |
+| `hairline` | Divisores e contorno de painéis e listas | `#E6E6EA` | `#26262B` |
+| `border` | Contorno de controles que já têm texto (secundário, chips) | `#D8D8DE` | `#36363D` |
+| `outline` | Contorno de campos e caixas de seleção (3:1) | `#8B8B94` | `#6E6E78` |
+| `textPrimary` / `textSecondary` | Texto principal / de apoio (6:1 ou mais) | `#17171A` / `#5C5C66` | `#ECECEF` / `#A3A3AD` |
+| `textTertiary` | Texto de exemplo dos campos (4,5:1) | `#73737D` | `#808089` |
+| `primary` | Marca e tudo que é interativo | petróleo `#136874` | `#6DBAC3` |
+| `primaryContainer` | Fundo leve da seleção (chip escolhido) | `#EDF5F6` | `#0F2629` |
 | `success` | Permitido, aplicado, online | `#1A6E44` | `#7FD3A6` |
 | `warning` | Atenção, pendente, pouco tempo | `#8A5100` | `#F2BF6C` |
 | `danger` | Erro, destrutivo, tentativa bloqueada | `#B4372F` | `#FF9F93` |
@@ -60,35 +65,50 @@ Cada papel tem um único significado em todo o app. Use o papel, nunca a primiti
 | `brandAccent` | Só o logotipo | âmbar `#E59B32` | `#F6C46A` |
 | `chart` | Séries de gráficos, em ordem fixa | 6 cores | 6 cores |
 
+A interface é quase toda neutra. O petróleo aparece no que é interativo e na marca; as cores de
+estado aparecem em ícones e textos curtos, nunca como fundo decorativo de botões, avisos,
+etiquetas ou ícones.
+
 ### Tom semântico (`Tone`)
 
-`neutral`, `info`, `success`, `warning`, `danger` e `rest`. Componentes com tom (avisos,
-etiquetas, ícones de linha) leem `tone.foreground`, `tone.background` e `tone.onBackground`, e
-sempre mostram também um ícone e um texto: a cor nunca é o único sinal.
+`neutral`, `info`, `success`, `warning`, `danger` e `rest`. O tom colore o ícone e o texto
+curto (`tone.foreground`), não o fundo: avisos e etiquetas ficam sobre a superfície neutra, e
+atenção e erro ganham também o contorno do tom (`tone.border`). Ícones que acompanham um título
+(linhas de lista, marcadores) usam `tone.iconColor`: cinza para `neutral`, `info` e `rest`,
+cor só para `success`, `warning` e `danger`. `tone.background` fica para o raro painel que
+precisa se destacar como bloco. A cor nunca é o único sinal: sempre há um ícone ou marcador e um
+texto.
 
 Na tela da criança, restrições usam `Tone.rest` (descanso) ou `Tone.neutral`, nunca
 `Tone.danger`.
 
 ### Tipografia (`AppTypography`, `AppTextStyles`)
 
-Manrope, embutida. Escala do responsável (no perfil da criança, ×1,08):
+Manrope, embutida. A hierarquia vem do tamanho e da cor: títulos, rótulos e números em 600,
+texto corrido em 500, nada acima de 700. Escala do responsável (no perfil da criança, ×1,08):
 
 | Estilo | Tamanho / altura | Uso |
 | --- | --- | --- |
-| `headlineMedium` | 26 / 32, 700 | Título da página (`AppPageHeader`) |
-| `headlineSmall` | 22 / 28, 700 | Título de diálogo |
-| `titleLarge` | 19 / 26, 700 | Barra superior, título de folha |
-| `titleMedium` | 16 / 22, 700 | Título de seção |
-| `titleSmall` | 14 / 20, 700 | Título de aviso, de estado |
+| `headlineMedium` | 24 / 30, 600 | Título da página (`AppPageHeader`) |
+| `headlineSmall` | 20 / 26, 600 | Título de diálogo |
+| `titleLarge` | 18 / 24, 600 | Barra superior, título de folha |
+| `titleMedium` | 15 / 20, 600 | Título de seção |
+| `titleSmall` | 14 / 20, 600 | Título de aviso, botões compactos |
 | `bodyLarge` | 16 / 24, 500 | Texto principal, linhas de lista |
 | `bodyMedium` | 14 / 20, 500 | Texto de apoio |
-| `bodySmall` | 12,5 / 17, 500 | Legendas, rodapés de grupo |
-| `labelLarge` | 15 / 20, 700 | Botões |
-| `metricHero` | 52, 800, tabular | Tempo restante na tela da criança |
-| `metricLarge` | 38, 800, tabular | Valor principal de um painel |
-| `metricMedium` | 22, 700, tabular | Linha de métricas |
-| `metricSmall` | 14, 700, tabular | Minutos na lista de apps |
-| `eyebrow` | 11,5, 800, maiúsculas | Sobretítulo ("HOJE", "APARELHO") |
+| `bodySmall` | 12,5 / 18, 500 | Legendas, rodapés de grupo |
+| `labelLarge` | 15 / 20, 600 | Botões |
+| `labelMedium` | 13 / 18, 600 | Indicadores de estado, rótulos de campo, abas |
+| `metricHero` | 48, 600, tabular | Tempo restante na tela da criança |
+| `metricLarge` | 34, 600, tabular | Valor principal de um painel |
+| `metricMedium` | 20, 600, tabular | Linha de métricas |
+| `metricSmall` | 14, 600, tabular | Minutos na lista de apps |
+| `eyebrow` | 13, 600, caixa normal | Sobretítulo ("Hoje", "Passo 1 de 3") |
+
+Textos de até 13 pontos usam 600 e rótulos curtos de chips usam 700: a medição de contraste dos
+testes (`textContrastGuideline`) estima a cor do texto a partir dos pixels de uma imagem em 1x
+e, com hastes finas, confunde o serrilhado com a cor do texto, mesmo quando o contraste real
+passa de 6:1. Pelo mesmo motivo o texto corrido fica em 500, não em 400.
 
 ### Espaçamento (`AppSpacing`)
 
@@ -99,20 +119,22 @@ Semânticos: `gutter 20` (margem lateral), `sectionGap 32` (entre seções),
 
 ### Raios (`AppRadius`, `AppShapes`)
 
-Escala: `xs 6`, `sm 10`, `md 14`, `lg 20`, `xl 28`, `pill`. Componentes usam a forma do perfil
-(`context.shapes`): controles 14 / 20, contêineres 20 / 28, folhas 28 / 32, quadrados de ícone
-10 / 16 (responsável / criança).
+Escala: `xs 4`, `sm 6`, `md 8`, `lg 12`, `xl 16`, `xxl 20`, `pill`. Componentes usam a forma do
+perfil (`context.shapes`): controles 8 / 12, contêineres 12 / 16, folhas 16 / 20, ícones de app
+8 / 12 (responsável / criança). Elementos dentro de um painel usam um raio menor que o dele.
 
 ### Elevação, movimento, opacidade e dimensões
 
-- `AppElevation.none` para o conteúdo; `raised` para a barra de ação fixa; `overlay` para o que
-  flutua. Sem sombras em painéis.
+- `AppElevation.none` para o conteúdo; `raised` para o seletor do controle segmentado;
+  `overlay` para o que flutua. Painéis, listas, avisos e a barra de ação fixa se separam por um
+  contorno fino (`hairline`), sem sombra.
 - `AppMotion`: `fast 120ms`, `base 200ms`, `slow 320ms`, `emphasis 520ms`; curvas `standard`,
   `emphasized`, `exit`. Sempre passe por `AppMotion.resolve(context, ...)`, que zera a duração
   quando o sistema pede para reduzir animações.
 - `AppOpacity`: desabilitado `0.38`, camadas de interação `0.08` a `0.12`, fundo de folha `0.40`.
-- `AppSizes`: área de toque mínima `48`, botões `52` (compactos `40` com toque de `48`), ícones
-  `14` a `32`, quadrado de ícone `40`, avatares `32`/`40`/`56`.
+- `AppSizes`: área de toque mínima `48`, botões e campos `48` (compactos `36` com toque de
+  `48`), ícones `14` a `32`, ícone de linha `24` (`rowIcon`), ícone de app `36` (`iconTile`),
+  medalhão `48`, avatares `32`/`36`/`48`, barra de uso `4`.
 
 ## 2. Temas e perfis
 
@@ -128,15 +150,15 @@ Escala: `xs 6`, `sm 10`, `md 14`, `lg 20`, `xl 28`, `pill`. Componentes usam a f
 
 | Componente | Quando usar |
 | --- | --- |
-| `AppButton.primary` | A ação principal da tela (no máximo uma visível). |
-| `AppButton.secondary` | Ações de apoio com o mesmo peso entre si ("+ 15 min", "Pedir mais tempo" quando não é a principal). |
+| `AppButton.primary` | A ação principal da tela (no máximo uma visível). Único botão preenchido com a cor de ação. |
+| `AppButton.secondary` | Ações de apoio com o mesmo peso entre si ("+ 15 min", "Pedir mais tempo" quando não é a principal). Contornado, sobre a superfície. |
 | `AppButton.tertiary` | Ações discretas e links ("Cancelar", "Ver todos"). |
 | `AppButton.danger` | Ação destrutiva, sempre depois de `showConfirmDialog`. |
 | `busy: true` | Durante a operação: mostra o indicador e ignora toques (evita envio duplo) sem parecer desabilitado. |
-| `AppIconButton` | Botão só com ícone; `tooltip` obrigatório (é o nome lido pelo leitor de tela). |
-| `AppTextField` / `AppPasswordField` | Campos com rótulo sempre visível; `isRequired` marca obrigatório; `hint` e `helper` mostram o formato esperado antes do erro. |
+| `AppIconButton` | Botão só com ícone; `tooltip` obrigatório (é o nome lido pelo leitor de tela). A variante `tonal` é contornada. |
+| `AppTextField` / `AppPasswordField` | Campos com o rótulo acima do contorno, sempre visível e anunciado como nome do campo; `isRequired` marca obrigatório; `hint` e `helper` mostram o formato esperado antes do erro. |
 | `AppChoiceChips` | Valores prontos (atalhos) sem esconder o valor próprio. |
-| `AppSegmentedControl` | De 2 a 4 opções exclusivas lado a lado (períodos de relatório). |
+| `AppSegmentedControl` | De 2 a 4 opções exclusivas lado a lado (períodos de relatório): trilho neutro com a opção escolhida destacada. |
 | `AppSwitchRow` / `AppCheckboxRow` / `AppRadioRow` | Linhas de configuração; a linha inteira é tocável. |
 | `showDurationPicker` / `pickTimeOfDay` | Duração e horário com rodas e atalhos. |
 | `AppPageBody` | Corpo rolável da página (margem, largura máxima, puxar para atualizar). |
@@ -144,10 +166,11 @@ Escala: `xs 6`, `sm 10`, `md 14`, `lg 20`, `xl 28`, `pill`. Componentes usam a f
 | `AppSection` | Título de seção fora do conteúdo, ação à direita ("Ver todos"). |
 | `SectionGap` | Espaço padrão entre seções. |
 | `AppPanel` | Conteúdo de destaque de uma seção (tempo de hoje, resumo). Com `tone`, fundo do tom. |
-| `AppListGroup` + `AppListRow` | Listas de itens em um único painel; `leading` com `AppIconTile` ou avatar, `trailing` com `AppRowValue`/`StatusBadge`, `below` com `UsageBar`. |
-| `StatusBadge` | Estado curto com ícone e texto. |
+| `AppListGroup` + `AppListRow` | Listas de itens em um único painel com contorno fino e divisores de ponta a ponta; `leading` com `AppIconTile` (ícone sem fundo) ou avatar, `trailing` com `AppRowValue`/`StatusBadge`, `below` com `UsageBar`. |
+| `IconMedallion` | Ícone em destaque em um quadro com contorno: estados vazios, diálogos e cabeçalhos de telas curtas. Nunca dentro de listas. |
+| `StatusBadge` | Estado curto: ponto (ou ícone) e texto na cor do tom, sem caixa em volta. |
 | `SyncStatusLine` | Estado de uma configuração entre painel e aparelho: `applied`, `pending`, `sending`, `offline`, `failed`. |
-| `TimeRing` | Tempo usado/restante com o valor no centro e `semanticLabel` completo. |
+| `TimeRing` | Tempo usado/restante com o valor no centro e `semanticLabel` completo. Só na tela da criança; no painel do responsável o tempo aparece como número e `UsageBar`. |
 | `UsageBar` | Barra fina de uso relativo (o valor vem em texto ao lado). |
 | `MetricTile` / `MetricRow` | Valores numéricos com rótulo. |
 | `InitialAvatar` | Inicial de um nome (criança, aparelho). |
@@ -287,7 +310,6 @@ heurística e que devem virar componentes compartilhados (seguindo a seção 7):
 | Aviso flutuante no topo (alerta em tempo real) | `guardian` (casca do painel) | `AppToast` |
 | Diálogo com campo, no estilo de `showConfirmDialog` | `authentication` (`FormDialogFrame`) | `showFormDialog` |
 | Exibição de segredos e códigos (agrupamento, quebra entre grupos) | chave de recuperação, código de vinculação | `SecretCode` |
-| Ícone em círculo de destaque | `child_mode`, `managed_browser` | `IconMedallion` |
 | Grade de apps (ícone e nome, tocável) | `child_mode` | `AppGridTile` |
 | Chips de múltipla escolha (filtros) | `app_management` | `AppFilterChips` |
 | Lista agrupada construída sob demanda (listas longas) | `app_management` (`_GroupedRow`) | `AppListGroup.builder` |
