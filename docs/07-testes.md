@@ -9,8 +9,9 @@ de verdade em um emulador Android, e o que ainda não foi validado.
 | --- | --- | --- |
 | Backend (`backend/test`, `node:test`) | 171 | todos passam |
 | Agente nativo Kotlin (`app/android/app/src/test`, JUnit na JVM) | 132 | todos passam |
-| Aplicativo Flutter (`app/test`, unidade, widget e arquitetura) | 618 | todos passam |
-| Validação em emulador (Android 16) | roteiro da seção 4 | aprovado antes da migração para BLoC, com os defeitos da seção 5 corrigidos; não repetido depois dela |
+| Aplicativo Flutter (`app/test`, unidade, widget, arquitetura e Design System) | 878 | todos passam |
+| Capturas de tela de referência (temas claro e escuro) | 118 | todas conferem |
+| Validação em emulador (Android 16) | roteiro da seção 4 | aprovado antes da migração para BLoC e do Design System, com os defeitos da seção 5 corrigidos; não repetido depois deles |
 | Aparelhos físicos | nenhum | não executado |
 
 Verificações estáticas: `flutter analyze` sem apontamentos, `tsc --noEmit` sem erros, compilação
@@ -54,7 +55,12 @@ testes. Para regenerar: `flutter test --update-goldens --tags screenshot`.
   da API, canal em tempo real, JSON, senha, TOTP, código de vinculação, formatação), roteamento
   do app montado (perfil, sessão do responsável, vínculo da criança, em `test/app`) e as regras
   de arquitetura (`test/architecture`: camadas, dependências entre funcionalidades sem ciclos,
-  contêiner de dependências só na composição).
+  contêiner de dependências só na composição), as regras do Design System por funcionalidade
+  (`test/architecture/design_system_test.dart`) e o catálogo do Design System
+  (`test/shared/design_system`: capturas nos dois temas e perfis, diretrizes de acessibilidade
+  do Flutter e fonte 2×). Cada tela principal tem captura nos temas claro e escuro, um teste com
+  a fonte no maior tamanho (2×) e a conferência de área de toque, rótulos e contraste
+  (`expectAccessible`).
 
 ## 3. Ferramentas de ponta a ponta
 
@@ -142,6 +148,12 @@ Nenhum destes aparecia nos testes automatizados. Todos foram achados no emulador
 
 ## 6. O que não foi validado
 
+- **Interface nova em aparelho real.** O Design System e as telas redesenhadas
+  ([avaliação de usabilidade](usabilidade/README.md)) foram verificados por testes de widget,
+  capturas de referência, diretrizes de acessibilidade do Flutter e fonte 2×, mas não em
+  aparelho: faltam TalkBack, a fonte do sistema no maior tamanho, tamanhos de tela variados, a
+  tela de bloqueio nativa redesenhada, o ícone do app e a ida e volta às telas de configuração do
+  Android.
 - **Roteiro em emulador depois da migração para BLoC.** A interface foi reorganizada com BLoC e
   Clean Architecture ([ADR 0001](adr/0001-bloc-clean-architecture.md)). A migração está coberta
   pelos testes automatizados e o APK de depuração compila, mas o roteiro da seção 4 ainda não foi
@@ -184,6 +196,10 @@ Repetir o roteiro da seção 4 em pelo menos estes cenários, anotando o resulta
 | Troca manual de data, hora e fuso | Evento `clock_changed` e dia da cota inalterado |
 | Aparelho recém-restaurado | Provisionamento Device Owner por `adb` e por QR code |
 | 24 horas de uso normal | Consumo de bateria e precisão do total do dia contra o "Bem-estar digital" do sistema |
+| TalkBack ligado, nos dois perfis | Ordem de leitura, nomes dos botões, anúncio dos estados (sincronização, erros, pedido de tempo) |
+| Fonte e tela do sistema no maior tamanho | Nenhum texto cortado; o tempo e os códigos continuam legíveis |
+| Tema escuro do sistema | Contraste e legibilidade, incluindo a tela de bloqueio nativa |
+| Tablet ou celular deitado | Conteúdo centralizado com largura limitada, sem esticar |
 
 Para apontar os roteiros de `scripts/e2e/android.sh` a um aparelho físico:
 

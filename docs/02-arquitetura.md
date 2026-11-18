@@ -76,7 +76,7 @@ lib/
     security/               política de senha, TOTP, código de vinculação
     storage/                armazenamento seguro e preferências locais
     time/ utils/            relógio, formatação, valor observável
-  shared/                   tema, widgets e serviços de interface comuns
+  shared/                   Design System (tokens, temas, componentes) e serviços de interface
   features/
     user_role/  server_config/  onboarding/  authentication/  device_sync/
     child_device/  device_policy/  screen_time/  schedules/  app_management/

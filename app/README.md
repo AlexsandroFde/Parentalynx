@@ -14,7 +14,7 @@ lib/
   app/                     raiz de composição: inicialização, injeção (get_it), roteador
   core/                    infraestrutura sem regra de negócio: Result, falhas, rede, JSON,
                            ponte nativa, armazenamento, tempo, segurança, base dos BLoCs
-  shared/                  tema, componentes visuais e serviços de interface comuns
+  shared/                  Design System (tokens, temas, componentes) e serviços de interface
   features/<nome>/         uma funcionalidade por pasta
     domain/                entidades, contratos de repositório e serviço, casos de uso
     data/                  DTOs, mapeadores, fontes de dados e repositórios
@@ -57,6 +57,12 @@ dart run pigeon --input pigeons/native_api.dart
 
 ## Convenções
 
+- Interface com o Design System (`lib/shared/design_system/`, importado por
+  `design_system.dart`): cores, textos, ícones, espaçamentos e raios vêm dos tokens, e as telas
+  usam os componentes do Design System em vez dos do Material. Documentação em
+  [../docs/design/design-system.md](../docs/design/design-system.md); as regras são conferidas por
+  `test/architecture/design_system_test.dart` e o catálogo visual fica em
+  `test/shared/design_system/`.
 - O Material Design vem do pacote `material_ui`: importe `package:material_ui/material_ui.dart`,
   não `package:flutter/material.dart`.
 - Estado da interface com BLoC (`flutter_bloc`): eventos e estados imutáveis e tipados. Um BLoC

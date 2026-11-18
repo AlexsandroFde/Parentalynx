@@ -65,6 +65,11 @@ Para testar sem um segundo aparelho, o backend traz um simulador de aparelho da 
    garantido, o que é só detectado e o que não é possível em cada modo.
 2. [Arquitetura](docs/02-arquitetura.md) e a decisão sobre o app Flutter com BLoC e Clean
    Architecture ([ADR 0001](docs/adr/0001-bloc-clean-architecture.md))
+   - Interface: [Design System "Lince"](docs/design/design-system.md), com a
+     [pesquisa e o conceito visual](docs/design/pesquisa-e-conceito.md), a
+     [arquitetura de informação](docs/design/arquitetura-de-informacao.md), a
+     [avaliação de usabilidade por funcionalidade](docs/usabilidade/README.md) e o
+     [ADR 0002](docs/adr/0002-identidade-visual-e-design-system.md)
 3. [Protocolo: API, política, eventos e sincronização](docs/03-protocolo.md)
 4. [Instalação](docs/04-instalacao.md)
 5. [Modo Device Owner](docs/05-device-owner.md)
