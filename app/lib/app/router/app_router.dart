@@ -26,7 +26,7 @@ import '../../features/screen_time/screen_time_routes.dart';
 import '../../features/settings/settings_routes.dart';
 import '../../features/user_role/domain/entities/user_role.dart';
 import '../../features/user_role/presentation/bloc/user_role_bloc.dart';
-import '../../shared/widgets/feedback_views.dart';
+import '../../shared/design_system/design_system.dart';
 import 'guardian_session_scope.dart';
 import 'router_refresh.dart';
 
@@ -128,7 +128,7 @@ AppRouter buildAppRouter(GetIt di, {required GlobalKey<NavigatorState> navigator
       GoRoute(
         path: GuardianPaths.root,
         builder: (BuildContext context, GoRouterState state) {
-          return const Scaffold(body: LoadingView());
+          return const Scaffold(body: LoadingState());
         },
       ),
       ...authenticationRoutes(di),

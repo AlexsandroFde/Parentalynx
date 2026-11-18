@@ -8,9 +8,9 @@ import '../features/app_management/presentation/services/app_icon_images.dart';
 import '../features/authentication/presentation/bloc/auth/auth_bloc.dart';
 import '../features/device_linking/presentation/bloc/child_link/child_link_bloc.dart';
 import '../features/user_role/presentation/bloc/user_role_bloc.dart';
+import '../shared/design_system/design_system.dart';
 import '../shared/services/share_service.dart';
 import '../shared/theme/app_frame.dart';
-import '../shared/theme/app_theme.dart';
 import 'router/app_router.dart';
 
 /// Raiz do aplicativo principal (os dois perfis).

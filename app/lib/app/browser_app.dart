@@ -5,8 +5,8 @@ import 'package:material_ui/material_ui.dart';
 import '../features/managed_browser/presentation/bloc/browser_bloc.dart';
 import '../features/managed_browser/presentation/engine/browser_engine.dart';
 import '../features/managed_browser/presentation/pages/browser_page.dart';
+import '../shared/design_system/design_system.dart';
 import '../shared/theme/app_frame.dart';
-import '../shared/theme/app_theme.dart';
 
 /// Raiz do navegador gerenciado, executada pelo ponto de entrada `browserMain`.
 ///
@@ -30,8 +30,9 @@ class BrowserApp extends StatelessWidget {
         child: MaterialApp(
           title: 'Navegador ParentaLynx',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.light(),
-          darkTheme: AppTheme.dark(),
+          // O navegador e usado pela crianca: perfil infantil do Design System.
+          theme: AppTheme.light(experience: AppExperience.child),
+          darkTheme: AppTheme.dark(experience: AppExperience.child),
           locale: appLocale,
           supportedLocales: const <Locale>[appLocale],
           localizationsDelegates: GlobalMaterialLocalizations.delegates,
