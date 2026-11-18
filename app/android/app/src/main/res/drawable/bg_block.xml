@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Fundo da tela de bloqueio: petroleo da marca. Uma cor so, escurecendo de leve para baixo
+     para o cartao e os botoes se destacarem. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android">
-    <gradient android:angle="270" android:startColor="@color/plx_primary" android:endColor="@color/plx_primary_dark" />
+    <gradient android:angle="270" android:startColor="@color/plx_primary" android:endColor="@color/plx_primary_deep" />
 </shape>

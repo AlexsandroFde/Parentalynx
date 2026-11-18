@@ -1,11 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Cores da identidade "Lince", com os mesmos valores dos tokens do Design System do app
+     (app/lib/shared/design_system/tokens/colors.dart). -->
 <resources>
-    <color name="plx_primary">#3046C5</color>
-    <color name="plx_primary_dark">#1B2A7A</color>
-    <color name="plx_on_primary">#FFFFFF</color>
-    <color name="plx_on_primary_muted">#D6DBF7</color>
+    <!-- Petroleo: a marca. -->
+    <color name="plx_primary">#136874</color>
+    <color name="plx_primary_deep">#0C444D</color>
+    <color name="plx_primary_ink">#082F36</color>
+    <color name="plx_primary_soft">#CDE9EC</color>
+    <!-- Anil: descanso combinado (hora de dormir, pausa). Nao e erro. -->
+    <color name="plx_rest">#362F78</color>
+    <color name="plx_rest_deep">#2A255A</color>
+    <!-- Ambar: so o simbolo da marca. -->
+    <color name="plx_brand_accent">#E59B32</color>
+    <!-- Texto e contornos sobre os fundos escuros da tela de bloqueio. -->
+    <color name="plx_on_dark">#FFFFFF</color>
+    <color name="plx_on_dark_muted">#E3EEF0</color>
+    <color name="plx_on_dark_outline">#99FFFFFF</color>
+    <color name="plx_on_dark_soft">#24FFFFFF</color>
+    <!-- Superficies e texto do cartao. -->
     <color name="plx_surface">#FFFFFF</color>
-    <color name="plx_text">#1B1F3B</color>
-    <color name="plx_text_muted">#5B6180</color>
-    <color name="plx_outline">#66FFFFFF</color>
+    <color name="plx_text">#1C1C1B</color>
+    <color name="plx_text_muted">#66635D</color>
 </resources>

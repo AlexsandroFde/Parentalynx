@@ -138,7 +138,7 @@ class BlockActivity : Activity() {
                 message.text = getString(R.string.block_message_app_limit, appLabel)
             }
             BlockReason.MANUAL_LOCK -> {
-                icon.setImageResource(R.drawable.ic_block_lock)
+                icon.setImageResource(R.drawable.ic_block_pause)
                 title.setText(R.string.block_title_manual_lock)
                 message.setText(R.string.block_message_manual_lock)
             }
@@ -148,6 +148,11 @@ class BlockActivity : Activity() {
                 message.setText(R.string.block_message_tamper)
             }
         }
+        // Descansos combinados (horário e pausa) usam o anil de descanso do Design System, e os
+        // demais motivos o petróleo da marca: nenhum motivo usa vermelho, que soaria como punição.
+        val rest = reason == BlockReason.SCHEDULE || reason == BlockReason.MANUAL_LOCK
+        findViewById<View>(R.id.block_root).setBackgroundResource(if (rest) R.drawable.bg_block_rest else R.drawable.bg_block)
+        request.setTextColor(getColor(if (rest) R.color.plx_rest else R.color.plx_primary))
         request.visibility = if (reason == BlockReason.TAMPER_LOCK) View.GONE else View.VISIBLE
         request.setText(
             if (reason == BlockReason.APP_BLOCKED || reason == BlockReason.NEW_APP) R.string.block_request_release else R.string.block_request_time,

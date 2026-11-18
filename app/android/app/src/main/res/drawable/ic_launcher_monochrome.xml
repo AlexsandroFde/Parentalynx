@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Simbolo do ParentaLynx (mesmas formas do BrandMark do Design System): cabeca de lince com
+     orelhas com tufos, colar de pelos e olhos ambar. Versao de uma cor so para os icones tematicos do Android, com os olhos vazados. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF" android:fillType="evenOdd" android:pathData="M38.160,60.6 A15.84,15.84 0 1,0 69.840,60.6 A15.84,15.84 0 1,0 38.160,60.6 Z M44.100,59.28 A3.63,2.475 0 1,0 51.360,59.28 A3.63,2.475 0 1,0 44.100,59.28 Z M56.640,59.28 A3.63,2.475 0 1,0 63.900,59.28 A3.63,2.475 0 1,0 56.640,59.28 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M39.48,54 L41.46,31.56 L52.02,46.08 Z M68.52,54 L66.54,31.56 L55.98,46.08 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M40.14,61.92 L30.9,71.82 L45.42,73.8 Z M67.86,61.92 L77.1,71.82 L62.58,73.8 Z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.38" android:strokeLineCap="round" android:pathData="M41.46,32.22 L39.81,26.28 M66.54,32.22 L68.19,26.28" />
+</vector>

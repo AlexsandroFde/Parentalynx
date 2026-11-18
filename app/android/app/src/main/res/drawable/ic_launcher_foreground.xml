@@ -1,10 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Simbolo do ParentaLynx (mesmas formas do BrandMark do Design System): cabeca de lince com
+     orelhas com tufos, colar de pelos e olhos ambar. Centrado na area segura do icone adaptativo. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp" android:viewportWidth="108" android:viewportHeight="108">
-    <!-- Orelhas do lince -->
-    <path android:fillColor="#FFFFFFFF" android:pathData="M37,37 L33,24 L46,33 Z M71,37 L75,24 L62,33 Z" />
-    <!-- Escudo -->
-    <path android:fillColor="#FFFFFFFF" android:pathData="M54,30 L74,37 L74,53 C74,66 65.5,76 54,80 C42.5,76 34,66 34,53 L34,37 Z" />
-    <!-- Relógio -->
-    <path android:fillColor="#FF3046C5" android:pathData="M54,43 C47.9,43 43,47.9 43,54 C43,60.1 47.9,65 54,65 C60.1,65 65,60.1 65,54 C65,47.9 60.1,43 54,43 Z M54,62 C49.6,62 46,58.4 46,54 C46,49.6 49.6,46 54,46 C58.4,46 62,49.6 62,54 C62,58.4 58.4,62 54,62 Z M55,48.5 L52.6,48.5 L52.6,55 L57.8,58.1 L59,56.1 L55,53.7 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M38.160,60.6 A15.84,15.84 0 1,0 69.840,60.6 A15.84,15.84 0 1,0 38.160,60.6 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M39.48,54 L41.46,31.56 L52.02,46.08 Z M68.52,54 L66.54,31.56 L55.98,46.08 Z" />
+    <path android:fillColor="#FFFFFFFF" android:pathData="M40.14,61.92 L30.9,71.82 L45.42,73.8 Z M67.86,61.92 L77.1,71.82 L62.58,73.8 Z" />
+    <path android:strokeColor="#FFFFFFFF" android:strokeWidth="2.38" android:strokeLineCap="round" android:pathData="M41.46,32.22 L39.81,26.28 M66.54,32.22 L68.19,26.28" />
+    <path android:fillColor="#FFCDE9EC" android:pathData="M42.12,50.04 L42.78,37.5 L48.72,46.08 Z M65.88,50.04 L65.22,37.5 L59.28,46.08 Z" />
+    <path android:fillColor="#FFE59B32" android:pathData="M44.100,59.28 A3.63,2.475 0 1,0 51.360,59.28 A3.63,2.475 0 1,0 44.100,59.28 Z M56.640,59.28 A3.63,2.475 0 1,0 63.900,59.28 A3.63,2.475 0 1,0 56.640,59.28 Z" />
+    <path android:fillColor="#FF082F36" android:pathData="M46.872,59.28 A0.858,2.112 0 1,0 48.588,59.28 A0.858,2.112 0 1,0 46.872,59.28 Z M59.412,59.28 A0.858,2.112 0 1,0 61.128,59.28 A0.858,2.112 0 1,0 59.412,59.28 Z" />
+    <path android:fillColor="#FF0F5661" android:pathData="M51.36,65.22 L56.64,65.22 L54,68.52 Z" />
 </vector>

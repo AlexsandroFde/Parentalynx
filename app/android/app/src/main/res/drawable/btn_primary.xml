@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#333046C5">
+<!-- Botao principal sobre o fundo escuro: superficie clara com o texto na cor do fundo. -->
+<ripple xmlns:android="http://schemas.android.com/apk/res/android" android:color="#33136874">
     <item>
         <shape>
             <solid android:color="@color/plx_surface" />
-            <corners android:radius="26dp" />
+            <corners android:radius="20dp" />
         </shape>
     </item>
 </ripple>
