@@ -1,39 +1,36 @@
-import 'dart:async';
-
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
-import '../../../../core/errors/app_failure.dart';
-import '../../../../core/platform/native_providers.dart';
 import '../../../../core/security/pairing_code.dart';
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/child_layout.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../agent/data/child_device_repository.dart';
-import '../../agent/domain/child_models.dart';
-import '../../agent/presentation/child_session.dart';
-import '../../shared/child_widgets.dart';
-import '../domain/pairing.dart';
-import 'linking_controller.dart';
+import '../../domain/entities/pairing_claim.dart';
+import '../bloc/child_link/child_link_bloc.dart';
+import '../bloc/child_linking/child_linking_bloc.dart';
 
 /// Vinculacao deste aparelho ao responsavel: codigo, espera da aprovacao e ativacao.
-class LinkPage extends ConsumerStatefulWidget {
+///
+/// Espera um [ChildLinkingBloc] acima na arvore e le o aviso de vinculo desfeito do
+/// [ChildLinkBloc].
+class LinkPage extends StatefulWidget {
   const LinkPage({super.key});
 
   @override
-  ConsumerState<LinkPage> createState() => _LinkPageState();
+  State<LinkPage> createState() => _LinkPageState();
 }
 
-class _LinkPageState extends ConsumerState<LinkPage> {
+class _LinkPageState extends State<LinkPage> {
   final TextEditingController _code = TextEditingController();
   final TextEditingController _name = TextEditingController();
-  bool _leaving = false;
+  bool _nameFilled = false;
 
   @override
   void initState() {
     super.initState();
-    unawaited(_prefillName());
+    _fillName(context.read<ChildLinkingBloc>().state.suggestedDeviceName);
   }
 
   @override
@@ -43,14 +40,14 @@ class _LinkPageState extends ConsumerState<LinkPage> {
     super.dispose();
   }
 
-  Future<void> _prefillName() async {
-    try {
-      final DeviceIdentity info = await ref.read(childDeviceRepositoryProvider).deviceInfo();
-      if (mounted && _name.text.isEmpty) {
-        _name.text = info.name;
-      }
-    } on AppFailure {
-      // Sem o nome sugerido a pessoa digita um.
+  /// Preenche o nome sugerido uma vez, sem sobrescrever o que a pessoa digitar.
+  void _fillName(String? suggestion) {
+    if (suggestion == null || _nameFilled) {
+      return;
+    }
+    _nameFilled = true;
+    if (_name.text.isEmpty) {
+      _name.text = suggestion;
     }
   }
 
@@ -69,15 +66,19 @@ class _LinkPageState extends ConsumerState<LinkPage> {
       text: formatted,
       selection: TextSelection.collapsed(offset: formatted.length),
     );
-    ref.read(linkingControllerProvider.notifier).clearError();
+    _changed();
+  }
+
+  void _changed() {
+    context.read<ChildLinkingBloc>().add(const ChildLinkingErrorCleared());
     setState(() {});
   }
 
-  Future<void> _submit() async {
+  void _submit() {
     FocusScope.of(context).unfocus();
-    await ref
-        .read(linkingControllerProvider.notifier)
-        .submit(code: _code.text, deviceName: _name.text);
+    context.read<ChildLinkingBloc>().add(
+      ChildLinkingCodeSubmitted(code: _code.text, deviceName: _name.text),
+    );
   }
 
   Future<void> _cancelWaiting() async {
@@ -89,55 +90,53 @@ class _LinkPageState extends ConsumerState<LinkPage> {
       cancelLabel: 'Continuar esperando',
     );
     if (confirmed && mounted) {
-      await ref.read(linkingControllerProvider.notifier).cancelWaiting();
-    }
-  }
-
-  Future<void> _leaveChildMode() async {
-    setState(() => _leaving = true);
-    try {
-      await ref.read(appModeProvider.notifier).setMode(AppMode.unset);
-    } on Object catch (error) {
-      if (mounted) {
-        showFailure(context, error);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _leaving = false);
-      }
+      context.read<ChildLinkingBloc>().add(const ChildLinkingWaitCancelled());
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final LinkingState state = ref.watch(linkingControllerProvider);
-    return Scaffold(
-      body: SafeArea(
-        child: switch (state) {
-          LinkingForm() => _FormView(
-            state: state,
-            code: _code,
-            name: _name,
-            notice: ref.watch(childLinkNoticeProvider),
-            leaving: _leaving,
-            onChanged: () {
-              ref.read(linkingControllerProvider.notifier).clearError();
-              setState(() {});
+    final String? notice = context.select<ChildLinkBloc, String?>(
+      (ChildLinkBloc bloc) => bloc.state.notice,
+    );
+    return BlocConsumer<ChildLinkingBloc, ChildLinkingState>(
+      listener: (BuildContext context, ChildLinkingState state) {
+        _fillName(state.suggestedDeviceName);
+        if (state case ChildLinkingForm(leaveFailure: final Object failure)) {
+          showFailure(context, failure);
+        }
+      },
+      listenWhen: (ChildLinkingState previous, ChildLinkingState current) {
+        return previous.suggestedDeviceName != current.suggestedDeviceName ||
+            (current is ChildLinkingForm && current.leaveFailure != null && current != previous);
+      },
+      builder: (BuildContext context, ChildLinkingState state) {
+        return Scaffold(
+          body: SafeArea(
+            child: switch (state) {
+              ChildLinkingForm() => _FormView(
+                state: state,
+                code: _code,
+                name: _name,
+                notice: notice,
+                onChanged: _changed,
+                onPaste: _paste,
+                onSubmit: _submit,
+                onLeave: () =>
+                    context.read<ChildLinkingBloc>().add(const ChildLinkingLeaveRequested()),
+              ),
+              ChildLinkingWaiting() => _WaitingView(
+                claim: state.claim,
+                connectionTrouble: state.connectionTrouble,
+                onCancel: _cancelWaiting,
+              ),
+              ChildLinkingActivating() => const LoadingView(
+                message: 'Aprovado! Ligando o controle neste aparelho...',
+              ),
             },
-            onPaste: _paste,
-            onSubmit: _submit,
-            onLeave: _leaveChildMode,
           ),
-          LinkingWaiting() => _WaitingView(
-            claim: state.claim,
-            connectionTrouble: state.connectionTrouble,
-            onCancel: _cancelWaiting,
-          ),
-          LinkingActivating() => const LoadingView(
-            message: 'Aprovado! Ligando o controle neste aparelho...',
-          ),
-        },
-      ),
+        );
+      },
     );
   }
 }
@@ -148,18 +147,16 @@ class _FormView extends StatelessWidget {
     required this.code,
     required this.name,
     required this.notice,
-    required this.leaving,
     required this.onChanged,
     required this.onPaste,
     required this.onSubmit,
     required this.onLeave,
   });
 
-  final LinkingForm state;
+  final ChildLinkingForm state;
   final TextEditingController code;
   final TextEditingController name;
   final String? notice;
-  final bool leaving;
   final VoidCallback onChanged;
   final VoidCallback onPaste;
   final VoidCallback onSubmit;
@@ -168,8 +165,11 @@ class _FormView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final bool busy = state.submitting || state.restoring;
+    final bool busy = state.activity.isBusy;
+    final bool leaving = state.activity == LinkFormActivity.leaving;
+    final bool restoring = state.activity == LinkFormActivity.restoring;
     final bool ready = PairingCode.isComplete(code.text) && name.text.trim().isNotEmpty;
+    final String? error = state.error;
     return ChildPageBody(
       padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
       children: <Widget>[
@@ -227,19 +227,19 @@ class _FormView extends StatelessWidget {
             prefixIcon: Icon(Icons.smartphone_rounded),
           ),
         ),
-        if (state.error != null) ...<Widget>[
+        if (error != null) ...<Widget>[
           const SizedBox(height: AppSpacing.lg),
           Semantics(
             liveRegion: true,
-            child: NoticeBanner(message: state.error!, tone: Tone.danger),
+            child: NoticeBanner(message: error, tone: Tone.danger),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
         BusyButton(
           label: 'Vincular',
           icon: Icons.link_rounded,
-          busy: state.submitting,
-          onPressed: ready && !state.restoring ? onSubmit : null,
+          busy: state.activity == LinkFormActivity.submitting,
+          onPressed: ready && !restoring ? onSubmit : null,
         ),
         const SizedBox(height: AppSpacing.xl),
         const SectionCard(

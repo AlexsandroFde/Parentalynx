@@ -1,53 +1,52 @@
 import 'dart:async';
 
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
-import '../../../../core/errors/app_failure.dart';
+import '../../../../core/bloc/action_status.dart';
+import '../../../../core/constants/route_paths.dart';
 import '../../../../core/security/pairing_code.dart';
+import '../../../../core/time/clock.dart';
 import '../../../../core/time/formatters.dart';
+import '../../../../shared/services/share_service.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../auth/presentation/elevation.dart';
-import '../../auth/presentation/widgets/auth_widgets.dart';
-import '../../devices/domain/device.dart';
-import '../../devices/presentation/devices_providers.dart';
-import '../../guardian_paths.dart';
-import '../../realtime/guardian_realtime.dart';
-import '../../shell/data/local_prefs.dart';
-import '../../shell/data/share_service.dart';
-import '../domain/pairing.dart';
-import 'pairing_controller.dart';
+import '../../../authentication/presentation/widgets/auth_widgets.dart';
+import '../../../child_device/presentation/bloc/devices/devices_bloc.dart';
+import '../../domain/entities/link_code.dart';
+import '../../domain/entities/link_request.dart';
+import '../../domain/services/link_request_rules.dart';
+import '../bloc/device_linking/device_linking_bloc.dart';
+import '../dialogs/approve_link_dialog.dart';
 
 /// Vinculacao de um aparelho da crianca: gera o codigo, acompanha o pedido e confirma.
-class PairingPage extends ConsumerStatefulWidget {
+///
+/// Espera acima na arvore o [DeviceLinkingBloc] e o [DevicesBloc] (o aparelho aprovado passa a
+/// ser o aparelho em foco no painel).
+class PairingPage extends StatefulWidget {
   const PairingPage({super.key});
 
   @override
-  ConsumerState<PairingPage> createState() => _PairingPageState();
+  State<PairingPage> createState() => _PairingPageState();
 }
 
-class _PairingPageState extends ConsumerState<PairingPage> {
-  /// Validade padrao do codigo, usada so para desenhar a barra de tempo.
-  static const Duration _codeLifetime = Duration(minutes: 15);
-
+class _PairingPageState extends State<PairingPage> {
   Timer? _ticker;
   Timer? _poller;
-  bool _generating = false;
-  bool _cancelling = false;
-  bool _offline = false;
-  String? _actingOn;
 
   @override
   void initState() {
     super.initState();
     // O relogio redesenha a contagem regressiva. A consulta periodica e a reserva para o
     // caso de o aviso em tempo real nao chegar.
-    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => _onTick());
-    _poller = Timer.periodic(const Duration(seconds: 5), (_) => _poll());
-    WidgetsBinding.instance.addPostFrameCallback((_) => _poll());
+    final DeviceLinkingBloc bloc = context.read<DeviceLinkingBloc>();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) => bloc.add(const LinkCodeTicked()));
+    _poller = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) => bloc.add(const LinkRequestsCheckRequested()),
+    );
   }
 
   @override
@@ -55,47 +54,6 @@ class _PairingPageState extends ConsumerState<PairingPage> {
     _ticker?.cancel();
     _poller?.cancel();
     super.dispose();
-  }
-
-  int get _now => ref.read(guardianClockProvider)().millisecondsSinceEpoch;
-
-  void _onTick() {
-    if (!mounted) {
-      return;
-    }
-    final PairingCodeInfo? code = ref.read(pairingProvider).code;
-    if (code == null) {
-      return;
-    }
-    if (code.expiresAt <= _now) {
-      ref.read(pairingProvider.notifier).expireShownCode();
-    } else {
-      setState(() {});
-    }
-  }
-
-  Future<void> _poll() async {
-    if (!mounted) {
-      return;
-    }
-    try {
-      await ref.read(pairingProvider.notifier).poll();
-      if (mounted && _offline) {
-        setState(() => _offline = false);
-      }
-    } on AppFailure catch (failure) {
-      if (mounted && failure is NetworkFailure && !_offline) {
-        setState(() => _offline = true);
-      }
-    }
-  }
-
-  Future<void> _generate() async {
-    setState(() => _generating = true);
-    await guardedAction<void>(context, ref, () => ref.read(pairingProvider.notifier).generate());
-    if (mounted) {
-      setState(() => _generating = false);
-    }
   }
 
   Future<void> _cancelCode() async {
@@ -109,37 +67,24 @@ class _PairingPageState extends ConsumerState<PairingPage> {
     if (!confirmed || !mounted) {
       return;
     }
-    setState(() => _cancelling = true);
-    try {
-      await ref.read(pairingProvider.notifier).cancel();
-    } on Object catch (error) {
-      if (mounted) {
-        showFailure(context, error);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _cancelling = false);
-      }
-    }
+    context.read<DeviceLinkingBloc>().add(const LinkCodeCancelRequested());
   }
 
-  Future<void> _copy(PairingCodeInfo code) async {
-    await ref.read(shareServiceProvider).copy(PairingCode.format(code.code));
+  Future<void> _copy(LinkCode code) async {
+    await context.read<ShareService>().copy(PairingCode.format(code.code));
     if (mounted) {
       showAppSnackBar(context, 'Código copiado.', tone: Tone.success);
     }
   }
 
-  Future<void> _share(PairingCodeInfo code) async {
+  Future<void> _share(LinkCode code) async {
     try {
-      await ref
-          .read(shareServiceProvider)
-          .shareText(
-            'Código de vinculação do ParentaLynx: ${PairingCode.format(code.code)}\n'
-            'Digite no aparelho da criança até as ${formatClockMs(code.expiresAt)}. '
-            'O código só pode ser usado uma vez.',
-            subject: 'Código de vinculação do ParentaLynx',
-          );
+      await context.read<ShareService>().shareText(
+        'Código de vinculação do ParentaLynx: ${PairingCode.format(code.code)}\n'
+        'Digite no aparelho da criança até as ${formatClockMs(code.expiresAt)}. '
+        'O código só pode ser usado uma vez.',
+        subject: 'Código de vinculação do ParentaLynx',
+      );
     } on Object catch (error) {
       if (mounted) {
         showFailure(context, error);
@@ -147,35 +92,22 @@ class _PairingPageState extends ConsumerState<PairingPage> {
     }
   }
 
-  Future<void> _approve(Device device) async {
-    final String? childName = await showDialog<String>(
-      context: context,
-      builder: (BuildContext context) => _ApproveDialog(device: device),
-    );
+  Future<void> _approve(LinkRequest request) async {
+    final String? childName = await showApproveLinkDialog(context, request);
     if (childName == null || !mounted) {
       return;
     }
-    setState(() => _actingOn = device.id);
-    final Device? approved = await guardedAction<Device>(
-      context,
-      ref,
-      () => ref.read(pairingProvider.notifier).approve(device.id, childName: childName),
+    context.read<DeviceLinkingBloc>().add(
+      LinkApprovalSubmitted(requestId: request.id, childName: childName),
     );
-    if (!mounted) {
-      return;
-    }
-    setState(() => _actingOn = null);
-    if (approved != null) {
-      ref.read(selectedDeviceIdProvider.notifier).select(approved.id);
-    }
   }
 
-  Future<void> _reject(Device device) async {
+  Future<void> _reject(LinkRequest request) async {
     final bool confirmed = await confirmAction(
       context,
       title: 'Rejeitar o pedido?',
       message:
-          'O aparelho "${device.deviceName}" não será vinculado. Para tentar de novo será '
+          'O aparelho "${request.deviceName}" não será vinculado. Para tentar de novo será '
           'preciso gerar outro código.',
       confirmLabel: 'Rejeitar',
       destructive: true,
@@ -183,25 +115,11 @@ class _PairingPageState extends ConsumerState<PairingPage> {
     if (!confirmed || !mounted) {
       return;
     }
-    setState(() => _actingOn = device.id);
-    try {
-      await ref.read(pairingProvider.notifier).reject(device.id);
-      if (mounted) {
-        showAppSnackBar(context, 'Pedido rejeitado.');
-      }
-    } on Object catch (error) {
-      if (mounted) {
-        showFailure(context, error);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _actingOn = null);
-      }
-    }
+    context.read<DeviceLinkingBloc>().add(LinkRejectionSubmitted(request.id));
   }
 
   void _finish() {
-    ref.read(pairingProvider.notifier).dismissApproved();
+    context.read<DeviceLinkingBloc>().add(const ApprovedLinkDismissed());
     if (context.canPop()) {
       context.pop();
     } else {
@@ -209,38 +127,54 @@ class _PairingPageState extends ConsumerState<PairingPage> {
     }
   }
 
+  void _onAction(BuildContext context, DeviceLinkingState state) {
+    switch (state.action) {
+      case ActionSucceeded(:final String? message):
+        final LinkRequest? approved = state.approved;
+        if (state.command == LinkingCommand.approve && approved != null) {
+          // O aparelho aprovado passa a ser o aparelho em foco no painel.
+          context.read<DevicesBloc>().add(DeviceSelected(approved.id));
+        }
+        if (message != null) {
+          showAppSnackBar(context, message);
+        }
+      case ActionFailed(:final failure):
+        showFailure(context, failure);
+      case ActionIdle() || ActionRunning():
+        break;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    // Um aviso em tempo real de pedido novo ou resolvido dispara a consulta na hora.
-    ref.listen<AsyncValue<GuardianRealtimeEvent>>(guardianRealtimeEventsProvider, (
-      AsyncValue<GuardianRealtimeEvent>? previous,
-      AsyncValue<GuardianRealtimeEvent> next,
-    ) {
-      final String? type = next.value?.type;
-      if (type == 'link_pending' || type == 'link_resolved') {
-        _poll();
-      }
-    });
-
-    final PairingState state = ref.watch(pairingProvider);
-    final Device? approved = state.approved;
-    return Scaffold(
-      appBar: AppBar(title: const Text('Vincular aparelho')),
-      body: approved != null
-          ? _SuccessView(
-              device: approved,
-              onDone: _finish,
-              onAnother: () => ref.read(pairingProvider.notifier).dismissApproved(),
-            )
-          : PageBody(children: _content(state)),
+    return BlocConsumer<DeviceLinkingBloc, DeviceLinkingState>(
+      listenWhen: (DeviceLinkingState previous, DeviceLinkingState current) {
+        return previous.action != current.action;
+      },
+      listener: _onAction,
+      builder: (BuildContext context, DeviceLinkingState state) {
+        final LinkRequest? approved = state.approved;
+        return Scaffold(
+          appBar: AppBar(title: const Text('Vincular aparelho')),
+          body: approved != null
+              ? _SuccessView(
+                  device: approved,
+                  onDone: _finish,
+                  onAnother: () =>
+                      context.read<DeviceLinkingBloc>().add(const ApprovedLinkDismissed()),
+                )
+              : PageBody(children: _content(context, state)),
+        );
+      },
     );
   }
 
-  List<Widget> _content(PairingState state) {
-    final PairingCodeInfo? code = state.code;
-    final int? otherCodeExpiresAt = state.otherCodeExpiresAt;
+  List<Widget> _content(BuildContext context, DeviceLinkingState state) {
+    final LinkCode? code = state.code;
+    final int? otherCodeExpiresAt = state.otherCodeStillValidUntil;
+    final String? busyRequestId = state.busyRequestId;
     return <Widget>[
-      if (_offline) ...<Widget>[
+      if (state.offline) ...<Widget>[
         const NoticeBanner(
           tone: Tone.warning,
           icon: Icons.cloud_off_outlined,
@@ -248,33 +182,33 @@ class _PairingPageState extends ConsumerState<PairingPage> {
         ),
         const SizedBox(height: AppSpacing.lg),
       ],
-      for (final Device device in state.pending) ...<Widget>[
+      for (final LinkRequest request in state.requests) ...<Widget>[
         _PendingLinkCard(
-          device: device,
-          busy: _actingOn == device.id,
-          enabled: _actingOn == null,
-          onApprove: () => _approve(device),
-          onReject: () => _reject(device),
+          request: request,
+          busy: busyRequestId == request.id,
+          enabled: busyRequestId == null,
+          onApprove: () => _approve(request),
+          onReject: () => _reject(request),
         ),
         const SizedBox(height: AppSpacing.lg),
       ],
       if (code != null)
         _CodeCard(
           code: code,
-          remaining: Duration(milliseconds: code.expiresAt - _now),
-          lifetime: _codeLifetime,
-          cancelling: _cancelling,
+          remaining: state.remaining,
+          lifetime: LinkRequestRules.codeLifetime,
+          cancelling: state.cancelling,
           onCopy: () => _copy(code),
           onShare: () => _share(code),
           onCancel: _cancelCode,
         )
       else ...<Widget>[
         _GenerateCard(
-          hasPending: state.pending.isNotEmpty,
-          busy: _generating,
-          onGenerate: _generate,
+          hasPending: state.requests.isNotEmpty,
+          busy: state.generating,
+          onGenerate: () => context.read<DeviceLinkingBloc>().add(const LinkCodeRequested()),
         ),
-        if (otherCodeExpiresAt != null && otherCodeExpiresAt > _now) ...<Widget>[
+        if (otherCodeExpiresAt != null) ...<Widget>[
           const SizedBox(height: AppSpacing.lg),
           NoticeBanner(
             message:
@@ -353,7 +287,7 @@ class _CodeCard extends StatelessWidget {
     required this.onCancel,
   });
 
-  final PairingCodeInfo code;
+  final LinkCode code;
   final Duration remaining;
   final Duration lifetime;
   final bool cancelling;
@@ -460,14 +394,14 @@ class _CodeCard extends StatelessWidget {
 
 class _PendingLinkCard extends StatelessWidget {
   const _PendingLinkCard({
-    required this.device,
+    required this.request,
     required this.busy,
     required this.enabled,
     required this.onApprove,
     required this.onReject,
   });
 
-  final Device device;
+  final LinkRequest request;
   final bool busy;
   final bool enabled;
   final VoidCallback onApprove;
@@ -476,7 +410,8 @@ class _PendingLinkCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final String confirmCode = device.confirmCode ?? '';
+    final DateTime now = context.read<Clock>().now();
+    final String confirmCode = request.confirmCode ?? '';
     return Card(
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(AppRadius.md),
@@ -493,7 +428,7 @@ class _PendingLinkCard extends StatelessWidget {
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(child: Text('Pedido de vínculo', style: theme.textTheme.titleMedium)),
                 Text(
-                  formatRelativeMs(device.createdAt),
+                  formatRelativeMs(request.createdAt, now: now),
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -502,24 +437,24 @@ class _PendingLinkCard extends StatelessWidget {
             ),
             const SizedBox(height: AppSpacing.md),
             Text(
-              device.deviceName.isEmpty ? 'Aparelho sem nome' : device.deviceName,
+              request.deviceName.isEmpty ? 'Aparelho sem nome' : request.deviceName,
               style: theme.textTheme.titleLarge,
             ),
-            if (device.hardwareLabel.isNotEmpty)
+            if (request.hardwareLabel.isNotEmpty)
               Text(
-                device.hardwareLabel,
+                request.hardwareLabel,
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                 ),
               ),
-            if (device.relink) ...<Widget>[
+            if (request.relink) ...<Widget>[
               const SizedBox(height: AppSpacing.md),
               NoticeBanner(
                 icon: Icons.history,
-                message: device.childName.isEmpty
+                message: request.childName.isEmpty
                     ? 'Este aparelho já foi vinculado a esta conta. Ao aprovar, as regras e o '
                           'histórico anteriores são mantidos.'
-                    : 'Este aparelho já foi vinculado a esta conta como "${device.childName}". '
+                    : 'Este aparelho já foi vinculado a esta conta como "${request.childName}". '
                           'Ao aprovar, as regras e o histórico anteriores são mantidos.',
               ),
             ],
@@ -584,79 +519,6 @@ class _PendingLinkCard extends StatelessWidget {
           ],
         ),
       ),
-    );
-  }
-}
-
-/// Pede o nome da crianca antes de aprovar o vinculo.
-class _ApproveDialog extends StatefulWidget {
-  const _ApproveDialog({required this.device});
-
-  final Device device;
-
-  @override
-  State<_ApproveDialog> createState() => _ApproveDialogState();
-}
-
-class _ApproveDialogState extends State<_ApproveDialog> {
-  late final TextEditingController _name = TextEditingController(text: widget.device.childName);
-  String? _error;
-
-  @override
-  void dispose() {
-    _name.dispose();
-    super.dispose();
-  }
-
-  void _submit() {
-    final String name = _name.text.trim();
-    if (name.isEmpty) {
-      setState(() => _error = 'Informe o nome da criança.');
-      return;
-    }
-    if (name.length > 40) {
-      setState(() => _error = 'Use no máximo 40 caracteres.');
-      return;
-    }
-    Navigator.of(context).pop(name);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return AlertDialog(
-      title: const Text('Aprovar vínculo'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            'De quem é este aparelho? O nome aparece no painel e nos relatórios.',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          TextField(
-            controller: _name,
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            textInputAction: TextInputAction.done,
-            onSubmitted: (_) => _submit(),
-            decoration: InputDecoration(
-              labelText: 'Nome da criança',
-              errorText: _error,
-              prefixIcon: const Icon(Icons.child_care_outlined),
-            ),
-          ),
-        ],
-      ),
-      actions: <Widget>[
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar')),
-        FilledButton(
-          style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
-          onPressed: _submit,
-          child: const Text('Aprovar'),
-        ),
-      ],
     );
   }
 }
@@ -729,7 +591,7 @@ class _HowStep extends StatelessWidget {
 class _SuccessView extends StatelessWidget {
   const _SuccessView({required this.device, required this.onDone, required this.onAnother});
 
-  final Device device;
+  final LinkRequest device;
   final VoidCallback onDone;
   final VoidCallback onAnother;
 
