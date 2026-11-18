@@ -1,31 +1,41 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
+import '../../../../core/time/clock.dart';
 import '../../../../core/time/formatters.dart';
-import '../../../../shared/domain/policy.dart';
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/duration_picker.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../domain/ids.dart';
-import '../domain/policy_summaries.dart';
-import 'widgets/duration_picker.dart';
-import 'widgets/rule_scaffold.dart';
-
-const int _maxPeriods = 50;
+import '../../../child_device/domain/entities/child_device.dart';
+import '../../../device_policy/domain/entities/policy.dart';
+import '../../../device_policy/presentation/widgets/rule_editor_scaffold.dart';
+import '../../domain/entities/block_period_draft.dart';
+import '../../domain/entities/block_period_suggestion.dart';
+import '../../domain/entities/schedule_rules.dart';
+import '../../domain/services/block_period_editing.dart';
+import '../bloc/schedule/schedule_bloc.dart';
+import '../texts/schedule_texts.dart';
 
 /// Periodos de bloqueio: recorrentes por dia da semana ou pontuais com data e hora.
+///
+/// Espera um [ScheduleBloc] acima na arvore, ja iniciado para [device].
 class BlockPeriodsPage extends StatelessWidget {
-  const BlockPeriodsPage({super.key});
+  const BlockPeriodsPage({required this.device, super.key});
+
+  final ChildDevice device;
 
   @override
   Widget build(BuildContext context) {
-    return RuleEditorScaffold(
+    final ScheduleBloc bloc = context.read<ScheduleBloc>();
+    return RuleEditorScaffold<ScheduleBloc, ScheduleRules>(
       title: 'Períodos de bloqueio',
-      children: (BuildContext context, RuleEditing editing) {
-        final List<BlockPeriod> periods = editing.draft.blockPeriods;
-
-        void setPeriods(List<BlockPeriod> next) {
-          editing.update((Policy policy) => policy.copyWith(blockPeriods: next));
-        }
+      device: device,
+      onSave: () => bloc.add(const ScheduleSaveRequested()),
+      onDiscard: () => bloc.add(const ScheduleDiscardRequested()),
+      onRetry: () => bloc.add(ScheduleStarted(device.id)),
+      children: (BuildContext context, ScheduleRules rules) {
+        final List<BlockPeriod> periods = rules.blockPeriods;
 
         Future<void> edit(BlockPeriod? current) async {
           final _PeriodEdit? result = await showModalBottomSheet<_PeriodEdit>(
@@ -37,24 +47,12 @@ class BlockPeriodsPage extends StatelessWidget {
           if (result == null) {
             return;
           }
-          final BlockPeriod? saved = result.period;
-          if (saved == null) {
-            setPeriods(periods.where((BlockPeriod p) => p.id != current?.id).toList());
-          } else if (current == null) {
-            setPeriods(<BlockPeriod>[...periods, saved]);
-          } else {
-            setPeriods(<BlockPeriod>[
-              for (final BlockPeriod p in periods)
-                if (p.id == current.id) saved else p,
-            ]);
+          final BlockPeriodDraft? draft = result.draft;
+          if (draft != null) {
+            bloc.add(BlockPeriodSaved(draft));
+          } else if (current != null) {
+            bloc.add(BlockPeriodDeleted(current.id));
           }
-        }
-
-        void addSuggestion(String label, List<int> days, LocalTime start, LocalTime end) {
-          setPeriods(<BlockPeriod>[
-            ...periods,
-            BlockPeriod.weekly(id: newUuid(), label: label, days: days, start: start, end: end),
-          ]);
         }
 
         return <Widget>[
@@ -75,22 +73,16 @@ class BlockPeriodsPage extends StatelessWidget {
                   ActionChip(
                     avatar: const Icon(Icons.bedtime_outlined, size: 18),
                     label: const Text('Hora de dormir, 21:00 às 07:00'),
-                    onPressed: () => addSuggestion(
-                      'Hora de dormir',
-                      const <int>[1, 2, 3, 4, 5, 6, 7],
-                      const LocalTime(21, 0),
-                      const LocalTime(7, 0),
-                    ),
+                    onPressed: () {
+                      bloc.add(const BlockPeriodSuggestionAdded(BlockPeriodSuggestion.bedtime));
+                    },
                   ),
                   ActionChip(
                     avatar: const Icon(Icons.school_outlined, size: 18),
                     label: const Text('Escola, seg a sex, 07:00 às 12:00'),
-                    onPressed: () => addSuggestion(
-                      'Escola',
-                      const <int>[1, 2, 3, 4, 5],
-                      const LocalTime(7, 0),
-                      const LocalTime(12, 0),
-                    ),
+                    onPressed: () {
+                      bloc.add(const BlockPeriodSuggestionAdded(BlockPeriodSuggestion.school));
+                    },
                   ),
                 ],
               ),
@@ -100,16 +92,15 @@ class BlockPeriodsPage extends StatelessWidget {
               _PeriodCard(
                 period: period,
                 onTap: () => edit(period),
-                onToggle: (bool value) => setPeriods(<BlockPeriod>[
-                  for (final BlockPeriod p in periods)
-                    if (p.id == period.id) p.withEnabled(value) else p,
-                ]),
+                onToggle: (bool value) {
+                  bloc.add(BlockPeriodToggled(periodId: period.id, enabled: value));
+                },
               ),
               const SizedBox(height: AppSpacing.sm),
             ],
           const SizedBox(height: AppSpacing.md),
           OutlinedButton.icon(
-            onPressed: periods.length >= _maxPeriods ? null : () => edit(null),
+            onPressed: BlockPeriodEditing.canAdd(periods) ? () => edit(null) : null,
             icon: const Icon(Icons.add),
             label: const Text('Novo período'),
           ),
@@ -130,7 +121,7 @@ class _PeriodCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
     final bool once = period.kind == BlockPeriodKind.once;
-    final bool ended = once && (period.endAt ?? 0) < DateTime.now().millisecondsSinceEpoch;
+    final bool ended = BlockPeriodEditing.hasEnded(period, context.read<Clock>().nowMs());
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -178,11 +169,11 @@ class _PeriodCard extends StatelessWidget {
   }
 }
 
-/// Resultado da folha de edicao: o periodo gravado, ou nulo em `period` para excluir.
+/// Resultado da folha de edicao: o periodo preenchido, ou nulo em [draft] para excluir.
 class _PeriodEdit {
-  const _PeriodEdit(this.period);
+  const _PeriodEdit(this.draft);
 
-  final BlockPeriod? period;
+  final BlockPeriodDraft? draft;
 }
 
 class _PeriodSheet extends StatefulWidget {
@@ -195,6 +186,7 @@ class _PeriodSheet extends StatefulWidget {
 }
 
 class _PeriodSheetState extends State<_PeriodSheet> {
+  late final Clock _clock = context.read<Clock>();
   late final TextEditingController _label = TextEditingController(
     text: widget.initial?.label ?? '',
   );
@@ -208,12 +200,11 @@ class _PeriodSheetState extends State<_PeriodSheet> {
   late DateTime _endAt = _initialInstant(widget.initial?.endAt, 2);
   String? _error;
 
-  static DateTime _initialInstant(int? ms, int hoursAhead) {
+  DateTime _initialInstant(int? ms, int hoursAhead) {
     if (ms != null) {
       return DateTime.fromMillisecondsSinceEpoch(ms);
     }
-    final DateTime now = DateTime.now();
-    return DateTime(now.year, now.month, now.day, now.hour + 1 + hoursAhead);
+    return BlockPeriodEditing.suggestedInstant(_clock.now(), hoursAhead: hoursAhead);
   }
 
   @override
@@ -244,7 +235,7 @@ class _PeriodSheetState extends State<_PeriodSheet> {
 
   Future<void> _pickInstant({required bool start}) async {
     final DateTime current = start ? _startAt : _endAt;
-    final DateTime now = DateTime.now();
+    final DateTime now = _clock.now();
     final DateTime? date = await showDatePicker(
       context: context,
       initialDate: current,
@@ -273,51 +264,23 @@ class _PeriodSheetState extends State<_PeriodSheet> {
   }
 
   void _save() {
-    final String label = _label.text.trim();
-    final String id = widget.initial?.id ?? newUuid();
-    final bool enabled = widget.initial?.enabled ?? true;
-    if (label.isEmpty) {
-      setState(() => _error = 'Dê um nome ao período, por exemplo "Hora de dormir".');
-      return;
-    }
-    if (_kind == BlockPeriodKind.weekly) {
-      if (_days.isEmpty) {
-        setState(() => _error = 'Escolha pelo menos um dia da semana.');
-        return;
-      }
-      if (_start == _end) {
-        setState(() => _error = 'O início e o fim não podem ser iguais.');
-        return;
-      }
-      Navigator.of(context).pop(
-        _PeriodEdit(
-          BlockPeriod.weekly(
-            id: id,
-            label: label,
-            days: _days.toList()..sort(),
-            start: _start,
-            end: _end,
-            enabled: enabled,
-          ),
-        ),
-      );
-      return;
-    }
-    if (!_endAt.isAfter(_startAt)) {
-      setState(() => _error = 'O fim precisa ser depois do início.');
-      return;
-    }
-    Navigator.of(context).pop(
-      _PeriodEdit(
-        BlockPeriod.once(
-          id: id,
-          label: label,
-          startAt: _startAt.millisecondsSinceEpoch,
-          endAt: _endAt.millisecondsSinceEpoch,
-          enabled: enabled,
-        ),
-      ),
+    final BlockPeriodDraft draft = BlockPeriodDraft(
+      id: widget.initial?.id,
+      label: _label.text,
+      kind: _kind,
+      days: _days,
+      start: _start,
+      end: _end,
+      startAt: _startAt,
+      endAt: _endAt,
+      enabled: widget.initial?.enabled ?? true,
     );
+    final String? problem = draft.problem;
+    if (problem != null) {
+      setState(() => _error = problem);
+      return;
+    }
+    Navigator.of(context).pop(_PeriodEdit(draft));
   }
 
   Future<void> _delete() async {

@@ -1,7 +1,9 @@
 import 'dart:math';
 
-/// Gera um identificador UUID versao 4 (aleatorio), usado nos periodos de bloqueio criados no
-/// app.
+/// Gera o identificador de um periodo de bloqueio criado no app.
+typedef PeriodIdGenerator = String Function();
+
+/// Identificador UUID versao 4 (aleatorio).
 String newUuid([Random? random]) {
   final Random source = random ?? Random.secure();
   final List<int> bytes = List<int>.generate(16, (_) => source.nextInt(256));

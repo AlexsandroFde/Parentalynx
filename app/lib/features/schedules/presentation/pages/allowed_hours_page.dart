@@ -1,53 +1,40 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../../../core/time/formatters.dart';
-import '../../../../shared/domain/policy.dart';
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/duration_picker.dart';
 import '../../../../shared/widgets/feedback_views.dart';
-import '../domain/allowed_hours_editing.dart';
-import '../domain/policy_summaries.dart';
-import 'widgets/duration_picker.dart';
-import 'widgets/rule_scaffold.dart';
+import '../../../child_device/domain/entities/child_device.dart';
+import '../../../device_policy/domain/entities/policy.dart';
+import '../../../device_policy/presentation/texts/describe_days.dart';
+import '../../../device_policy/presentation/widgets/rule_editor_scaffold.dart';
+import '../../domain/entities/day_window.dart';
+import '../../domain/entities/schedule_rules.dart';
+import '../../domain/services/allowed_hours_editing.dart';
+import '../bloc/schedule/schedule_bloc.dart';
 
 /// Horarios permitidos por dia da semana. Dia sem janela fica bloqueado o dia inteiro.
+///
+/// Espera um [ScheduleBloc] acima na arvore, ja iniciado para [device].
 class AllowedHoursPage extends StatelessWidget {
-  const AllowedHoursPage({super.key});
+  const AllowedHoursPage({required this.device, super.key});
+
+  final ChildDevice device;
 
   @override
   Widget build(BuildContext context) {
-    return RuleEditorScaffold(
+    final ScheduleBloc bloc = context.read<ScheduleBloc>();
+    return RuleEditorScaffold<ScheduleBloc, ScheduleRules>(
       title: 'Horários permitidos',
-      children: (BuildContext context, RuleEditing editing) {
-        final AllowedHours hours = editing.draft.allowedHours;
+      device: device,
+      onSave: () => bloc.add(const ScheduleSaveRequested()),
+      onDiscard: () => bloc.add(const ScheduleDiscardRequested()),
+      onRetry: () => bloc.add(ScheduleStarted(device.id)),
+      children: (BuildContext context, ScheduleRules rules) {
+        final AllowedHours hours = rules.allowedHours;
         final WeekWindows byDay = expandAllowedHours(hours);
         final List<int> blocked = blockedDays(byDay);
-
-        void setWeek(WeekWindows week) {
-          editing.update(
-            (Policy p) => p.copyWith(
-              allowedHours: p.allowedHours.copyWith(windows: compactAllowedHours(week)),
-            ),
-          );
-        }
-
-        void toggle(bool value) {
-          editing.update((Policy p) {
-            // Ao ligar sem nenhuma janela, comeca com um horario comum em todos os dias,
-            // para nao bloquear a semana inteira sem querer.
-            final List<TimeWindow> windows = value && p.allowedHours.windows.isEmpty
-                ? const <TimeWindow>[
-                    TimeWindow(
-                      days: <int>[1, 2, 3, 4, 5, 6, 7],
-                      start: LocalTime(7, 0),
-                      end: LocalTime(21, 0),
-                    ),
-                  ]
-                : p.allowedHours.windows;
-            return p.copyWith(
-              allowedHours: AllowedHours(enabled: value, windows: windows),
-            );
-          });
-        }
 
         Future<void> add(int day) async {
           final DayWindow? window = await showDialog<DayWindow>(
@@ -55,7 +42,7 @@ class AllowedHoursPage extends StatelessWidget {
             builder: (BuildContext context) => _WindowDialog(day: day),
           );
           if (window != null) {
-            setWeek(addDayWindow(byDay, day, window));
+            bloc.add(AllowedHoursWindowAdded(weekday: day, window: window));
           }
         }
 
@@ -65,7 +52,7 @@ class AllowedHoursPage extends StatelessWidget {
             title: 'Restringir os horários de uso',
             subtitle: 'Fora dos horários liberados, só as exceções funcionam.',
             value: hours.enabled,
-            onChanged: toggle,
+            onChanged: (bool value) => bloc.add(AllowedHoursToggled(value)),
           ),
           const SizedBox(height: AppSpacing.md),
           if (!hours.enabled)
@@ -88,9 +75,10 @@ class AllowedHoursPage extends StatelessWidget {
                 day: day,
                 windows: byDay[day] ?? const <DayWindow>[],
                 onAdd: () => add(day),
-                onRemove: (DayWindow window) => setWeek(removeDayWindow(byDay, day, window)),
-                onCopyToAll: () =>
-                    setWeek(copyDayWindows(byDay, from: day, to: const <int>[1, 2, 3, 4, 5, 6, 7])),
+                onRemove: (DayWindow window) {
+                  bloc.add(AllowedHoursWindowRemoved(weekday: day, window: window));
+                },
+                onCopyToAll: () => bloc.add(AllowedHoursDayCopiedToAll(day)),
               ),
               const SizedBox(height: AppSpacing.sm),
             ],

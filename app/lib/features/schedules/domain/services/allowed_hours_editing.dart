@@ -1,38 +1,23 @@
-import '../../../../shared/domain/policy.dart';
+import '../../../device_policy/domain/entities/policy.dart';
+import '../entities/day_window.dart';
 
-/// Edicao dos horarios permitidos por dia da semana.
-///
-/// A politica guarda janelas que valem para varios dias (`TimeWindow`). A tela edita dia a
-/// dia. Estas funcoes puras convertem entre as duas formas.
+/// Edicao dos horarios permitidos por dia da semana. Funcoes puras.
 
-/// Janela de uso em um unico dia.
-class DayWindow implements Comparable<DayWindow> {
-  const DayWindow(this.start, this.end);
+/// Janela usada ao ligar a restricao sem nenhuma janela: um horario comum todos os dias, para
+/// nao bloquear a semana inteira sem querer.
+const TimeWindow defaultAllowedWindow = TimeWindow(
+  days: <int>[1, 2, 3, 4, 5, 6, 7],
+  start: LocalTime(7, 0),
+  end: LocalTime(21, 0),
+);
 
-  final LocalTime start;
-  final LocalTime end;
-
-  @override
-  int compareTo(DayWindow other) {
-    final int byStart = start.compareTo(other.start);
-    return byStart != 0 ? byStart : end.compareTo(other.end);
-  }
-
-  @override
-  bool operator ==(Object other) {
-    return other is DayWindow && other.start == start && other.end == end;
-  }
-
-  @override
-  int get hashCode => Object.hash(start, end);
-
-  @override
-  String toString() => '$start às $end';
+/// Liga ou desliga a restricao de horarios.
+AllowedHours withAllowedHoursEnabled(AllowedHours hours, bool enabled) {
+  final List<TimeWindow> windows = enabled && hours.windows.isEmpty
+      ? const <TimeWindow>[defaultAllowedWindow]
+      : hours.windows;
+  return AllowedHours(enabled: enabled, windows: windows);
 }
-
-/// Janelas por dia da semana ISO (1 = segunda). Todo dia de 1 a 7 esta presente. Lista vazia
-/// significa dia bloqueado o dia inteiro.
-typedef WeekWindows = Map<int, List<DayWindow>>;
 
 /// Abre as janelas da politica em uma lista por dia da semana, em ordem de inicio.
 WeekWindows expandAllowedHours(AllowedHours hours) {
@@ -71,6 +56,11 @@ List<TimeWindow> compactAllowedHours(WeekWindows byDay) {
     for (final MapEntry<DayWindow, List<int>> entry in entries)
       TimeWindow(days: entry.value, start: entry.key.start, end: entry.key.end),
   ];
+}
+
+/// Aplica uma alteracao dia a dia sobre os horarios e devolve a forma compacta da politica.
+AllowedHours editWeek(AllowedHours hours, WeekWindows Function(WeekWindows week) change) {
+  return hours.copyWith(windows: compactAllowedHours(change(expandAllowedHours(hours))));
 }
 
 /// Motivo pelo qual a janela nao pode ser gravada, ou nulo se ela e valida.
