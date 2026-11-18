@@ -2,7 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/time/formatters.dart';
 import '../../../../shared/widgets/feedback_views.dart';
-import '../domain/device.dart';
+import '../../domain/entities/child_device.dart';
 
 /// Textos e rotulos sobre aparelhos, usados na lista e no detalhe.
 
@@ -152,7 +152,10 @@ String issueLabel(String code) {
 }
 
 /// Situacao de conexao de um aparelho ativo, para a etiqueta da lista e do detalhe.
-({String label, Tone tone, IconData icon}) connectionStatus(Device device, {DateTime? now}) {
+({String label, Tone tone, IconData icon}) connectionStatus(
+  ChildDevice device, {
+  required DateTime now,
+}) {
   if (device.online) {
     return (label: 'Online', tone: Tone.success, icon: Icons.wifi);
   }

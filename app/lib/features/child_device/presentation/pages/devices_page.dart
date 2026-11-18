@@ -1,23 +1,34 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
+import '../../../../core/constants/route_paths.dart';
+import '../../../../core/time/clock.dart';
 import '../../../../core/time/formatters.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../guardian_paths.dart';
-import '../domain/device.dart';
-import 'device_texts.dart';
-import 'devices_providers.dart';
+import '../../domain/entities/child_device.dart';
+import '../bloc/devices/devices_bloc.dart';
+import '../texts/device_texts.dart';
 
 /// Lista dos aparelhos da conta: ativos, aguardando aprovacao e revogados.
-class DevicesPage extends ConsumerWidget {
+///
+/// Usa o [DevicesBloc] do painel.
+class DevicesPage extends StatelessWidget {
   const DevicesPage({super.key});
 
+  Future<void> _refresh(BuildContext context) {
+    final Completer<void> completer = Completer<void>();
+    context.read<DevicesBloc>().add(DevicesRefreshRequested(completer: completer));
+    return completer.future;
+  }
+
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final AsyncValue<List<Device>> devices = ref.watch(devicesProvider);
+  Widget build(BuildContext context) {
+    final DevicesState state = context.watch<DevicesBloc>().state;
     return Scaffold(
       appBar: AppBar(title: const Text('Aparelhos')),
       floatingActionButton: FloatingActionButton.extended(
@@ -26,12 +37,16 @@ class DevicesPage extends ConsumerWidget {
         label: const Text('Vincular aparelho'),
       ),
       body: RefreshIndicator(
-        onRefresh: () => ref.read(devicesProvider.notifier).refresh(),
-        child: AsyncValueView<List<Device>>(
-          value: devices,
-          onRetry: () => ref.invalidate(devicesProvider),
-          data: (List<Device> all) => _DevicesList(devices: all),
-        ),
+        onRefresh: () => _refresh(context),
+        child: switch (state) {
+          DevicesLoaded(:final List<ChildDevice> devices) => _DevicesList(devices: devices),
+          DevicesEmpty() => const _DevicesList(devices: <ChildDevice>[]),
+          DevicesError(:final failure) => FailureView(
+            error: failure,
+            onRetry: () => context.read<DevicesBloc>().add(const DevicesRefreshRequested()),
+          ),
+          DevicesInitial() || DevicesLoading() => const LoadingView(),
+        },
       ),
     );
   }
@@ -40,10 +55,10 @@ class DevicesPage extends ConsumerWidget {
 class _DevicesList extends StatelessWidget {
   const _DevicesList({required this.devices});
 
-  final List<Device> devices;
+  final List<ChildDevice> devices;
 
-  List<Device> _with(DeviceStatus status) {
-    return devices.where((Device device) => device.status == status).toList();
+  List<ChildDevice> _with(DeviceLinkStatus status) {
+    return devices.where((ChildDevice device) => device.status == status).toList();
   }
 
   @override
@@ -65,9 +80,10 @@ class _DevicesList extends StatelessWidget {
         ],
       );
     }
-    final List<Device> pending = _with(DeviceStatus.pending);
-    final List<Device> active = _with(DeviceStatus.active);
-    final List<Device> revoked = _with(DeviceStatus.revoked);
+    final List<ChildDevice> pending = _with(DeviceLinkStatus.pending);
+    final List<ChildDevice> active = _with(DeviceLinkStatus.active);
+    final List<ChildDevice> revoked = _with(DeviceLinkStatus.revoked);
+    final DateTime now = context.read<Clock>().now();
     return PageBody(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 96),
       children: <Widget>[
@@ -85,12 +101,12 @@ class _DevicesList extends StatelessWidget {
         ],
         if (active.isNotEmpty) ...<Widget>[
           const _SectionTitle('Ativos'),
-          for (final Device device in active) _DeviceCard(device: device),
+          for (final ChildDevice device in active) _DeviceCard(device: device, now: now),
         ],
         if (revoked.isNotEmpty) ...<Widget>[
           const SizedBox(height: AppSpacing.sm),
           const _SectionTitle('Vínculo revogado'),
-          for (final Device device in revoked) _DeviceCard(device: device),
+          for (final ChildDevice device in revoked) _DeviceCard(device: device, now: now),
         ],
       ],
     );
@@ -116,23 +132,27 @@ class _SectionTitle extends StatelessWidget {
 }
 
 class _DeviceCard extends StatelessWidget {
-  const _DeviceCard({required this.device});
+  const _DeviceCard({required this.device, required this.now});
 
-  final Device device;
+  final ChildDevice device;
+  final DateTime now;
 
   @override
   Widget build(BuildContext context) {
     final ThemeData theme = Theme.of(context);
-    final bool revoked = device.status == DeviceStatus.revoked;
+    final bool revoked = device.status == DeviceLinkStatus.revoked;
     final int? revokedAt = device.revokedAt;
-    final ({String label, Tone tone, IconData icon}) connection = connectionStatus(device);
-    final bool degraded = !revoked && (device.state?.isDegraded ?? false);
+    final ({String label, Tone tone, IconData icon}) connection = connectionStatus(
+      device,
+      now: now,
+    );
+    final bool degraded = !revoked && (device.snapshot?.isDegraded ?? false);
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: Card(
         clipBehavior: Clip.antiAlias,
         child: InkWell(
-          onTap: () => context.push('${GuardianPaths.devices}/${Uri.encodeComponent(device.id)}'),
+          onTap: () => context.push(GuardianPaths.device(device.id)),
           child: Padding(
             padding: const EdgeInsets.all(AppSpacing.lg),
             child: Row(
@@ -174,7 +194,7 @@ class _DeviceCard extends StatelessWidget {
                             StatusPill(
                               label: revokedAt == null
                                   ? 'Revogado'
-                                  : 'Revogado ${formatRelativeMs(revokedAt)}',
+                                  : 'Revogado ${formatRelativeMs(revokedAt, now: now)}',
                               icon: Icons.link_off,
                             )
                           else ...<Widget>[
