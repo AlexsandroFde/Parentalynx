@@ -1,51 +1,47 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:get_it/get_it.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:parentalynx/app/app.dart';
-import 'package:parentalynx/app/theme/app_theme.dart';
-import 'package:parentalynx/core/network/network_providers.dart';
-import 'package:parentalynx/core/platform/native_providers.dart';
-import 'package:parentalynx/core/storage/secure_store.dart';
+import 'package:parentalynx/core/time/clock.dart';
+import 'package:parentalynx/features/app_management/presentation/services/app_icon_images.dart';
+import 'package:parentalynx/shared/services/share_service.dart';
+import 'package:parentalynx/shared/theme/app_frame.dart';
+import 'package:parentalynx/shared/theme/app_theme.dart';
+
+import 'fakes.dart';
 
 /// Tamanho logico de um celular comum, usado nos testes de widget e nas capturas.
 const Size phoneSize = Size(392, 850);
 
-/// Substituicoes minimas para montar qualquer tela sem a ponte nativa.
-List<Override> baseOverrides({
-  AppMode mode = AppMode.unset,
-  String serverUrl = 'https://servidor.teste',
-  String? sessionToken,
-  SecureStore? secureStore,
-}) {
-  return <Override>[
-    initialAppModeProvider.overrideWithValue(mode),
-    initialServerUrlProvider.overrideWithValue(serverUrl),
-    initialSessionTokenProvider.overrideWithValue(sessionToken),
-    secureStoreProvider.overrideWithValue(secureStore ?? InMemorySecureStore()),
-  ];
-}
-
 /// Monta [child] dentro do tema e da localizacao do app.
+///
+/// Os servicos de interface ([ShareService] e [Clock]) vem de [di], como no app. Os BLoCs de
+/// que a tela precisa sao montados pelo proprio teste em volta de [child].
 Future<void> pumpWidgetInApp(
   WidgetTester tester,
   Widget child, {
-  List<Override> overrides = const <Override>[],
+  required GetIt di,
   Brightness brightness = Brightness.light,
   Size size = phoneSize,
+  GlobalKey<NavigatorState>? navigatorKey,
 }) async {
   await initializeDateFormatting('pt_BR');
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
   addTearDown(tester.view.reset);
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: overrides,
+    MultiRepositoryProvider(
+      providers: <RepositoryProvider<Object>>[
+        RepositoryProvider<ShareService>.value(value: di<ShareService>()),
+        RepositoryProvider<Clock>.value(value: di<Clock>()),
+        RepositoryProvider<AppIconImages>.value(value: const NoAppIconImages()),
+      ],
       child: MaterialApp(
+        navigatorKey: navigatorKey,
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light(),
         darkTheme: AppTheme.dark(),

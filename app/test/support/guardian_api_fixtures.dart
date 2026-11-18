@@ -1,22 +1,23 @@
-import 'dart:convert';
-
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/misc.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:http/http.dart' as http;
-import 'package:http/testing.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_ui/material_ui.dart';
-import 'package:parentalynx/app/app.dart';
-import 'package:parentalynx/app/theme/app_theme.dart';
-import 'package:parentalynx/core/network/api_client.dart';
-import 'package:parentalynx/core/network/network_providers.dart';
-import 'package:parentalynx/core/platform/native_providers.dart';
-import 'package:parentalynx/features/guardian/apps/presentation/app_icon.dart';
-import 'package:parentalynx/features/guardian/guardian_paths.dart';
+import 'package:parentalynx/core/constants/route_paths.dart';
+import 'package:parentalynx/core/time/clock.dart';
+import 'package:parentalynx/features/app_management/presentation/services/app_icon_images.dart';
+import 'package:parentalynx/shared/services/share_service.dart';
+import 'package:parentalynx/shared/theme/app_frame.dart';
+import 'package:parentalynx/shared/theme/app_theme.dart';
 
-import '../../../../support/test_app.dart';
+import 'fake_backend.dart';
+import 'fakes.dart';
+import 'test_app.dart';
+import 'test_dependencies.dart';
+
+// Dados de exemplo de um aparelho ativo (politica, apps, alertas e relatorio) no formato do
+// protocolo, para os testes do painel, das regras e dos relatorios.
 
 /// Momento fixo dos dados de exemplo: terca-feira, 17/11/2026, 15:30.
 final DateTime fixtureNow = DateTime(2026, 11, 17, 15, 30);
@@ -24,69 +25,6 @@ const String fixtureToday = '2026-11-17';
 const String deviceId = 'dev-1';
 
 int msAgo(Duration ago) => fixtureNow.subtract(ago).millisecondsSinceEpoch;
-
-/// Resposta de uma rota simulada: corpo JSON, ou uma resposta HTTP completa.
-typedef RouteHandler = Object? Function(http.Request request);
-
-/// Servidor simulado: associa "METODO /caminho" a uma resposta e guarda as requisicoes.
-class FakeApi {
-  FakeApi(this.routes);
-
-  final Map<String, RouteHandler> routes;
-  final List<http.Request> requests = <http.Request>[];
-
-  /// Requisicoes feitas a uma rota ("METODO /caminho").
-  List<http.Request> calls(String route) {
-    return requests.where((http.Request r) => '${r.method} ${r.url.path}' == route).toList();
-  }
-
-  Map<String, Object?> bodyOf(http.Request request) {
-    return jsonDecode(request.body) as Map<String, Object?>;
-  }
-
-  http.Client get client {
-    return MockClient((http.Request request) async {
-      requests.add(request);
-      final RouteHandler? handler = routes['${request.method} ${request.url.path}'];
-      if (handler == null) {
-        return jsonResponse(<String, Object?>{
-          'error': <String, Object?>{'code': 'not_found', 'message': 'Rota não simulada.'},
-        }, 404);
-      }
-      final Object? result = handler(request);
-      return result is http.Response ? result : jsonResponse(result ?? <String, Object?>{});
-    });
-  }
-
-  List<Override> get overrides {
-    return <Override>[
-      ...baseOverrides(mode: AppMode.guardian),
-      apiClientProvider.overrideWithValue(
-        ApiClient(
-          httpClient: client,
-          baseUrl: () => 'https://servidor.teste',
-          sessionToken: () => 'gs_teste',
-        ),
-      ),
-      // Sem rede nos testes: os icones usam a inicial do app.
-      appIconImageFactoryProvider.overrideWithValue((Uri uri, Map<String, String> headers) => null),
-    ];
-  }
-}
-
-http.Response jsonResponse(Object body, [int status = 200]) {
-  return http.Response.bytes(
-    utf8.encode(jsonEncode(body)),
-    status,
-    headers: <String, String>{'content-type': 'application/json; charset=utf-8'},
-  );
-}
-
-http.Response errorResponse(String code, int status, [Map<String, Object?>? details]) {
-  return jsonResponse(<String, Object?>{
-    'error': <String, Object?>{'code': code, 'message': 'Erro $code.', 'details': ?details},
-  }, status);
-}
 
 Map<String, Object?> policyJson({
   bool limitEnabled = true,
@@ -357,46 +295,59 @@ Map<String, Object?> _usage(String package, String label, String category, int m
   };
 }
 
-/// Rotas de leitura de um aparelho ativo com politica, apps, alertas e relatorio.
-Map<String, RouteHandler> standardRoutes({
+/// Registra no servidor falso as rotas de leitura de um aparelho ativo com politica, apps,
+/// alertas e relatorio.
+void installStandardRoutes(
+  FakeBackend backend, {
   Map<String, Object?>? device,
   Map<String, Object?>? policy,
   int policyVersion = 12,
 }) {
   final Map<String, Object?> deviceBody = device ?? deviceJson();
-  return <String, RouteHandler>{
-    'GET /v1/guardian/devices': (http.Request r) => <String, Object?>{
-      'devices': <Object?>[deviceBody],
-    },
-    'GET /v1/guardian/devices/$deviceId': (http.Request r) => <String, Object?>{
-      'device': deviceBody,
-      'policyVersion': policyVersion,
-      'policy': policy ?? policyJson(),
-    },
-    'GET /v1/guardian/devices/$deviceId/apps': (http.Request r) => appsJson(),
-    'GET /v1/guardian/alerts': (http.Request r) => alertsJson(),
-    'GET /v1/guardian/devices/$deviceId/reports/summary': (http.Request r) => summaryJson(),
-  };
+  backend
+    ..on('GET', '/v1/guardian/devices', (http.Request r) {
+      return jsonResponse(<String, Object?>{
+        'devices': <Object?>[deviceBody],
+      });
+    })
+    ..on('GET', '/v1/guardian/devices/$deviceId', (http.Request r) {
+      return jsonResponse(<String, Object?>{
+        'device': deviceBody,
+        'policyVersion': policyVersion,
+        'policy': policy ?? policyJson(),
+      });
+    })
+    ..onJson('GET', '/v1/guardian/devices/$deviceId/apps', appsJson())
+    ..onJson('GET', '/v1/guardian/alerts', alertsJson())
+    ..onJson('GET', '/v1/guardian/devices/$deviceId/reports/summary', summaryJson());
 }
 
-/// Monta as rotas informadas em um roteador de teste, com o tema e a localizacao do app.
-Future<void> pumpGuardianRoutes(
+/// Monta as rotas informadas em um roteador de teste, com o tema, a localizacao e os servicos
+/// de interface do app. [wrap] coloca BLoCs acima do roteador (por exemplo o `DevicesBloc`,
+/// que no app vive enquanto o painel esta aberto).
+///
+/// Os caminhos de pareamento e de alertas viram telas de destino simples, para os testes
+/// conferirem a navegacao.
+Future<GoRouter> pumpGuardianRoutes(
   WidgetTester tester, {
   required List<RouteBase> routes,
   required String location,
-  required List<Override> overrides,
+  required TestDependencies deps,
+  Widget Function(Widget child)? wrap,
   Size size = phoneSize,
   Brightness brightness = Brightness.light,
+  List<String> destinations = const <String>[GuardianPaths.pairing, GuardianPaths.alerts],
 }) async {
   await initializeDateFormatting('pt_BR');
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
   addTearDown(tester.view.reset);
   final GoRouter router = GoRouter(
+    navigatorKey: deps.navigatorKey,
     initialLocation: location,
     routes: <RouteBase>[
       ...routes,
-      for (final String path in <String>[GuardianPaths.pairing, GuardianPaths.alerts])
+      for (final String path in destinations)
         GoRoute(
           path: path,
           builder: (BuildContext context, GoRouterState state) {
@@ -406,23 +357,30 @@ Future<void> pumpGuardianRoutes(
     ],
   );
   addTearDown(router.dispose);
+  final Widget app = MaterialApp.router(
+    debugShowCheckedModeBanner: false,
+    routerConfig: router,
+    theme: AppTheme.light(),
+    darkTheme: AppTheme.dark(),
+    themeMode: brightness == Brightness.light ? ThemeMode.light : ThemeMode.dark,
+    locale: appLocale,
+    supportedLocales: const <Locale>[appLocale],
+    localizationsDelegates: GlobalMaterialLocalizations.delegates,
+    builder: wrapAppContent,
+  );
   await tester.pumpWidget(
-    ProviderScope(
-      overrides: overrides,
-      child: MaterialApp.router(
-        debugShowCheckedModeBanner: false,
-        routerConfig: router,
-        theme: AppTheme.light(),
-        darkTheme: AppTheme.dark(),
-        themeMode: brightness == Brightness.light ? ThemeMode.light : ThemeMode.dark,
-        locale: appLocale,
-        supportedLocales: const <Locale>[appLocale],
-        localizationsDelegates: GlobalMaterialLocalizations.delegates,
-        builder: wrapAppContent,
-      ),
+    MultiRepositoryProvider(
+      providers: <RepositoryProvider<Object>>[
+        RepositoryProvider<ShareService>.value(value: deps.share),
+        RepositoryProvider<Clock>.value(value: deps.clock),
+        // Sem rede nos testes: os icones usam a inicial do app.
+        RepositoryProvider<AppIconImages>.value(value: const NoAppIconImages()),
+      ],
+      child: wrap == null ? app : wrap(app),
     ),
   );
   await settle(tester);
+  return router;
 }
 
 /// Avanca o tempo simulado o bastante para as respostas chegarem e as animacoes terminarem,
