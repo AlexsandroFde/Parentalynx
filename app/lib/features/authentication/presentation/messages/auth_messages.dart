@@ -1,5 +1,6 @@
 import '../../../../core/errors/app_failure.dart';
 import '../../../../core/security/password_policy.dart';
+import '../../domain/entities/credential_errors.dart';
 
 /// Mensagens em linguagem simples para as falhas de conta e de senha.
 
@@ -16,11 +17,13 @@ String waitLabel(int seconds) {
   return hours == 1 ? '1 hora' : '$hours horas';
 }
 
-/// Texto para uma falha de autenticacao (login, registro, recuperacao, desbloqueio).
+/// Texto para uma falha de autenticacao (entrada, registro, recuperacao, desbloqueio).
 ///
 /// [wrongCredentials] troca o texto de credencial errada conforme a tela.
-String authFailureMessage(Object error, {String wrongCredentials = 'E-mail ou senha incorretos.'}) {
-  final AppFailure failure = toFailure(error);
+String authFailureMessage(
+  AppFailure failure, {
+  String wrongCredentials = 'E-mail ou senha incorretos.',
+}) {
   if (failure is! ApiFailure) {
     return failure.message;
   }
@@ -57,29 +60,39 @@ String weakPasswordMessage(ApiFailure failure) {
   return messages.join(' ');
 }
 
-/// Verdadeiro quando a falha e de senha fraca, para a tela marcar o campo da senha.
-bool isWeakPassword(Object error) {
-  final AppFailure failure = toFailure(error);
-  return failure is ApiFailure && failure.code == 'weak_password';
+bool _hasCode(AppFailure failure, String code) => failure is ApiFailure && failure.code == code;
+
+/// Erros da tela de entrada para uma recusa do servidor.
+CredentialErrors loginErrorsFor(AppFailure failure) {
+  return CredentialErrors(form: authFailureMessage(failure));
 }
 
-/// Verdadeiro quando o e-mail ja tem conta, para a tela marcar o campo do e-mail.
-bool isEmailInUse(Object error) {
-  final AppFailure failure = toFailure(error);
-  return failure is ApiFailure && failure.code == 'email_in_use';
+/// Erros da tela de criar conta: e-mail ja usado e senha fraca marcam o campo.
+CredentialErrors registrationErrorsFor(AppFailure failure) {
+  final String message = authFailureMessage(failure);
+  if (_hasCode(failure, 'email_in_use')) {
+    return CredentialErrors(email: message);
+  }
+  if (_hasCode(failure, 'weak_password')) {
+    return CredentialErrors(password: message);
+  }
+  return CredentialErrors(form: message);
 }
 
-final RegExp _emailPattern = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]{2,}$');
+/// Erros da tela de recuperacao: senha fraca marca o campo.
+CredentialErrors recoveryErrorsFor(AppFailure failure) {
+  if (_hasCode(failure, 'weak_password')) {
+    return CredentialErrors(password: authFailureMessage(failure));
+  }
+  return CredentialErrors(
+    form: authFailureMessage(
+      failure,
+      wrongCredentials: 'E-mail ou chave de recuperação incorretos.',
+    ),
+  );
+}
 
-/// Validacao simples de e-mail para dar retorno antes de enviar. Devolve a mensagem de erro
-/// ou nulo.
-String? validateEmail(String value) {
-  final String email = value.trim();
-  if (email.isEmpty) {
-    return 'Informe o e-mail.';
-  }
-  if (!_emailPattern.hasMatch(email)) {
-    return 'Esse e-mail não parece válido.';
-  }
-  return null;
+/// Mensagem para a senha recusada no desbloqueio e na confirmacao de senha.
+String unlockErrorFor(AppFailure failure) {
+  return authFailureMessage(failure, wrongCredentials: 'Senha incorreta.');
 }

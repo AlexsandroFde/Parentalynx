@@ -1,52 +1,30 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
+import '../../../../shared/services/share_service.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
-import '../../shell/data/share_service.dart';
-import 'session_controller.dart';
-import 'widgets/auth_widgets.dart';
-
-/// Mostra a chave de recuperacao recem-gerada e so deixa continuar depois que a pessoa
-/// confirma que guardou. A chave nao e mostrada de novo.
-class RecoveryKeyPage extends ConsumerWidget {
-  const RecoveryKeyPage({super.key});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final GuardianSession session = ref.watch(guardianSessionProvider);
-    final String? key = session is GuardianReady ? session.pendingRecoveryKey : null;
-    if (key == null) {
-      // O roteador ja esta saindo desta tela.
-      return const Scaffold(body: LoadingView());
-    }
-    return PopScope(
-      canPop: false,
-      child: RecoveryKeyView(
-        recoveryKey: key,
-        onDone: () => ref.read(guardianSessionProvider.notifier).acknowledgeRecoveryKey(),
-      ),
-    );
-  }
-}
+import 'auth_widgets.dart';
 
 /// Conteudo da tela da chave de recuperacao. Usado apos criar a conta, apos recuperar o
 /// acesso e quando a chave e gerada de novo nas configuracoes.
-class RecoveryKeyView extends ConsumerStatefulWidget {
+///
+/// Copia e compartilha pelo [ShareService] entregue pela arvore de widgets.
+class RecoveryKeyView extends StatefulWidget {
   const RecoveryKeyView({required this.recoveryKey, required this.onDone, super.key});
 
   final String recoveryKey;
   final VoidCallback onDone;
 
   @override
-  ConsumerState<RecoveryKeyView> createState() => _RecoveryKeyViewState();
+  State<RecoveryKeyView> createState() => _RecoveryKeyViewState();
 }
 
-class _RecoveryKeyViewState extends ConsumerState<RecoveryKeyView> {
+class _RecoveryKeyViewState extends State<RecoveryKeyView> {
   bool _saved = false;
 
   Future<void> _copy() async {
-    await ref.read(shareServiceProvider).copy(widget.recoveryKey);
+    await context.read<ShareService>().copy(widget.recoveryKey);
     if (mounted) {
       showAppSnackBar(context, 'Chave copiada.', tone: Tone.success);
     }
@@ -54,13 +32,11 @@ class _RecoveryKeyViewState extends ConsumerState<RecoveryKeyView> {
 
   Future<void> _share() async {
     try {
-      await ref
-          .read(shareServiceProvider)
-          .shareText(
-            'Chave de recuperação do ParentaLynx: ${widget.recoveryKey}\n'
-            'Guarde em um lugar seguro e não compartilhe com a criança.',
-            subject: 'Chave de recuperação do ParentaLynx',
-          );
+      await context.read<ShareService>().shareText(
+        'Chave de recuperação do ParentaLynx: ${widget.recoveryKey}\n'
+        'Guarde em um lugar seguro e não compartilhe com a criança.',
+        subject: 'Chave de recuperação do ParentaLynx',
+      );
     } on Object catch (error) {
       if (mounted) {
         showFailure(context, error);

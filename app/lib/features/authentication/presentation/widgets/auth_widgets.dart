@@ -1,8 +1,8 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../../app/theme/app_theme.dart';
-import '../../../../../core/security/password_policy.dart';
-import '../../../../../shared/widgets/feedback_views.dart';
+import '../../../../core/security/password_policy.dart';
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/feedback_views.dart';
 
 /// Estrutura comum das telas de conta: barra com voltar, titulo, texto de apoio e o
 /// formulario em coluna rolavel de largura limitada.

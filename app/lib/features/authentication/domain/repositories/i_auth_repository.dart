@@ -1,24 +1,23 @@
-import 'guardian_account.dart';
+import '../../../../core/result/result.dart';
+import '../entities/guardian_session.dart';
 
-/// Autenticacao e sessao do responsavel (protocolo, secoes 2.4 e 2.5).
-///
-/// Todas as operacoes lancam `AppFailure` em caso de erro.
-abstract interface class AuthRepository {
-  Future<AuthResult> register({
+/// Operacoes de conta no servidor (protocolo, secoes 2.4 e 2.5).
+abstract interface class IAuthRepository {
+  Future<Result<AuthenticatedSession>> register({
     required String email,
     required String displayName,
     required String password,
     required String deviceName,
   });
 
-  Future<AuthResult> login({
+  Future<Result<AuthenticatedSession>> login({
     required String email,
     required String password,
     required String deviceName,
   });
 
   /// Troca a senha usando a chave de recuperacao. Devolve uma sessao nova e uma chave nova.
-  Future<AuthResult> recover({
+  Future<Result<AuthenticatedSession>> recover({
     required String email,
     required String recoveryKey,
     required String newPassword,
@@ -26,11 +25,14 @@ abstract interface class AuthRepository {
   });
 
   /// Encerra a sessao atual no servidor.
-  Future<void> logout();
+  Future<Result<void>> logout();
 
   /// Conta e sessao atuais.
-  Future<GuardianProfile> me();
+  Future<Result<GuardianProfile>> fetchProfile();
 
   /// Confirma a senha administrativa. Devolve o instante ate o qual a sessao fica elevada.
-  Future<int> elevate(String password);
+  ///
+  /// Senha errada falha com `ApiFailure` de codigo `invalid_credentials`; excesso de
+  /// tentativas, com `account_locked`.
+  Future<Result<int>> elevate(String password);
 }

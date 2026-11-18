@@ -1,19 +1,15 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../../../core/json/json_reader.dart';
+import '../../../../../core/network/api_client.dart';
+import '../../dto/auth_dtos.dart';
 
-import '../../../../core/json/json_reader.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/network/network_providers.dart';
-import '../domain/auth_repository.dart';
-import '../domain/guardian_account.dart';
-
-/// Implementacao de [AuthRepository] sobre a API.
-class ApiAuthRepository implements AuthRepository {
-  const ApiAuthRepository(this._api);
+/// Rotas de conta da API (protocolo, secoes 2.2, 2.4 e 2.5). Lanca `AppFailure` em erro; o
+/// repositorio converte em `Result`.
+class AuthRemoteDataSource {
+  const AuthRemoteDataSource(this._api);
 
   final ApiClient _api;
 
-  @override
-  Future<AuthResult> register({
+  Future<AuthResponseDto> register({
     required String email,
     required String displayName,
     required String password,
@@ -29,11 +25,10 @@ class ApiAuthRepository implements AuthRepository {
         'deviceName': deviceName,
       },
     );
-    return AuthResult.fromJson(json);
+    return AuthResponseDto.fromJson(json);
   }
 
-  @override
-  Future<AuthResult> login({
+  Future<AuthResponseDto> login({
     required String email,
     required String password,
     required String deviceName,
@@ -43,11 +38,10 @@ class ApiAuthRepository implements AuthRepository {
       auth: ApiAuth.none,
       body: <String, Object?>{'email': email, 'password': password, 'deviceName': deviceName},
     );
-    return AuthResult.fromJson(json);
+    return AuthResponseDto.fromJson(json);
   }
 
-  @override
-  Future<AuthResult> recover({
+  Future<AuthResponseDto> recover({
     required String email,
     required String recoveryKey,
     required String newPassword,
@@ -63,20 +57,18 @@ class ApiAuthRepository implements AuthRepository {
         'deviceName': deviceName,
       },
     );
-    return AuthResult.fromJson(json);
+    return AuthResponseDto.fromJson(json);
   }
 
-  @override
   Future<void> logout() async {
     await _api.post('/v1/auth/logout');
   }
 
-  @override
-  Future<GuardianProfile> me() async {
-    return GuardianProfile.fromJson(await _api.get('/v1/guardian/me'));
+  Future<ProfileResponseDto> me() async {
+    return ProfileResponseDto.fromJson(await _api.get('/v1/guardian/me'));
   }
 
-  @override
+  /// Devolve o instante ate o qual a sessao fica elevada.
   Future<int> elevate(String password) async {
     final JsonMap json = await _api.post(
       '/v1/guardian/session/elevate',
@@ -85,7 +77,3 @@ class ApiAuthRepository implements AuthRepository {
     return json.integer('elevatedUntil');
   }
 }
-
-final Provider<AuthRepository> authRepositoryProvider = Provider<AuthRepository>(
-  (Ref ref) => ApiAuthRepository(ref.watch(apiClientProvider)),
-);
