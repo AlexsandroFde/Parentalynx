@@ -8,9 +8,9 @@ de verdade em um emulador Android, e o que ainda não foi validado.
 | Camada | Testes | Resultado |
 | --- | --- | --- |
 | Backend (`backend/test`, `node:test`) | 171 | todos passam |
-| Agente nativo Kotlin (`app/android/app/src/test`, JUnit na JVM) | 128 | todos passam |
-| Aplicativo Flutter (`app/test`, unidade e widget) | 241 | todos passam |
-| Validação em emulador (Android 16) | roteiro da seção 4 | aprovado, com os defeitos da seção 5 corrigidos |
+| Agente nativo Kotlin (`app/android/app/src/test`, JUnit na JVM) | 132 | todos passam |
+| Aplicativo Flutter (`app/test`, unidade, widget e arquitetura) | 618 | todos passam |
+| Validação em emulador (Android 16) | roteiro da seção 4 | aprovado antes da migração para BLoC, com os defeitos da seção 5 corrigidos; não repetido depois dela |
 | Aparelhos físicos | nenhum | não executado |
 
 Verificações estáticas: `flutter analyze` sem apontamentos, `tsc --noEmit` sem erros, compilação
@@ -46,11 +46,15 @@ testes. Para regenerar: `flutter test --update-goldens --tags screenshot`.
   por escopo, bloqueio manual, exceções, app novo, limite próprio), calendário da cota e
   horários, rastreador de uso (troca de app, tela apagada, tela dividida, união de sessões,
   viradas de dia e de hora, retomada pelo cursor, reinício), hora confiável, TOTP, leitura da
-  política, filtro web, montagem das mensagens de sincronização.
-- **Flutter:** núcleo (cliente da API, canal em tempo real, JSON, senha, TOTP, código de
-  vinculação, modelo da política, formatação), sessão e roteamento do responsável, vinculação,
-  alertas, painel, rascunho e editores de regras, relatórios, vinculação e telas do modo criança,
-  área do responsável, decisão de navegação do navegador gerenciado.
+  política, filtro web, montagem das mensagens de sincronização, validação das entradas que
+  chegam pela ponte.
+- **Flutter:** organizado por funcionalidade, como o código. Para cada uma: entidades, regras e
+  casos de uso (testes puros), mapeadores e repositórios contra o servidor falso, BLoCs com
+  `bloc_test` e telas com capturas de referência. Além disso: núcleo (`Result` e falhas, cliente
+  da API, canal em tempo real, JSON, senha, TOTP, código de vinculação, formatação), roteamento
+  do app montado (perfil, sessão do responsável, vínculo da criança, em `test/app`) e as regras
+  de arquitetura (`test/architecture`: camadas, dependências entre funcionalidades sem ciclos,
+  contêiner de dependências só na composição).
 
 ## 3. Ferramentas de ponta a ponta
 
@@ -138,6 +142,10 @@ Nenhum destes aparecia nos testes automatizados. Todos foram achados no emulador
 
 ## 6. O que não foi validado
 
+- **Roteiro em emulador depois da migração para BLoC.** A interface foi reorganizada com BLoC e
+  Clean Architecture ([ADR 0001](adr/0001-bloc-clean-architecture.md)). A migração está coberta
+  pelos testes automatizados e o APK de depuração compila, mas o roteiro da seção 4 ainda não foi
+  repetido em um emulador nem em aparelho.
 - **Aparelhos físicos.** Nada foi testado em hardware real. A especificação pede fabricantes,
   versões e modos de economia de bateria diferentes, e isso não foi feito.
 - **Android 9 a 15.** Só o Android 16 foi exercitado. O código trata as diferenças de API, mas

@@ -10,18 +10,27 @@ A visão geral do projeto está em [../README.md](../README.md) e a arquitetura 
 
 ```
 lib/
-  main.dart            entradas: main() e browserMain() (navegador gerenciado)
-  app/                 composição: inicialização, roteador, tema
-  core/                infraestrutura: rede, JSON, ponte nativa, segurança, tempo
-  shared/              modelo da política e componentes visuais comuns
-  features/
-    onboarding/        boas-vindas e escolha do modo
-    guardian/          modo responsável
-    child/             modo criança e navegador gerenciado
-pigeons/               definição da ponte Dart e Kotlin
-android/               agente nativo, manifesto e recursos
-test/                  testes de unidade, de widget e capturas de tela de referência
+  main.dart                entradas: main() e browserMain() (navegador gerenciado)
+  app/                     raiz de composição: inicialização, injeção (get_it), roteador
+  core/                    infraestrutura sem regra de negócio: Result, falhas, rede, JSON,
+                           ponte nativa, armazenamento, tempo, segurança, base dos BLoCs
+  shared/                  tema, componentes visuais e serviços de interface comuns
+  features/<nome>/         uma funcionalidade por pasta
+    domain/                entidades, contratos de repositório e serviço, casos de uso
+    data/                  DTOs, mapeadores, fontes de dados e repositórios
+    presentation/          BLoCs, páginas e widgets
+    <nome>_module.dart     registros da funcionalidade no get_it
+    <nome>_routes.dart     rotas da funcionalidade
+pigeons/                   definição da ponte Dart e Kotlin
+android/                   agente nativo, manifesto e recursos
+test/                      testes por camada, capturas de tela de referência e regras de arquitetura
 ```
+
+Funcionalidades: `onboarding`, `user_role`, `server_config`, `authentication`, `device_sync`,
+`child_device`, `device_policy`, `device_linking`, `screen_time`, `schedules`,
+`app_management`, `blocking`, `activity_reports`, `notifications`, `settings`,
+`managed_browser`, `guardian` (casca e início do painel) e `child_mode` (casca e telas do modo
+criança). As decisões estão em [../docs/adr/0001-bloc-clean-architecture.md](../docs/adr/0001-bloc-clean-architecture.md).
 
 ## Comandos
 
@@ -50,8 +59,18 @@ dart run pigeon --input pigeons/native_api.dart
 
 - O Material Design vem do pacote `material_ui`: importe `package:material_ui/material_ui.dart`,
   não `package:flutter/material.dart`.
-- Injeção de dependências por provedores Riverpod. Os testes trocam dependências com `overrides`.
+- Estado da interface com BLoC (`flutter_bloc`): eventos e estados imutáveis e tipados. Um BLoC
+  só chama casos de uso; HTTP, banco, preferências e ponte nativa ficam na camada `data`.
+- Repositórios e casos de uso devolvem `Result<T>` com uma `AppFailure` tipada, em vez de lançar
+  exceções para a interface.
+- Injeção de dependências com `get_it`, registrada em `<nome>_module.dart`. Só `app/` e os
+  arquivos de rotas consultam o contêiner; widgets recebem os BLoCs pela árvore. Os testes montam
+  um contêiner próprio com dublês (`test/support/test_dependencies.dart`).
+- As regras de camadas e de dependência entre funcionalidades são verificadas por
+  `test/architecture/architecture_test.dart`.
 - Sem `dynamic`. A leitura de JSON passa por `core/json/json_reader.dart`.
 - Largura de linha de 100 colunas (`dart format`).
 - Em testes de widget, não espere dentro de `testWidgets` por futuros que dependem de E/S real ou
-  do cancelamento de assinaturas de stream: use `tester.runAsync`.
+  do cancelamento de assinaturas de stream: use `tester.runAsync`. Pelo mesmo motivo, fechar um
+  BLoC que ainda escuta fluxos nunca termina no relógio simulado; o contêiner dos testes é
+  descartado sem fechar as instâncias (`TestDependencies.dispose`).

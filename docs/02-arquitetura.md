@@ -54,46 +54,54 @@ Três bases de código:
 
 ## 3. Aplicação Flutter (`app/lib`)
 
+BLoC, Clean Architecture e organização por funcionalidade. As decisões, as regras de
+dependência e as bibliotecas avaliadas estão em
+[`adr/0001-bloc-clean-architecture.md`](adr/0001-bloc-clean-architecture.md).
+
 ```
 lib/
   main.dart                 entradas: main() e browserMain()
-  app/                      composição: bootstrap, roteador, tema
+  app/                      composição: bootstrap, injeção de dependências, roteador e as
+                            raízes do app principal e do navegador gerenciado
   core/                     infraestrutura sem regra de negócio
-    config/                 configuração de build e constantes
-    errors/                 falhas tipadas
-    json/                   leitura tipada de JSON
-    network/                cliente HTTP da API, exceções, WebSocket
-    platform/               código gerado pelo Pigeon e provedores da ponte
+    bloc/                   transformadores de eventos, andamento de comandos, observador
+    constants/              caminhos de navegação, chaves de armazenamento, nome do app
+    errors/                 falhas tipadas (AppFailure)
+    result/                 Result (Ok/Err)
+    json/                   leitura tipada de JSON (só a camada de dados usa)
+    logging/                registro estruturado
+    navigation/             ações de abertura vindas do lado nativo
+    network/                cliente da API, WebSocket, endereço do servidor, credenciais
+    platform/               código gerado pelo Pigeon e adaptadores da ponte
     security/               política de senha, TOTP, código de vinculação
-    storage/                armazenamento seguro e preferências
-    time/                   formatação de durações e datas
-  shared/                   o que mais de uma funcionalidade usa
-    domain/                 modelos compartilhados (política)
-    widgets/                componentes visuais comuns
+    storage/                armazenamento seguro e preferências locais
+    time/ utils/            relógio, formatação, valor observável
+  shared/                   tema, widgets e serviços de interface comuns
   features/
-    onboarding/             boas-vindas, escolha do modo, servidor
-    guardian/               modo responsável
-      auth/  pairing/  dashboard/  rules/  reports/  alerts/  devices/  settings/
-    child/                  modo criança
-      linking/  permissions/  home/  guardian_area/  browser/
+    user_role/  server_config/  onboarding/  authentication/  device_sync/
+    child_device/  device_policy/  screen_time/  schedules/  app_management/
+    blocking/  activity_reports/  notifications/  device_linking/  settings/
+    guardian/  child_mode/  managed_browser/
 ```
 
-Cada funcionalidade segue as camadas:
-
-- `domain/`: entidades imutáveis e a interface do repositório. Sem Flutter, sem HTTP.
-- `data/`: implementação do repositório (API ou ponte nativa) e conversão de JSON.
-- `presentation/`: páginas, widgets e controladores (`Notifier` e `AsyncNotifier` do Riverpod).
+Cada funcionalidade tem `domain/` (entidades, contratos, casos de uso; Dart puro),
+`data/` (DTOs, mapeadores, fontes de dados, repositórios), `presentation/` (BLoCs, páginas,
+widgets) e, na raiz, o módulo de dependências e as rotas. As regras de dependência entre
+camadas e entre funcionalidades são conferidas por `test/architecture/architecture_test.dart`.
 
 Regras de código:
 
-- Injeção de dependências por provedores Riverpod. Nenhum singleton global. Testes trocam
-  dependências com `overrides`.
+- Estado com BLoC: eventos e estados `sealed` e imutáveis; BLoCs chamam casos de uso e não
+  conversam entre si. Dados de mais de uma funcionalidade têm um repositório como fonte única
+  de verdade, observado pelos BLoCs.
+- Injeção de dependências com `get_it`, um módulo por funcionalidade. Só a composição acessa
+  o contêiner; as páginas recebem os BLoCs pelas rotas.
 - Sem `dynamic`. `Object?` aparece só na fronteira de decodificação de JSON, dentro de
-  `core/json`, e é convertido de imediato para modelos tipados.
-- Uma funcionalidade não importa outra. O que for comum sobe para `shared/` ou `core/`.
-- Erros de rede e de API viram `AppFailure` (classe selada) antes de chegar à interface.
-- Textos em português do Brasil, direto nos widgets. A internacionalização por ARB fica como
-  evolução (o app já usa `flutter_localizations` para os componentes do Material).
+  `core/json`, e é convertido de imediato para DTOs tipados.
+- Repositórios e casos de uso devolvem `Result`; erros de rede, da API e da ponte viram
+  `AppFailure` antes de sair da camada de dados.
+- Textos em português do Brasil. A internacionalização por ARB fica como evolução (o app já
+  usa `flutter_localizations` para os componentes do Material).
 
 ## 4. Agente nativo (`app/android`, pacote `com.parentalynx.app`)
 

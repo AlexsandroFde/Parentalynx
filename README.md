@@ -63,7 +63,8 @@ Para testar sem um segundo aparelho, o backend traz um simulador de aparelho da 
 
 1. [Capacidades do Android por modo de instalação](docs/01-capacidades-android.md): o que é
    garantido, o que é só detectado e o que não é possível em cada modo.
-2. [Arquitetura](docs/02-arquitetura.md)
+2. [Arquitetura](docs/02-arquitetura.md) e a decisão sobre o app Flutter com BLoC e Clean
+   Architecture ([ADR 0001](docs/adr/0001-bloc-clean-architecture.md))
 3. [Protocolo: API, política, eventos e sincronização](docs/03-protocolo.md)
 4. [Instalação](docs/04-instalacao.md)
 5. [Modo Device Owner](docs/05-device-owner.md)
@@ -87,5 +88,5 @@ Para testar sem um segundo aparelho, o backend traz um simulador de aparelho da 
 
 ## Tecnologia
 
-Flutter 3.47 e Dart 3.13 (Riverpod, go_router, fl_chart, Pigeon), Kotlin (OkHttp, WorkManager),
+Flutter 3.47 e Dart 3.13 (BLoC, get_it, go_router, fl_chart, Pigeon), Kotlin (OkHttp, WorkManager),
 Node 24 com TypeScript executado diretamente (Fastify, `node:sqlite`, Argon2 de `node:crypto`).
