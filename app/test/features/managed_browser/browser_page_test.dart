@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -8,6 +9,7 @@ import 'package:parentalynx/features/managed_browser/managed_browser_module.dart
 import 'package:parentalynx/features/managed_browser/presentation/bloc/browser_bloc.dart';
 import 'package:parentalynx/features/managed_browser/presentation/engine/browser_engine.dart';
 import 'package:parentalynx/features/managed_browser/presentation/pages/browser_page.dart';
+import 'package:parentalynx/shared/design_system/design_system.dart';
 
 import '../../support/native_doubles.dart';
 import '../../support/test_app.dart';
@@ -42,7 +44,11 @@ void main() {
 
   /// O BLoC e criado pela arvore e fechado quando ela e desmontada, ainda no tempo simulado
   /// do teste.
-  Future<BrowserBloc> pumpBrowser(WidgetTester tester) async {
+  Future<BrowserBloc> pumpBrowser(
+    WidgetTester tester, {
+    Brightness brightness = Brightness.light,
+    double textScale = 1,
+  }) async {
     await pumpWidgetInApp(
       tester,
       RepositoryProvider<BrowserEngine>.value(
@@ -51,48 +57,105 @@ void main() {
           create: (BuildContext context) {
             return deps.di<BrowserBloc>(param1: engine)..add(const BrowserStarted());
           },
-          child: const BrowserPage(),
+          // Perfil da crianca do Design System, como no `BrowserApp`.
+          child: const AppExperienceScope(experience: AppExperience.child, child: BrowserPage()),
         ),
       ),
       di: deps.di,
+      brightness: brightness,
+      textScale: textScale,
     );
     await _settle(tester);
     return BlocProvider.of<BrowserBloc>(tester.element(find.byType(BrowserPage)));
   }
 
-  testWidgets('pagina inicial avisa que o historico e visto pelo responsavel', tags: 'screenshot', (
-    WidgetTester tester,
-  ) async {
-    await pumpBrowser(tester);
-
-    expect(find.text('Navegador ParentaLynx'), findsOneWidget);
-    expect(find.text('O responsável vê o histórico deste navegador.'), findsOneWidget);
-    expect(find.textContaining('A busca segura está ligada'), findsOneWidget);
-    await expectScreenshot(tester, 'child_browser_start');
-  });
-
-  testWidgets('site barrado mostra a pagina de bloqueio com o motivo', tags: 'screenshot', (
-    WidgetTester tester,
-  ) async {
-    when(() => api.evaluateUrl('https://apostas.exemplo/')).thenAnswer(
-      (_) async => UrlDecision(allowed: false, reason: 'category', category: 'gambling'),
-    );
-    final BrowserBloc bloc = await pumpBrowser(tester);
-
+  Future<void> blockGambling(WidgetTester tester) async {
     await tester.enterText(find.byType(EditableText), 'https://apostas.exemplo/');
     await tester.testTextInput.receiveAction(TextInputAction.go);
     await _settle(tester);
+  }
 
-    expect(find.text('Este site não abre aqui'), findsOneWidget);
-    expect(find.text('apostas.exemplo'), findsWidgets);
-    expect(find.textContaining('apostas e jogos de azar'), findsOneWidget);
-    expect(engine.loaded, isEmpty);
-    expect((bloc.state as BrowserReady).blocked, isNotNull);
-    await expectScreenshot(tester, 'child_browser_blocked');
+  for (final Brightness brightness in Brightness.values) {
+    final String suffix = brightness == Brightness.light ? '' : '_escuro';
 
-    await tester.tap(find.text('Ir para a página inicial'));
+    testWidgets(
+      'pagina inicial avisa que o historico e visto pelo responsavel ($brightness)',
+      tags: 'screenshot',
+      (WidgetTester tester) async {
+        await pumpBrowser(tester, brightness: brightness);
+
+        expect(find.text('Navegador ParentaLynx'), findsOneWidget);
+        expect(find.text('O responsável vê o histórico deste navegador.'), findsOneWidget);
+        expect(find.textContaining('A busca segura está ligada'), findsOneWidget);
+        await expectScreenshot(tester, 'child_browser_start$suffix');
+      },
+    );
+
+    testWidgets(
+      'site barrado mostra a pagina de bloqueio com o motivo ($brightness)',
+      tags: 'screenshot',
+      (WidgetTester tester) async {
+        when(() => api.evaluateUrl('https://apostas.exemplo/')).thenAnswer(
+          (_) async => UrlDecision(allowed: false, reason: 'category', category: 'gambling'),
+        );
+        final BrowserBloc bloc = await pumpBrowser(tester, brightness: brightness);
+
+        await blockGambling(tester);
+
+        expect(find.text('Este site não abre aqui'), findsOneWidget);
+        expect(find.text('apostas.exemplo'), findsWidgets);
+        expect(find.textContaining('apostas e jogos de azar'), findsOneWidget);
+        expect(engine.loaded, isEmpty);
+        expect((bloc.state as BrowserReady).blocked, isNotNull);
+        await expectScreenshot(tester, 'child_browser_blocked$suffix');
+
+        await tester.tap(find.text('Ir para a página inicial'));
+        await _settle(tester);
+        expect(find.text('Navegador ParentaLynx'), findsOneWidget);
+      },
+    );
+  }
+
+  testWidgets('filtro sem resposta nao e uma regra: oferece tentar de novo', (
+    WidgetTester tester,
+  ) async {
+    int calls = 0;
+    when(() => api.evaluateUrl('https://apostas.exemplo/')).thenAnswer((_) async {
+      calls += 1;
+      if (calls == 1) {
+        throw PlatformException(code: 'channel-error');
+      }
+      return UrlDecision(allowed: true);
+    });
+    await pumpBrowser(tester);
+
+    await blockGambling(tester);
+    expect(find.text('Não deu para conferir este site'), findsOneWidget);
+
+    await tester.tap(find.text('Tentar de novo'));
     await _settle(tester);
-    expect(find.text('Navegador ParentaLynx'), findsOneWidget);
+    expect(find.text('Não deu para conferir este site'), findsNothing);
+    expect(engine.loaded, <String>['https://apostas.exemplo/']);
+  });
+
+  testWidgets('funciona com a fonte no maior tamanho', (WidgetTester tester) async {
+    when(() => api.evaluateUrl('https://apostas.exemplo/')).thenAnswer(
+      (_) async => UrlDecision(allowed: false, reason: 'category', category: 'gambling'),
+    );
+    await pumpBrowser(tester, textScale: 2);
+    expect(tester.takeException(), isNull);
+    await blockGambling(tester);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('segue as diretrizes de acessibilidade', (WidgetTester tester) async {
+    when(() => api.evaluateUrl('https://apostas.exemplo/')).thenAnswer(
+      (_) async => UrlDecision(allowed: false, reason: 'category', category: 'gambling'),
+    );
+    await pumpBrowser(tester);
+    await expectAccessible(tester);
+    await blockGambling(tester);
+    await expectAccessible(tester);
   });
 
   testWidgets('navegador desligado pelo responsavel fica indisponivel', (

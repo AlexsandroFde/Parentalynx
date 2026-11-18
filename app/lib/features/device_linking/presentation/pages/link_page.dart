@@ -3,10 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/security/pairing_code.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/child_layout.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/entities/pairing_claim.dart';
 import '../bloc/child_link/child_link_bloc.dart';
 import '../bloc/child_linking/child_linking_bloc.dart';
@@ -82,10 +79,11 @@ class _LinkPageState extends State<LinkPage> {
   }
 
   Future<void> _cancelWaiting() async {
-    final bool confirmed = await confirmAction(
+    final bool confirmed = await showConfirmDialog(
       context,
       title: 'Cancelar o pedido?',
-      message: 'Para vincular depois será preciso digitar o código de novo.',
+      message: 'O responsável não vai mais conseguir aprovar este pedido.',
+      consequence: 'Para vincular depois, será preciso digitar um código de novo.',
       confirmLabel: 'Cancelar pedido',
       cancelLabel: 'Continuar esperando',
     );
@@ -113,27 +111,40 @@ class _LinkPageState extends State<LinkPage> {
       builder: (BuildContext context, ChildLinkingState state) {
         return Scaffold(
           body: SafeArea(
-            child: switch (state) {
-              ChildLinkingForm() => _FormView(
-                state: state,
-                code: _code,
-                name: _name,
-                notice: notice,
-                onChanged: _changed,
-                onPaste: _paste,
-                onSubmit: _submit,
-                onLeave: () =>
-                    context.read<ChildLinkingBloc>().add(const ChildLinkingLeaveRequested()),
-              ),
-              ChildLinkingWaiting() => _WaitingView(
-                claim: state.claim,
-                connectionTrouble: state.connectionTrouble,
-                onCancel: _cancelWaiting,
-              ),
-              ChildLinkingActivating() => const LoadingView(
-                message: 'Aprovado! Ligando o controle neste aparelho...',
-              ),
-            },
+            child: StateSwitcher(
+              child: switch (state) {
+                ChildLinkingForm(activity: LinkFormActivity.restoring) => const KeyedSubtree(
+                  key: ValueKey<String>('conferindo'),
+                  child: LoadingState(message: 'Conferindo este aparelho...'),
+                ),
+                ChildLinkingForm() => KeyedSubtree(
+                  key: const ValueKey<String>('codigo'),
+                  child: _FormView(
+                    state: state,
+                    code: _code,
+                    name: _name,
+                    notice: notice,
+                    onChanged: _changed,
+                    onPaste: _paste,
+                    onSubmit: _submit,
+                    onLeave: () =>
+                        context.read<ChildLinkingBloc>().add(const ChildLinkingLeaveRequested()),
+                  ),
+                ),
+                ChildLinkingWaiting() => KeyedSubtree(
+                  key: const ValueKey<String>('esperando'),
+                  child: _WaitingView(
+                    claim: state.claim,
+                    connectionTrouble: state.connectionTrouble,
+                    onCancel: _cancelWaiting,
+                  ),
+                ),
+                ChildLinkingActivating() => const KeyedSubtree(
+                  key: ValueKey<String>('ativando'),
+                  child: LoadingState(message: 'Aprovado! Ligando o controle neste aparelho...'),
+                ),
+              },
+            ),
           ),
         );
       },
@@ -164,110 +175,91 @@ class _FormView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final bool busy = state.activity.isBusy;
     final bool leaving = state.activity == LinkFormActivity.leaving;
-    final bool restoring = state.activity == LinkFormActivity.restoring;
     final bool ready = PairingCode.isComplete(code.text) && name.text.trim().isNotEmpty;
     final String? error = state.error;
+    final TextStyle? codeStyle = context.text.headlineSmall?.copyWith(letterSpacing: AppSpacing.xs);
     return ChildPageBody(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
       children: <Widget>[
         const ChildHeader(
-          icon: Icons.link_rounded,
+          icon: AppIcons.link,
           title: 'Vincular este aparelho',
           message:
-              'Peça o código de vinculação ao seu responsável. Ele aparece no aparelho dele, '
-              'na opção "Vincular aparelho".',
+              'Peça o código ao seu responsável. Ele aparece no app do responsável, na opção '
+              '"Vincular aparelho".',
         ),
         if (notice != null) ...<Widget>[
           const SizedBox(height: AppSpacing.lg),
-          NoticeBanner(message: notice!, tone: Tone.warning),
+          AppBanner(icon: AppIcons.unlink, message: notice!, liveRegion: true),
         ],
         const SizedBox(height: AppSpacing.xl),
-        TextField(
+        AppTextField(
           controller: code,
           enabled: !busy,
+          label: 'Código de vinculação',
+          hint: 'XXXX-XXXX',
+          helper: '8 letras e números, do jeito que aparece no app do responsável.',
           autocorrect: false,
           enableSuggestions: false,
           textCapitalization: TextCapitalization.characters,
           textInputAction: TextInputAction.next,
           inputFormatters: <TextInputFormatter>[PairingCodeFormatter()],
           onChanged: (String value) => onChanged(),
-          style: theme.textTheme.headlineSmall?.copyWith(letterSpacing: 3),
-          decoration: InputDecoration(
-            labelText: 'Código de vinculação',
-            hintText: 'XXXX-XXXX',
-            hintStyle: theme.textTheme.headlineSmall?.copyWith(
-              letterSpacing: 3,
-              color: theme.colorScheme.outline,
-            ),
-            floatingLabelBehavior: FloatingLabelBehavior.always,
-            suffixIcon: IconButton(
-              tooltip: 'Colar o código copiado',
-              icon: const Icon(Icons.content_paste_rounded),
-              onPressed: busy ? null : onPaste,
-            ),
+          style: codeStyle,
+          suffix: AppIconButton(
+            icon: AppIcons.paste,
+            tooltip: 'Colar o código copiado',
+            onPressed: busy ? null : onPaste,
           ),
         ),
         const SizedBox(height: AppSpacing.lg),
-        TextField(
+        AppTextField(
           controller: name,
           enabled: !busy,
+          label: 'Nome deste aparelho',
+          helper: 'É como o responsável vai reconhecer este aparelho.',
+          prefixIcon: AppIcons.device,
           maxLength: 40,
           textCapitalization: TextCapitalization.sentences,
           textInputAction: TextInputAction.done,
           onChanged: (String value) => onChanged(),
           onSubmitted: (String value) => ready ? onSubmit() : null,
-          decoration: const InputDecoration(
-            labelText: 'Nome deste aparelho',
-            helperText: 'É como o responsável vai reconhecer este aparelho.',
-            helperMaxLines: 2,
-            counterText: '',
-            prefixIcon: Icon(Icons.smartphone_rounded),
-          ),
         ),
         if (error != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.lg),
-          Semantics(
+          const SizedBox(height: AppSpacing.md),
+          AppBanner(
+            tone: Tone.danger,
+            title: 'Não deu para vincular',
+            message: error,
             liveRegion: true,
-            child: NoticeBanner(message: error, tone: Tone.danger),
           ),
         ],
         const SizedBox(height: AppSpacing.xl),
-        BusyButton(
+        AppButton.primary(
           label: 'Vincular',
-          icon: Icons.link_rounded,
+          icon: AppIcons.link,
+          expand: true,
           busy: state.activity == LinkFormActivity.submitting,
-          onPressed: ready && !restoring ? onSubmit : null,
+          onPressed: ready ? onSubmit : null,
         ),
-        const SizedBox(height: AppSpacing.xl),
-        const SectionCard(
+        const SectionGap(),
+        const AppSection(
           title: 'O que acontece depois',
-          child: Column(
-            children: <Widget>[
-              BulletLine(
-                icon: Icons.looks_one_outlined,
-                text: 'O responsável confere um número no aparelho dele e aprova.',
-              ),
-              BulletLine(
-                icon: Icons.looks_two_outlined,
-                text: 'Você vê o que o app controla e o que ele não vê.',
-              ),
-              BulletLine(
-                icon: Icons.looks_3_outlined,
-                text: 'O aparelho pede algumas permissões para o controle funcionar.',
-              ),
+          child: StepList(
+            steps: <String>[
+              'O responsável confere um número no aparelho dele e aprova.',
+              'Você vê o que o app controla e o que ele não vê.',
+              'O aparelho pede algumas permissões para o controle funcionar.',
             ],
           ),
         ),
-        const SizedBox(height: AppSpacing.md),
-        Center(
-          child: TextButton.icon(
-            onPressed: busy || leaving ? null : onLeave,
-            icon: const Icon(Icons.arrow_back_rounded, size: 18),
-            label: const Text('Voltar e escolher outro modo'),
-          ),
+        const SizedBox(height: AppSpacing.xl),
+        AppButton.tertiary(
+          label: 'Voltar e escolher outro modo',
+          icon: AppIcons.back,
+          busy: leaving,
+          onPressed: busy ? null : onLeave,
         ),
       ],
     );
@@ -287,78 +279,58 @@ class _WaitingView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final String guardian = claim.guardianName.isEmpty ? 'O responsável' : claim.guardianName;
+    final bool named = claim.guardianName.isNotEmpty;
+    final String guardian = named ? claim.guardianName : 'O responsável';
+    final String guardianLower = named ? claim.guardianName : 'o responsável';
+    final String digits = claim.confirmCode.split('').join(' ');
     return ChildPageBody(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 24),
       children: <Widget>[
         ChildHeader(
-          icon: Icons.hourglass_top_rounded,
+          icon: AppIcons.timeStarting,
           title: 'Quase lá!',
           message: '$guardian precisa aprovar este aparelho no app do responsável.',
         ),
         const SizedBox(height: AppSpacing.xl),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.xl),
-            child: Column(
-              children: <Widget>[
-                Text(
-                  'Número de confirmação',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+        AppPanel(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            children: <Widget>[
+              Text('Número de confirmação'.toUpperCase(), style: context.textStyles.eyebrow),
+              const SizedBox(height: AppSpacing.md),
+              Semantics(
+                label: 'Número de confirmação: $digits',
+                excludeSemantics: true,
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: Text(
+                    digits,
+                    maxLines: 1,
+                    style: context.textStyles.metricHero.copyWith(color: context.colors.primary),
                   ),
                 ),
-                const SizedBox(height: AppSpacing.md),
-                Semantics(
-                  label: 'Número de confirmação: ${claim.confirmCode.split('').join(' ')}',
-                  excludeSemantics: true,
-                  child: FittedBox(
-                    fit: BoxFit.scaleDown,
-                    child: Text(
-                      claim.confirmCode.split('').join(' '),
-                      style: theme.textTheme.displayMedium?.copyWith(
-                        fontWeight: FontWeight.w700,
-                        color: theme.colorScheme.primary,
-                        letterSpacing: 4,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpacing.lg),
-        const NoticeBanner(
-          icon: Icons.fact_check_outlined,
-          title: 'Confira o número',
-          message:
-              'O mesmo número precisa aparecer no aparelho do responsável. Se o número de lá '
-              'for diferente, o responsável não deve aprovar.',
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        const ClipRRect(
-          borderRadius: BorderRadius.all(Radius.circular(4)),
-          child: LinearProgressIndicator(minHeight: 6),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        Semantics(
-          liveRegion: true,
-          child: Text(
-            connectionTrouble
-                ? 'Sem conexão com o servidor. Tentando de novo...'
-                : 'Esperando a aprovação...',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: connectionTrouble
-                  ? StatusColors.of(context).warning
-                  : theme.colorScheme.onSurfaceVariant,
-            ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              Text(
+                'Confira se o mesmo número aparece no aparelho de $guardianLower. Se for '
+                'diferente, o pedido não deve ser aprovado.',
+                textAlign: TextAlign.center,
+                style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary),
+              ),
+            ],
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        OutlinedButton(onPressed: onCancel, child: const Text('Cancelar pedido')),
+        SyncStatusLine(
+          state: connectionTrouble ? SyncState.offline : SyncState.pending,
+          label: connectionTrouble
+              ? 'Sem conexão com o servidor. Tentando de novo...'
+              : 'Esperando a aprovação...',
+          detail: connectionTrouble
+              ? 'O pedido continua valendo. Confira a internet deste aparelho.'
+              : 'Esta tela muda sozinha quando $guardianLower aprovar.',
+        ),
+        const SizedBox(height: AppSpacing.xl),
+        AppButton.tertiary(label: 'Cancelar pedido', onPressed: onCancel),
       ],
     );
   }

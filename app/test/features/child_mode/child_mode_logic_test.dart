@@ -53,7 +53,14 @@ void main() {
       final AgentStatus status = agentStatus(fakeStatus(lockState: LockState.manualLock));
       final LockMessage message = lockMessage(status)!;
       expect(message.title, 'Aparelho em pausa');
-      expect(message.body, contains('Fale com Maria'));
+      expect(message.body, contains('fale com Maria'));
+    });
+
+    test('permissao desligada orienta a ligar de novo, sem culpa', () {
+      final AgentStatus status = agentStatus(fakeStatus(lockState: LockState.tamperLock));
+      final LockMessage message = lockMessage(status)!;
+      expect(message.title, 'O controle precisa de atenção');
+      expect(message.body, contains('Ligue de novo'));
     });
 
     test('liberacao local do responsavel tem prioridade sobre o bloqueio', () {
@@ -62,25 +69,38 @@ void main() {
       );
       expect(status.isLocked, isFalse);
       expect(lockMessage(status), isNull);
-      expect(reliefMessage(status), 'Uso liberado pelo responsável até 16:00.');
+      final ReliefMessage relief = reliefMessage(status)!;
+      expect(relief.title, 'Uso liberado até 16:00');
+      expect(relief.body, 'Maria liberou o aparelho por um tempo.');
     });
   });
 
   group('tela inicial: tempo e avisos', () {
-    test('contagem regressiva e nivel do anel', () {
+    test('tempo restante, nivel do anel e a frase do leitor de tela', () {
       final TimeDisplay plenty = timeDisplay(agentStatus(fakeStatus()));
-      expect(plenty.headline, '1:20:00');
+      expect(plenty.headline, '1h 20min');
       expect(plenty.detail, 'Você usou 1h 10min de 2h 30min.');
+      expect(plenty.spoken, 'Restam 1 hora e 20 minutos para usar hoje, de 2 horas e 30 minutos.');
       expect(plenty.level, TimeLevel.plenty);
 
       final TimeDisplay low = timeDisplay(agentStatus(fakeStatus(quotaUsedMs: 8400000)));
-      expect(low.headline, '10:00');
+      expect(low.headline, '10min');
       expect(low.level, TimeLevel.low);
 
       final TimeDisplay over = timeDisplay(agentStatus(fakeStatus(quotaUsedMs: 9000000)));
-      expect(over.headline, '00:00');
+      expect(over.headline, '0min');
+      expect(over.spoken, 'O tempo de hoje acabou.');
       expect(over.level, TimeLevel.over);
       expect(over.progress, 1);
+    });
+
+    test('os minutos restantes arredondam para cima: o tempo so zera quando acaba', () {
+      final TimeDisplay seconds = timeDisplay(
+        agentStatus(fakeStatus(quotaUsedMs: 9000000 - 30000)),
+      );
+      expect(seconds.headline, '1min');
+      expect(spokenMinutes(61), '1 hora e 1 minuto');
+      expect(spokenMinutes(120), '2 horas');
     });
 
     test('sem limite mostra o uso total', () {
@@ -103,10 +123,9 @@ void main() {
           suspensionScopes: <String>['dailyLimit', 'schedules'],
         ),
       );
-      expect(
-        reliefMessage(status),
-        'Em pausa até 18:00: limite de tempo e horários e períodos de bloqueio.',
-      );
+      final ReliefMessage relief = reliefMessage(status)!;
+      expect(relief.title, 'Regras liberadas até 18:00');
+      expect(relief.body, 'Maria liberou o limite de tempo e os horários de pausa.');
     });
 
     test('escopo de suspensao desconhecido e ignorado', () {
@@ -130,18 +149,47 @@ void main() {
       expect(message, contains('E mais 2 avisos'));
     });
 
-    test('estado da conexao', () {
-      expect(connectionText(agentStatus(fakeStatus())).ok, isTrue);
-      final ConnectionText offline = connectionText(agentStatus(fakeStatus(lastSyncOk: false)));
-      expect(offline.ok, isFalse);
-      expect(offline.text, contains('As regras continuam valendo'));
+    test('so problemas de permissao levam a tela de permissoes', () {
+      expect(
+        attentionNeedsPermissions(
+          agentStatus(fakeStatus(issues: <String>['accessibility_disabled'])),
+        ),
+        isTrue,
+      );
+      expect(attentionNeedsPermissions(agentStatus(fakeStatus(clockTrusted: false))), isFalse);
     });
 
-    test('resultado de sincronizar agora', () {
-      expect(syncResultMessage(const DeviceSyncResult(ok: true, atMs: 1)), 'Tudo sincronizado.');
+    test('proxima pausa so aparece com o aparelho liberado', () {
+      final AgentStatus status = agentStatus(
+        fakeStatus(nextBlockAtMs: msAt(21, 0), nextBlockLabel: 'Hora de dormir'),
+      );
+      expect(nextPauseText(status), 'Hora de dormir começa às 21:00.');
+      expect(
+        nextPauseText(
+          agentStatus(fakeStatus(lockState: LockState.manualLock, nextBlockAtMs: msAt(21, 0))),
+        ),
+        isNull,
+      );
+    });
+
+    test('estado das regras entre o aparelho e o responsavel', () {
+      final ConnectionText ok = connectionText(agentStatus(fakeStatus()));
+      expect(ok.ok, isTrue);
+      expect(ok.title, 'Regras em dia');
+      expect(ok.detail, 'Atualizadas há 2 min.');
+      final ConnectionText offline = connectionText(agentStatus(fakeStatus(lastSyncOk: false)));
+      expect(offline.ok, isFalse);
+      expect(offline.detail, contains('As regras continuam valendo'));
+    });
+
+    test('resultado de atualizar agora', () {
+      expect(
+        syncResultMessage(const DeviceSyncResult(ok: true, atMs: 1)),
+        'Pronto: as regras estão em dia.',
+      );
       expect(
         syncResultMessage(const DeviceSyncResult(ok: false, atMs: 1, errorCode: 'network')),
-        contains('Sem conexão'),
+        contains('Sem internet'),
       );
       expect(
         syncResultMessage(const DeviceSyncResult(ok: false, atMs: 1, errorCode: 'device_revoked')),

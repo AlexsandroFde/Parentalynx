@@ -4,17 +4,18 @@ import 'package:flutter/services.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/entities/blocked_page.dart';
 import '../../domain/entities/browser_settings.dart';
+import '../../domain/entities/navigation_verdict.dart';
 import '../bloc/browser_bloc.dart';
 import '../engine/browser_engine.dart';
 import '../texts/browser_texts.dart';
 
 /// Tela do navegador gerenciado: barra de endereco, pagina e botoes de navegacao.
 ///
-/// Precisa de um [BrowserBloc] e do [BrowserEngine] que ele comanda acima na arvore.
+/// Usada pela crianca: fica no perfil da crianca do Design System (o `BrowserApp` monta o
+/// tema). Precisa de um [BrowserBloc] e do [BrowserEngine] que ele comanda acima na arvore.
 class BrowserPage extends StatefulWidget {
   const BrowserPage({super.key});
 
@@ -114,12 +115,12 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
         builder: (BuildContext context, BrowserState state) {
           return switch (state) {
             BrowserLoading() => const Scaffold(
-              body: SafeArea(child: LoadingView(message: 'Abrindo o navegador...')),
+              body: SafeArea(child: LoadingState(message: 'Abrindo o navegador...')),
             ),
             BrowserUnavailable() => const Scaffold(
               body: SafeArea(
                 child: EmptyState(
-                  icon: Icons.public_off_rounded,
+                  icon: AppIcons.webBlocked,
                   title: 'Navegador indisponível',
                   message:
                       'O navegador seguro não está disponível agora. Ele pode ter sido desligado '
@@ -155,9 +156,10 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                 onSubmitted: _submit,
               ),
               SizedBox(
-                height: 3,
+                height: _progressHeight,
                 child: state.loading
                     ? LinearProgressIndicator(
+                        minHeight: _progressHeight,
                         value: state.progress <= 0 ? null : state.progress / 100,
                       )
                     : null,
@@ -172,7 +174,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                     if (state.loadError != null && blocked == null)
                       _Overlay(
                         child: EmptyState(
-                          icon: Icons.cloud_off_outlined,
+                          icon: AppIcons.offline,
                           title: 'A página não abriu',
                           message: state.loadError,
                           actionLabel: 'Tentar de novo',
@@ -184,6 +186,7 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
                         page: blocked,
                         onBack: () => _bloc.add(const BrowserBackRequested()),
                         onHome: () => _bloc.add(const BrowserHomeRequested()),
+                        onRetry: () => _bloc.add(const BrowserReloadRequested()),
                       ),
                   ],
                 ),
@@ -201,6 +204,9 @@ class _BrowserPageState extends State<BrowserPage> with WidgetsBindingObserver {
       ),
     );
   }
+
+  /// Altura da linha de progresso do carregamento, logo abaixo da barra de endereco.
+  static const double _progressHeight = AppSizes.focusRing + AppSizes.hairline;
 
   static String _urlOf(BrowserState state) => state is BrowserReady ? state.url : '';
 
@@ -223,7 +229,12 @@ class _AddressBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 6),
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.md,
+        AppSpacing.sm,
+        AppSpacing.md,
+        AppSpacing.sm,
+      ),
       child: TextField(
         controller: controller,
         focusNode: focusNode,
@@ -235,11 +246,14 @@ class _AddressBar extends StatelessWidget {
         decoration: InputDecoration(
           hintText: 'Buscar ou digitar um endereço',
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-          prefixIcon: Icon(secure ? Icons.lock_outline : Icons.search_rounded, size: 20),
-          suffixIcon: IconButton(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: AppSpacing.md,
+            vertical: AppSpacing.md,
+          ),
+          prefixIcon: Icon(secure ? AppIcons.lock : AppIcons.search, size: AppSizes.iconMd),
+          suffixIcon: AppIconButton(
+            icon: AppIcons.close,
             tooltip: 'Limpar',
-            icon: const Icon(Icons.close_rounded, size: 20),
             onPressed: () {
               controller.clear();
               focusNode.requestFocus();
@@ -257,21 +271,19 @@ class _HistoryNotice extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final Color color = context.colors.textSecondary;
     return Container(
       width: double.infinity,
-      color: theme.colorScheme.surfaceContainerHighest,
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      color: context.colors.surfaceMuted,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg, vertical: AppSpacing.sm),
       child: Row(
         children: <Widget>[
-          Icon(Icons.visibility_outlined, size: 16, color: theme.colorScheme.onSurfaceVariant),
+          Icon(AppIcons.show, size: AppSizes.iconSm, color: color),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
             child: Text(
               'O responsável vê o histórico deste navegador.',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
+              style: context.text.labelMedium?.copyWith(color: color),
             ),
           ),
         ],
@@ -280,6 +292,7 @@ class _HistoryNotice extends StatelessWidget {
   }
 }
 
+/// Fundo que cobre a pagina do motor (inicio, bloqueio, erro).
 class _Overlay extends StatelessWidget {
   const _Overlay({required this.child});
 
@@ -287,7 +300,29 @@ class _Overlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ColoredBox(color: Theme.of(context).scaffoldBackgroundColor, child: child);
+    return ColoredBox(color: context.colors.canvas, child: child);
+  }
+}
+
+/// Icone em destaque dentro de um circulo, no topo das paginas do navegador.
+class _Medallion extends StatelessWidget {
+  const _Medallion({required this.icon, required this.tone});
+
+  final IconData icon;
+  final Tone tone;
+
+  static const double _size = AppSizes.avatarLg + AppSpacing.xl;
+
+  @override
+  Widget build(BuildContext context) {
+    return ExcludeSemantics(
+      child: Container(
+        width: _size,
+        height: _size,
+        decoration: BoxDecoration(color: tone.background(context), shape: BoxShape.circle),
+        child: Icon(icon, size: AppSizes.iconXl, color: tone.foreground(context)),
+      ),
+    );
   }
 }
 
@@ -298,134 +333,150 @@ class _StartPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     return _Overlay(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(24, 32, 24, 24),
-        child: Column(
-          children: <Widget>[
-            Container(
-              width: 72,
-              height: 72,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.travel_explore_rounded,
-                size: 38,
-                color: theme.colorScheme.onPrimaryContainer,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text('Navegador ParentaLynx', style: theme.textTheme.headlineSmall),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Digite um endereço ou o que você quer procurar na barra de cima.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodyLarge?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            if (settings.allowlistMode) ...<Widget>[
-              const NoticeBanner(
-                icon: Icons.checklist_rounded,
-                message: 'Aqui só abrem os sites que o seu responsável escolheu.',
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ],
-            if (settings.safeSearch) ...<Widget>[
-              const NoticeBanner(
-                tone: Tone.success,
-                icon: Icons.verified_user_outlined,
-                message: 'A busca segura está ligada: resultados impróprios ficam de fora.',
-              ),
-              const SizedBox(height: AppSpacing.md),
-            ],
-            if (settings.logHistory)
-              const NoticeBanner(
-                tone: Tone.neutral,
-                icon: Icons.visibility_outlined,
-                message:
-                    'Os sites abertos aqui aparecem para o seu responsável: o endereço, o '
-                    'título da página e o horário.',
-              ),
-          ],
+      child: ChildPageBody(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpacing.gutter,
+          AppSpacing.xxl,
+          AppSpacing.gutter,
+          AppSpacing.xxl,
         ),
+        children: <Widget>[
+          const Center(
+            child: _Medallion(icon: AppIcons.web, tone: Tone.info),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Semantics(
+            header: true,
+            child: Text(
+              'Navegador ParentaLynx',
+              textAlign: TextAlign.center,
+              style: context.text.headlineSmall,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Digite um endereço ou o que você quer procurar na barra de cima.',
+            textAlign: TextAlign.center,
+            style: context.text.bodyLarge?.copyWith(color: context.colors.textSecondary),
+          ),
+          if (settings.allowlistMode || settings.safeSearch || settings.logHistory) ...<Widget>[
+            const SizedBox(height: AppSpacing.xl),
+            AppPanel(
+              child: Column(
+                children: <Widget>[
+                  if (settings.allowlistMode)
+                    const BulletLine(
+                      icon: AppIcons.checklist,
+                      text: 'Aqui só abrem os sites que o seu responsável escolheu.',
+                    ),
+                  if (settings.safeSearch)
+                    const BulletLine(
+                      icon: AppIcons.verifiedUser,
+                      tone: Tone.success,
+                      text: 'A busca segura está ligada: resultados impróprios ficam de fora.',
+                    ),
+                  if (settings.logHistory)
+                    const BulletLine(
+                      icon: AppIcons.show,
+                      tone: Tone.neutral,
+                      text:
+                          'Os sites abertos aqui aparecem para o seu responsável: o endereço, o '
+                          'título da página e o horário.',
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 }
 
 /// Pagina mostrada no lugar de um site que o filtro barrou.
+///
+/// Diz o motivo sem tom de castigo (tom neutro, nunca o vermelho) e oferece o caminho de
+/// volta. Quando o filtro nao respondeu, nao e uma regra: a acao principal e tentar de novo.
 class BlockedPageView extends StatelessWidget {
   const BlockedPageView({
     required this.page,
     required this.onBack,
     required this.onHome,
+    required this.onRetry,
     super.key,
   });
 
   final BlockedPage page;
   final VoidCallback onBack;
   final VoidCallback onHome;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final StatusColors colors = StatusColors.of(context);
+    final bool checkFailed = page.reason == NavigationVerdict.checkFailedReason;
     return _Overlay(
       child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(AppSpacing.xl),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(color: colors.warningContainer, shape: BoxShape.circle),
-                child: Icon(Icons.front_hand_outlined, size: 40, color: colors.warning),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Semantics(
-                liveRegion: true,
-                child: Text(
-                  'Este site não abre aqui',
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: AppSpacing.maxFormWidth),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Center(
+                  child: _Medallion(
+                    icon: checkFailed ? AppIcons.syncProblem : AppIcons.webBlocked,
+                    tone: Tone.neutral,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.lg),
+                Semantics(
+                  liveRegion: true,
+                  header: true,
+                  child: Text(
+                    checkFailed ? 'Não deu para conferir este site' : 'Este site não abre aqui',
+                    textAlign: TextAlign.center,
+                    style: context.text.headlineSmall,
+                  ),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  page.domain,
                   textAlign: TextAlign.center,
-                  style: theme.textTheme.headlineSmall,
+                  style: context.text.titleMedium?.copyWith(color: context.colors.textSecondary),
                 ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                page.domain,
-                textAlign: TextAlign.center,
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  blockedReasonText(page.reason, page.category),
+                  textAlign: TextAlign.center,
+                  style: context.text.bodyLarge,
                 ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Text(
-                blockedReasonText(page.reason, page.category),
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyLarge,
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'Se você acha que este site deveria abrir, converse com o seu responsável.',
-                textAlign: TextAlign.center,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.xl),
-              FilledButton.icon(
-                onPressed: onBack,
-                icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Voltar'),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              TextButton(onPressed: onHome, child: const Text('Ir para a página inicial')),
-            ],
+                if (!checkFailed) ...<Widget>[
+                  const SizedBox(height: AppSpacing.sm),
+                  Text(
+                    'Se você acha que este site deveria abrir, converse com o seu responsável.',
+                    textAlign: TextAlign.center,
+                    style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary),
+                  ),
+                ],
+                const SizedBox(height: AppSpacing.xl),
+                if (checkFailed) ...<Widget>[
+                  AppButton.primary(
+                    label: 'Tentar de novo',
+                    icon: AppIcons.refresh,
+                    onPressed: onRetry,
+                  ),
+                  const SizedBox(height: AppSpacing.sm),
+                  AppButton.tertiary(label: 'Voltar', icon: AppIcons.back, onPressed: onBack),
+                ] else ...<Widget>[
+                  AppButton.primary(label: 'Voltar', icon: AppIcons.back, onPressed: onBack),
+                  const SizedBox(height: AppSpacing.sm),
+                  AppButton.tertiary(label: 'Ir para a página inicial', onPressed: onHome),
+                ],
+              ],
+            ),
           ),
         ),
       ),
@@ -452,29 +503,26 @@ class _NavigationBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final bool hasPage = state.hasPage;
     return BottomAppBar(
-      height: 64,
-      padding: const EdgeInsets.symmetric(horizontal: 8),
+      height: AppSizes.minTapTarget + AppSpacing.lg,
+      color: context.colors.surface,
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: <Widget>[
-          IconButton(
-            tooltip: 'Voltar',
-            icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: hasPage ? onBack : null,
-          ),
-          IconButton(
+          AppIconButton(icon: AppIcons.back, tooltip: 'Voltar', onPressed: hasPage ? onBack : null),
+          AppIconButton(
+            icon: AppIcons.forward,
             tooltip: 'Avançar',
-            icon: const Icon(Icons.arrow_forward_rounded),
             onPressed: state.canGoForward ? onForward : null,
           ),
-          IconButton(
+          AppIconButton(
+            icon: AppIcons.home,
             tooltip: 'Página inicial',
-            icon: const Icon(Icons.home_outlined),
             onPressed: hasPage ? onHome : null,
           ),
-          IconButton(
+          AppIconButton(
+            icon: AppIcons.refresh,
             tooltip: 'Recarregar',
-            icon: const Icon(Icons.refresh_rounded),
             onPressed: hasPage ? onReload : null,
           ),
         ],

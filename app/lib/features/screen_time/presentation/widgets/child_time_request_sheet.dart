@@ -3,41 +3,52 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/form_status.dart';
 import '../../../../core/time/formatters.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
+import '../../domain/entities/child_time_request.dart';
 import '../bloc/time_request_sheet/time_request_sheet_bloc.dart';
+import '../texts/child_time_request_texts.dart';
 
 /// Abre a folha para pedir mais tempo ao responsavel. Devolve verdadeiro se o pedido foi
 /// registrado.
 ///
-/// Usa o [TimeRequestSheetBloc] de quem chama, que precisa estar acima na arvore.
-Future<bool> showChildTimeRequestSheet(BuildContext context, {required String guardianName}) async {
+/// [pending] e um pedido ainda sem resposta: a folha avisa antes de a crianca mandar outro.
+/// [now] e a hora do agente, para o tempo relativo do aviso. Usa o [TimeRequestSheetBloc] de
+/// quem chama, que precisa estar acima na arvore.
+Future<bool> showChildTimeRequestSheet(
+  BuildContext context, {
+  required String guardianName,
+  ChildTimeRequest? pending,
+  DateTime? now,
+}) async {
   final TimeRequestSheetBloc bloc = context.read<TimeRequestSheetBloc>()
     ..add(const TimeRequestSheetOpened());
-  final bool? sent = await showModalBottomSheet<bool>(
-    context: context,
-    isScrollControlled: true,
-    useSafeArea: true,
+  final String guardian = guardianName.isEmpty ? 'seu responsável' : guardianName;
+  final bool? sent = await showAppSheet<bool>(
+    context,
+    title: 'Pedir mais tempo',
+    subtitle: 'O pedido vai para $guardian, que decide se aprova.',
     builder: (BuildContext context) {
       return BlocProvider<TimeRequestSheetBloc>.value(
         value: bloc,
-        child: _TimeRequestSheet(guardianName: guardianName),
+        child: _TimeRequestForm(guardian: guardian, pending: pending, now: now),
       );
     },
   );
   return sent ?? false;
 }
 
-class _TimeRequestSheet extends StatefulWidget {
-  const _TimeRequestSheet({required this.guardianName});
+class _TimeRequestForm extends StatefulWidget {
+  const _TimeRequestForm({required this.guardian, required this.pending, required this.now});
 
-  final String guardianName;
+  final String guardian;
+  final ChildTimeRequest? pending;
+  final DateTime? now;
 
   @override
-  State<_TimeRequestSheet> createState() => _TimeRequestSheetState();
+  State<_TimeRequestForm> createState() => _TimeRequestFormState();
 }
 
-class _TimeRequestSheetState extends State<_TimeRequestSheet> {
+class _TimeRequestFormState extends State<_TimeRequestForm> {
   final TextEditingController _message = TextEditingController();
 
   @override
@@ -47,13 +58,13 @@ class _TimeRequestSheetState extends State<_TimeRequestSheet> {
   }
 
   void _send() {
+    FocusScope.of(context).unfocus();
     context.read<TimeRequestSheetBloc>().add(TimeRequestSheetSubmitted(message: _message.text));
   }
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final String guardian = widget.guardianName.isEmpty ? 'o responsável' : widget.guardianName;
+    final ChildTimeRequest? pending = widget.pending;
     return BlocConsumer<TimeRequestSheetBloc, TimeRequestSheetState>(
       listenWhen: (TimeRequestSheetState previous, TimeRequestSheetState current) {
         return previous.status != current.status && current.status == FormStatus.succeeded;
@@ -63,65 +74,68 @@ class _TimeRequestSheetState extends State<_TimeRequestSheet> {
       },
       builder: (BuildContext context, TimeRequestSheetState state) {
         final bool busy = state.status != FormStatus.editing;
-        return SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(
-            20,
-            0,
-            20,
-            MediaQuery.viewInsetsOf(context).bottom + AppSpacing.xl,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              Text('Pedir mais tempo', style: theme.textTheme.titleLarge),
-              const SizedBox(height: AppSpacing.sm),
-              Text(
-                'O pedido vai para $guardian, que decide se aprova.',
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
+        final String? error = state.error;
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            if (pending != null) ...<Widget>[
+              AppBanner(
+                icon: AppIcons.pending,
+                tone: Tone.warning,
+                message: pendingRequestNotice(pending, guardian: widget.guardian, now: widget.now),
               ),
               const SizedBox(height: AppSpacing.lg),
-              Text('Quanto tempo?', style: theme.textTheme.titleSmall),
-              const SizedBox(height: AppSpacing.sm),
-              SegmentedButton<int>(
-                showSelectedIcon: false,
-                segments: <ButtonSegment<int>>[
-                  for (final int option in TimeRequestSheetBloc.minuteOptions)
-                    ButtonSegment<int>(value: option, label: Text(formatMinutes(option))),
-                ],
-                selected: <int>{state.minutes},
-                onSelectionChanged: busy
-                    ? null
-                    : (Set<int> selection) => context.read<TimeRequestSheetBloc>().add(
-                        TimeRequestMinutesSelected(selection.first),
-                      ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              TextField(
-                controller: _message,
-                enabled: !busy,
-                maxLength: 140,
-                maxLines: 2,
-                minLines: 1,
-                textCapitalization: TextCapitalization.sentences,
-                decoration: InputDecoration(
-                  labelText: 'Recado (opcional)',
-                  hintText: 'Por exemplo: falta pouco para terminar a tarefa',
-                  errorText: state.error,
-                  errorMaxLines: 3,
-                ),
-              ),
+            ],
+            Semantics(header: true, child: Text('Quanto tempo?', style: context.text.titleSmall)),
+            const SizedBox(height: AppSpacing.sm),
+            AppSegmentedControl<int>(
+              segments: <AppChoice<int>>[
+                for (final int option in TimeRequestSheetBloc.minuteOptions)
+                  AppChoice<int>(value: option, label: formatMinutes(option)),
+              ],
+              selected: state.minutes,
+              onChanged: busy
+                  ? null
+                  : (int minutes) {
+                      context.read<TimeRequestSheetBloc>().add(TimeRequestMinutesSelected(minutes));
+                    },
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            AppTextField(
+              controller: _message,
+              enabled: !busy,
+              label: 'Recado para ${widget.guardian} (opcional)',
+              hint: 'Ex.: falta pouco para terminar a tarefa',
+              maxLength: 140,
+              maxLines: 3,
+              minLines: 1,
+              textCapitalization: TextCapitalization.sentences,
+            ),
+            if (error != null) ...<Widget>[
               const SizedBox(height: AppSpacing.md),
-              BusyButton(
-                label: 'Enviar pedido',
-                icon: Icons.send_rounded,
-                busy: busy,
-                onPressed: _send,
+              AppBanner(
+                tone: Tone.danger,
+                title: 'O pedido não foi enviado',
+                message: error,
+                liveRegion: true,
               ),
             ],
-          ),
+            const SizedBox(height: AppSpacing.lg),
+            AppButton.primary(
+              label: 'Enviar pedido',
+              icon: AppIcons.send,
+              busy: busy,
+              expand: true,
+              onPressed: _send,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Sem internet, o pedido fica guardado e vai assim que o aparelho se conectar.',
+              textAlign: TextAlign.center,
+              style: context.text.bodySmall,
+            ),
+          ],
         );
       },
     );

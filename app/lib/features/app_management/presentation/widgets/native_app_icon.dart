@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../shared/design_system/design_system.dart';
+
 import '../services/installed_app_icons.dart';
 
 /// Mostra o icone de um app instalado neste aparelho, com um icone generico enquanto carrega
@@ -58,14 +60,14 @@ class _NativeAppIconState extends State<NativeAppIcon> {
   Widget build(BuildContext context) {
     final double size = widget.size;
     final Uint8List? bytes = _bytes;
-    final ColorScheme scheme = Theme.of(context).colorScheme;
-    final BorderRadius radius = BorderRadius.circular(size * 0.24);
+    final AppColors colors = context.colors;
+    final BorderRadius radius = context.shapes.tileRadius;
     if (bytes == null || bytes.isEmpty) {
       return Container(
         width: size,
         height: size,
-        decoration: BoxDecoration(color: scheme.surfaceContainerHighest, borderRadius: radius),
-        child: Icon(Icons.apps_rounded, size: size * 0.56, color: scheme.onSurfaceVariant),
+        decoration: BoxDecoration(color: colors.surfaceMuted, borderRadius: radius),
+        child: Icon(AppIcons.apps, size: size * 0.56, color: colors.textSecondary),
       );
     }
     return ClipRRect(
@@ -81,8 +83,8 @@ class _NativeAppIconState extends State<NativeAppIcon> {
           return Container(
             width: size,
             height: size,
-            color: scheme.surfaceContainerHighest,
-            child: Icon(Icons.apps_rounded, size: size * 0.56, color: scheme.onSurfaceVariant),
+            color: colors.surfaceMuted,
+            child: Icon(AppIcons.apps, size: size * 0.56, color: colors.textSecondary),
           );
         },
       ),

@@ -1,5 +1,6 @@
 /// Textos da tela inicial da crianca, em funcoes puras para poderem ser testados sem a
-/// interface. A linguagem e simples e sem tom de castigo.
+/// interface. A linguagem e simples e sem tom de castigo: cada restricao diz o motivo e quando
+/// acaba.
 library;
 
 import '../../../../core/time/formatters.dart';
@@ -20,7 +21,14 @@ String _guardian(AgentStatus status) {
   return status.guardianName.isEmpty ? 'seu responsável' : status.guardianName;
 }
 
+/// Nome do responsavel no comeco de uma frase.
+String _guardianTitle(AgentStatus status) {
+  return status.guardianName.isEmpty ? 'Seu responsável' : status.guardianName;
+}
+
 /// Mensagem do bloqueio em vigor, ou nulo quando o aparelho esta liberado.
+///
+/// Diz o motivo e quando acaba ("Hora de dormir. O aparelho volta amanha as 07:00.").
 LockMessage? lockMessage(AgentStatus status) {
   if (!status.isLocked) {
     return null;
@@ -33,73 +41,107 @@ LockMessage? lockMessage(AgentStatus status) {
     case ChildLock.dailyLimit:
       return LockMessage(
         title: 'Seu tempo de hoje acabou',
-        body: release == null
-            ? 'Você já usou todo o tempo de hoje.'
-            : 'Você já usou todo o tempo de hoje. O tempo volta $release.',
+        body: release == null ? 'Amanhã tem tempo de novo.' : 'O tempo volta $release.',
       );
     case ChildLock.schedule:
       final String? label = status.activeScheduleLabel;
       return LockMessage(
-        title: label == null || label.isEmpty ? 'Hora de pausa' : label,
+        title: label == null || label.isEmpty ? 'Hora de descansar' : label,
         body: release == null
-            ? 'Agora o aparelho está em pausa.'
-            : 'Agora o aparelho está em pausa. Ele volta a liberar $release.',
+            ? 'O aparelho volta quando a pausa acabar.'
+            : 'O aparelho volta $release.',
       );
     case ChildLock.manualLock:
       final String guardian = _guardian(status);
       return LockMessage(
         title: 'Aparelho em pausa',
         body: release == null
-            ? 'O aparelho foi pausado por $guardian. Fale com $guardian para liberar.'
-            : 'O aparelho foi pausado por $guardian. A pausa vai até $release.',
+            ? '${_guardianTitle(status)} pausou o aparelho por enquanto. Se precisar usar, fale '
+                  'com $guardian.'
+            : '${_guardianTitle(status)} pausou o aparelho. Ele volta $release.',
       );
     case ChildLock.tamperLock:
       return LockMessage(
         title: 'O controle precisa de atenção',
         body:
-            'Uma permissão do controle parental foi desligada. Chame ${_guardian(status)} '
-            'para arrumar.',
+            'Uma permissão do controle foi desligada. Ligue de novo para liberar os apps, ou '
+            'peça ajuda a ${_guardian(status)}.',
       );
   }
 }
 
 /// O que continua funcionando durante um bloqueio.
-const String lockedStillWorks = 'Os apps liberados e as ligações continuam funcionando.';
+const String lockedStillWorks =
+    'Os apps sempre liberados e as ligações de emergência continuam funcionando.';
 
-/// Numeros e textos do anel de tempo.
+/// Numeros e textos do tempo de hoje.
 class TimeDisplay {
   const TimeDisplay({
-    required this.headline,
+    required this.parts,
     required this.caption,
     required this.detail,
+    required this.spoken,
     required this.progress,
     required this.level,
   });
 
-  /// Valor em destaque no centro do anel.
-  final String headline;
+  /// Valor em destaque, em partes de numero e unidade (`1` `h`, `20` `min`).
+  final List<(String, String)> parts;
   final String caption;
   final String detail;
+
+  /// Frase completa para o leitor de tela.
+  final String spoken;
 
   /// Fracao da cota ja usada, de 0 a 1.
   final double progress;
   final TimeLevel level;
+
+  /// Valor em destaque em texto corrido: `1h 20min`.
+  String get headline => parts.map(((String, String) part) => '${part.$1}${part.$2}').join(' ');
 }
 
 /// Quanto da cota ainda resta, para a cor do anel. O valor em texto sempre acompanha.
 enum TimeLevel { unlimited, plenty, low, over }
 
+/// Minutos que restam, arredondados para cima: o tempo so chega a zero quando acaba de fato.
+int _remainingMinutes(int ms) => ms <= 0 ? 0 : (ms + 59999) ~/ 60000;
+
+/// Partes de uma duracao em minutos para o numero em destaque.
+List<(String, String)> durationParts(int minutes) {
+  final int hours = minutes ~/ 60;
+  final int rest = minutes % 60;
+  return <(String, String)>[
+    if (hours > 0) ('$hours', 'h'),
+    if (rest > 0 || hours == 0) ('$rest', 'min'),
+  ];
+}
+
+/// Duracao por extenso, para o leitor de tela: `1 hora e 20 minutos`.
+String spokenMinutes(int minutes) {
+  final int hours = minutes ~/ 60;
+  final int rest = minutes % 60;
+  final List<String> words = <String>[
+    if (hours > 0) hours == 1 ? '1 hora' : '$hours horas',
+    if (rest > 0 || hours == 0) rest == 1 ? '1 minuto' : '$rest minutos',
+  ];
+  return words.join(' e ');
+}
+
 TimeDisplay timeDisplay(AgentStatus status) {
   if (!status.hasQuota) {
+    final String used = formatDurationMs(status.totalUsedMs);
     return TimeDisplay(
-      headline: 'Sem limite',
+      parts: const <(String, String)>[('Sem limite', '')],
       caption: 'de tempo hoje',
-      detail: 'Você usou ${formatDurationMs(status.totalUsedMs)} hoje.',
+      detail: 'Você usou $used hoje.',
+      spoken: 'Sem limite de tempo hoje. Você usou $used.',
       progress: 0,
       level: TimeLevel.unlimited,
     );
   }
   final int remaining = status.remainingMs;
+  final int minutes = _remainingMinutes(remaining);
   final String extra = status.extraMs > 0
       ? ' (com ${formatDurationMs(status.extraMs)} extras)'
       : '';
@@ -112,30 +154,81 @@ TimeDisplay timeDisplay(AgentStatus status) {
     level = TimeLevel.plenty;
   }
   return TimeDisplay(
-    headline: formatCountdown(remaining),
-    caption: remaining <= 0 ? 'o tempo acabou' : 'de tempo restante',
+    parts: durationParts(minutes),
+    caption: 'para usar hoje',
     detail:
         'Você usou ${formatDurationMs(status.quotaUsedMs)} de '
         '${formatDurationMs(status.limitMs)}$extra.',
+    spoken: remaining <= 0
+        ? 'O tempo de hoje acabou.'
+        : 'Restam ${spokenMinutes(minutes)} para usar hoje, de '
+              '${spokenMinutes(status.limitMs ~/ 60000)}.',
     progress: status.usedFraction,
     level: level,
   );
 }
 
-/// Aviso de regras em pausa ou de uso liberado pelo responsavel, ou nulo quando nao ha.
-String? reliefMessage(AgentStatus status) {
+/// Dica gentil quando o tempo esta acabando.
+const String lowTimeHint = 'Falta pouco: um bom momento para terminar o que está fazendo.';
+
+/// Quando o tempo do dia recomeca.
+String resetText(AgentStatus status) {
+  return 'O tempo recomeça ${formatReleaseTime(status.nextResetAtMs, now: status.now)}.';
+}
+
+/// Regras liberadas pelo responsavel por um tempo (liberacao no aparelho ou suspensao).
+class ReliefMessage {
+  const ReliefMessage({required this.title, required this.body});
+
+  final String title;
+  final String body;
+}
+
+/// Aviso de uso liberado ou de regras suspensas pelo responsavel, ou nulo quando nao ha.
+ReliefMessage? reliefMessage(AgentStatus status) {
   if (status.localOverrideActive) {
-    return 'Uso liberado pelo responsável até ${formatClockMs(status.localOverrideUntilMs)}.';
+    return ReliefMessage(
+      title: 'Uso liberado até ${formatClockMs(status.localOverrideUntilMs)}',
+      body: '${_guardianTitle(status)} liberou o aparelho por um tempo.',
+    );
   }
   if (status.suspensionActive) {
     final List<String> parts = <String>[
-      for (final SuspensionScope scope in status.suspensionScopes) scope.label.toLowerCase(),
+      for (final SuspensionScope scope in status.suspensionScopes)
+        switch (scope) {
+          SuspensionScope.dailyLimit => 'o limite de tempo',
+          SuspensionScope.schedules => 'os horários de pausa',
+          SuspensionScope.appBlocks => 'os apps bloqueados',
+        },
     ];
     final String scope = parts.isEmpty ? 'algumas regras' : _joinList(parts);
-    return 'Em pausa até ${formatClockMs(status.suspensionUntilMs)}: $scope.';
+    return ReliefMessage(
+      title: 'Regras liberadas até ${formatClockMs(status.suspensionUntilMs)}',
+      body: '${_guardianTitle(status)} liberou $scope.',
+    );
   }
   return null;
 }
+
+/// Proxima pausa programada, quando o aparelho esta liberado e ha uma.
+String? nextPauseText(AgentStatus status) {
+  final int? at = status.nextBlockAtMs;
+  if (at == null || status.isLocked) {
+    return null;
+  }
+  final String? label = status.nextBlockLabel;
+  final String name = label == null || label.isEmpty ? 'A próxima pausa' : label;
+  return '$name começa ${formatReleaseTime(at, now: status.now)}.';
+}
+
+/// Codigos de problema que se resolvem ligando uma permissao do controle.
+const Set<String> _permissionIssues = <String>{
+  'accessibility_disabled',
+  'usage_access_missing',
+  'overlay_missing',
+  'notifications_disabled',
+  'battery_optimized',
+};
 
 /// Texto simples para um problema de aplicacao das regras.
 String issueText(String code) {
@@ -147,7 +240,8 @@ String issueText(String code) {
     'battery_optimized' => 'A economia de bateria pode desligar o controle.',
     'suspend_failed' => 'Alguns apps não puderam ser bloqueados pelo sistema.',
     'policy_invalid' => 'As regras recebidas não puderam ser lidas.',
-    'clock_untrusted' => 'A hora do aparelho não pôde ser conferida.',
+    'clock_untrusted' =>
+      'A hora do aparelho não pôde ser conferida. Deixe a data e a hora automáticas.',
     _ => 'O controle encontrou um problema.',
   };
 }
@@ -169,40 +263,49 @@ String? attentionMessage(AgentStatus status) {
       '${texts.length - 1 == 1 ? 'aviso' : 'avisos'}. O responsável já foi avisado.';
 }
 
-/// Estado de conexao com o servidor.
-class ConnectionText {
-  const ConnectionText({required this.text, required this.ok});
+/// Verdadeiro quando algum problema se resolve na tela de permissoes.
+bool attentionNeedsPermissions(AgentStatus status) {
+  return status.issues.any(_permissionIssues.contains);
+}
 
-  final String text;
+/// Estado das regras entre o aparelho e o responsavel.
+class ConnectionText {
+  const ConnectionText({required this.title, required this.detail, required this.ok});
+
+  final String title;
+  final String detail;
   final bool ok;
 }
 
 ConnectionText connectionText(AgentStatus status) {
   final int? last = status.lastSyncAtMs;
   if (last == null) {
-    return const ConnectionText(text: 'Ainda não sincronizou com o responsável.', ok: false);
+    return const ConnectionText(
+      title: 'As regras ainda não chegaram',
+      detail: 'Elas chegam quando o aparelho tiver internet.',
+      ok: false,
+    );
   }
   final String when = formatRelativeMs(last, now: status.now);
   if (status.lastSyncOk) {
-    return ConnectionText(text: 'Regras em dia. Última sincronização: $when.', ok: true);
+    return ConnectionText(title: 'Regras em dia', detail: 'Atualizadas $when.', ok: true);
   }
   return ConnectionText(
-    text:
-        'Sem conexão com o servidor. Última sincronização: $when. As regras continuam '
-        'valendo.',
+    title: 'Sem internet agora',
+    detail: 'As regras continuam valendo. Última atualização: $when.',
     ok: false,
   );
 }
 
-/// Mensagem para o resultado de "Sincronizar agora".
+/// Mensagem para o resultado de "Atualizar agora".
 String syncResultMessage(DeviceSyncResult result) {
   if (result.ok) {
-    return 'Tudo sincronizado.';
+    return 'Pronto: as regras estão em dia.';
   }
   return switch (result.errorCode) {
-    'network' => 'Sem conexão com o servidor. Tente de novo mais tarde.',
+    'network' => 'Sem internet agora. As regras de antes continuam valendo.',
     'device_revoked' => 'O vínculo deste aparelho foi removido pelo responsável.',
-    _ => 'Não foi possível sincronizar agora.',
+    _ => 'Não foi possível atualizar agora. Tente de novo.',
   };
 }
 
@@ -210,9 +313,9 @@ String syncResultMessage(DeviceSyncResult result) {
 const String timeRequestSentMessage = 'Pedido enviado. Você vê a resposta aqui.';
 
 /// Aviso quando um app sempre liberado nao abriu.
-String launchFailedMessage(String label) => 'Não foi possível abrir $label.';
+String launchFailedMessage(String label) => 'Não foi possível abrir $label. Tente de novo.';
 
-/// Tipo de uma linha do resumo de regras, para a tela escolher o icone.
+/// Tipo de uma linha do resumo de regras, para a tela escolher o icone e o tom.
 enum RuleKind { dailyLimit, reset, allowedHours, blockPeriod, blockedApps, newApps, web }
 
 class RuleLine {

@@ -13,17 +13,28 @@ import 'package:parentalynx/features/child_mode/child_mode_routes.dart';
 import 'package:parentalynx/features/child_mode/presentation/bloc/child_device_status/child_device_status_bloc.dart';
 import 'package:parentalynx/features/child_mode/presentation/services/foreground_tracker.dart';
 import 'package:parentalynx/features/device_linking/presentation/bloc/child_link/child_link_bloc.dart';
+import 'package:parentalynx/shared/design_system/design_system.dart';
 import 'package:parentalynx/shared/services/share_service.dart';
 import 'package:parentalynx/shared/theme/app_frame.dart';
-import 'package:parentalynx/shared/theme/app_theme.dart';
 
 import '../../../support/fakes.dart';
 import '../../../support/test_app.dart';
 
 /// Monta uma tela do modo crianca com o que a casca da area entrega a todas as telas: o
 /// [ChildLinkBloc], o [ChildDeviceStatusBloc], o [ForegroundTracker] e os icones dos apps.
-/// Os BLoCs da propria tela ficam por conta de [page].
-Future<void> pumpChildPage(WidgetTester tester, GetIt di, Widget page, {Size size = phoneSize}) {
+/// Os BLoCs da propria tela ficam por conta de [page]. A tela fica dentro do perfil da crianca do
+/// Design System, como na casca da area ([childShellRoute]).
+///
+/// [brightness] escolhe o tema claro ou escuro e [textScale] simula o tamanho de fonte do
+/// aparelho (2 e o maior do Android).
+Future<void> pumpChildPage(
+  WidgetTester tester,
+  GetIt di,
+  Widget page, {
+  Size size = phoneSize,
+  Brightness brightness = Brightness.light,
+  double textScale = 1,
+}) {
   return pumpWidgetInApp(
     tester,
     MultiRepositoryProvider(
@@ -41,11 +52,13 @@ Future<void> pumpChildPage(WidgetTester tester, GetIt di, Widget page, {Size siz
             },
           ),
         ],
-        child: page,
+        child: AppExperienceScope(experience: AppExperience.child, child: page),
       ),
     ),
     di: di,
     size: size,
+    brightness: brightness,
+    textScale: textScale,
   );
 }
 

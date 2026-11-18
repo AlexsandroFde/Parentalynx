@@ -4,6 +4,7 @@ import 'package:get_it/get_it.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/constants/route_paths.dart';
+import '../../shared/design_system/design_system.dart';
 import '../app_management/presentation/services/installed_app_icons.dart';
 import '../device_linking/device_linking_child_routes.dart';
 import '../device_linking/domain/entities/link_state.dart';
@@ -52,7 +53,12 @@ ShellRoute childShellRoute(GetIt di) {
               },
             ),
           ],
-          child: ChildShell(location: state.uri.path, child: child),
+          // Perfil da crianca do Design System (formas mais macias, texto maior) em toda a area,
+          // inclusive nas folhas e dialogos abertos a partir dela.
+          child: AppExperienceScope(
+            experience: AppExperience.child,
+            child: ChildShell(location: state.uri.path, child: child),
+          ),
         ),
       );
     },

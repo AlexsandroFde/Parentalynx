@@ -2,10 +2,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/bloc/action_status.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/child_layout.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/entities/management_level.dart';
 import '../../domain/entities/permission_plan.dart';
 import '../../domain/entities/permission_step.dart';
@@ -14,8 +11,10 @@ import '../texts/permission_texts.dart';
 
 /// Assistente das permissoes de que o controle parental depende.
 ///
-/// O estado e reconsultado sempre que o app volta ao primeiro plano, porque cada permissao e
-/// concedida em uma tela do sistema. Na configuracao inicial ([setup]) termina com "Concluir".
+/// Mostra um passo de cada vez (o proximo a ligar, com o porque e o como) e a lista completa
+/// logo abaixo. O estado e reconsultado sempre que o app volta ao primeiro plano, porque cada
+/// permissao e concedida em uma tela do sistema. Na configuracao inicial ([setup]) termina com
+/// "Concluir".
 ///
 /// Precisa de um [PermissionsBloc] acima na arvore.
 class PermissionsPage extends StatefulWidget {
@@ -52,15 +51,15 @@ class _PermissionsPageState extends State<PermissionsPage> with WidgetsBindingOb
   }
 
   Future<void> _finishAnyway() async {
-    final bool confirmed = await confirmAction(
+    final bool confirmed = await showConfirmDialog(
       context,
       title: 'Continuar sem as permissões?',
       message:
           'Sem as permissões obrigatórias o controle fica incompleto: o tempo pode não ser '
-          'contado e apps bloqueados podem abrir. O responsável é avisado de que a proteção '
-          'está incompleta.',
+          'contado e apps bloqueados podem abrir.',
+      consequence: 'O responsável é avisado de que a proteção está incompleta.',
       confirmLabel: 'Continuar assim',
-      cancelLabel: 'Voltar',
+      cancelLabel: 'Voltar e ligar',
     );
     if (confirmed && mounted) {
       _finish();
@@ -70,44 +69,58 @@ class _PermissionsPageState extends State<PermissionsPage> with WidgetsBindingOb
   @override
   Widget build(BuildContext context) {
     final PermissionsBloc bloc = context.read<PermissionsBloc>();
-    return Scaffold(
-      appBar: widget.setup ? null : AppBar(title: const Text('Permissões do controle')),
-      body: SafeArea(
-        child: BlocConsumer<PermissionsBloc, PermissionsState>(
-          listenWhen: (PermissionsState previous, PermissionsState current) {
-            return current is PermissionsLoaded &&
-                (previous is! PermissionsLoaded || previous.action != current.action);
-          },
-          listener: (BuildContext context, PermissionsState state) {
-            switch ((state as PermissionsLoaded).action) {
-              case ActionFailed(:final failure):
-                showFailure(context, failure);
-              case ActionSucceeded(:final String message?):
-                showAppSnackBar(context, message, tone: Tone.info);
-              case ActionIdle() || ActionRunning() || ActionSucceeded():
-                break;
-            }
-          },
-          builder: (BuildContext context, PermissionsState state) {
-            return switch (state) {
-              PermissionsLoading() => const LoadingView(message: 'Verificando as permissões...'),
-              PermissionsLoadFailure(:final failure) => FailureView(
-                error: failure,
-                onRetry: () => bloc.add(const PermissionsLoadRequested()),
-              ),
-              PermissionsLoaded() => _Content(
-                plan: state.plan,
-                setup: widget.setup,
-                opening: state.opening,
-                onOpen: (PermissionKind kind) => bloc.add(PermissionsStepOpened(kind)),
-                onOpenAppDetails: () => bloc.add(const PermissionsAppDetailsOpened()),
-                onFinish: _finish,
-                onFinishAnyway: _finishAnyway,
-              ),
-            };
-          },
-        ),
-      ),
+    return BlocConsumer<PermissionsBloc, PermissionsState>(
+      listenWhen: (PermissionsState previous, PermissionsState current) {
+        return current is PermissionsLoaded &&
+            (previous is! PermissionsLoaded || previous.action != current.action);
+      },
+      listener: (BuildContext context, PermissionsState state) {
+        switch ((state as PermissionsLoaded).action) {
+          case ActionFailed(:final failure):
+            showFailure(context, failure);
+          case ActionSucceeded(:final String message?):
+            showAppSnackBar(context, message, tone: Tone.info);
+          case ActionIdle() || ActionRunning() || ActionSucceeded():
+            break;
+        }
+      },
+      builder: (BuildContext context, PermissionsState state) {
+        final PermissionPlan? plan = state is PermissionsLoaded ? state.plan : null;
+        return Scaffold(
+          appBar: widget.setup ? null : AppBar(title: const Text('Permissões do controle')),
+          bottomNavigationBar: widget.setup && plan != null
+              ? _FinishBar(complete: plan.isComplete, onFinish: _finish, onAnyway: _finishAnyway)
+              : null,
+          body: SafeArea(
+            child: StateSwitcher(
+              child: switch (state) {
+                PermissionsLoading() => const KeyedSubtree(
+                  key: ValueKey<String>('carregando'),
+                  child: LoadingState(message: 'Conferindo as permissões...'),
+                ),
+                PermissionsLoadFailure(:final failure) => KeyedSubtree(
+                  key: const ValueKey<String>('erro'),
+                  child: ErrorState.fromError(
+                    failure,
+                    subject: 'as permissões',
+                    onRetry: () => bloc.add(const PermissionsLoadRequested()),
+                  ),
+                ),
+                PermissionsLoaded() => KeyedSubtree(
+                  key: const ValueKey<String>('conteudo'),
+                  child: _Content(
+                    plan: state.plan,
+                    setup: widget.setup,
+                    opening: state.opening,
+                    onOpen: (PermissionKind kind) => bloc.add(PermissionsStepOpened(kind)),
+                    onOpenAppDetails: () => bloc.add(const PermissionsAppDetailsOpened()),
+                  ),
+                ),
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }
@@ -119,8 +132,6 @@ class _Content extends StatelessWidget {
     required this.opening,
     required this.onOpen,
     required this.onOpenAppDetails,
-    required this.onFinish,
-    required this.onFinishAnyway,
   });
 
   final PermissionPlan plan;
@@ -128,124 +139,83 @@ class _Content extends StatelessWidget {
   final PermissionKind? opening;
   final ValueChanged<PermissionKind> onOpen;
   final VoidCallback onOpenAppDetails;
-  final VoidCallback onFinish;
-  final VoidCallback onFinishAnyway;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final List<PermissionStep> steps = plan.steps;
     final PermissionStep? next = plan.next;
     final int total = plan.requiredTotal;
     final int granted = plan.requiredGranted;
     final bool complete = plan.isComplete;
-    return Column(
+    final bool enabled = opening == null;
+    return ChildPageBody(
       children: <Widget>[
-        Expanded(
-          child: ChildPageBody(
-            padding: EdgeInsets.fromLTRB(20, setup ? 28 : 8, 20, 24),
+        if (setup) ...<Widget>[
+          Text('Primeiros passos · 2 de 2'.toUpperCase(), style: context.textStyles.eyebrow),
+          const SizedBox(height: AppSpacing.md),
+          const ChildHeader(
+            icon: AppIcons.protection,
+            title: 'Permissões do controle',
+            message:
+                'Para o controle funcionar, o Android pede algumas autorizações. Faça este passo '
+                'junto com o responsável.',
+          ),
+          const SizedBox(height: AppSpacing.xl),
+        ],
+        Semantics(
+          liveRegion: true,
+          child: Text(
+            complete
+                ? 'Tudo certo: as permissões obrigatórias estão ligadas.'
+                : '$granted de $total permissões obrigatórias ligadas',
+            style: context.text.titleSmall,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        UsageBar(
+          fraction: total == 0 ? 1 : granted / total,
+          color: complete ? context.colors.success : null,
+        ),
+        const SectionGap(),
+        if (next != null) ...<Widget>[
+          AppSection(
+            title: 'Próximo passo',
+            child: _NextStep(
+              step: next,
+              busy: opening == next.kind,
+              enabled: enabled,
+              showRestrictedHint: plan.needsRestrictedSettingsHint(next),
+              onOpen: () => onOpen(next.kind),
+              onOpenAppDetails: onOpenAppDetails,
+            ),
+          ),
+          const SectionGap(),
+        ],
+        AppSection(
+          title: 'Todas as permissões',
+          child: AppListGroup(
             children: <Widget>[
-              if (setup) ...<Widget>[
-                const ChildHeader(
-                  icon: Icons.verified_user_outlined,
-                  title: 'Permissões do controle',
-                  message:
-                      'Para o controle funcionar, o Android precisa de algumas permissões. '
-                      'Faça este passo junto com o responsável.',
+              for (final PermissionStep step in plan.steps)
+                _StepRow(
+                  step: step,
+                  onOpen: enabled && step.granted != true ? () => onOpen(step.kind) : null,
                 ),
-                const SizedBox(height: AppSpacing.xl),
-              ],
-              Semantics(
-                liveRegion: true,
-                child: Text(
-                  complete
-                      ? 'Tudo certo: as permissões obrigatórias estão ligadas.'
-                      : '$granted de $total permissões obrigatórias ligadas',
-                  style: theme.textTheme.titleSmall,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.sm),
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: LinearProgressIndicator(
-                  minHeight: 8,
-                  value: total == 0 ? 1 : granted / total,
-                  color: complete ? StatusColors.of(context).success : null,
-                ),
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              _ManagementCard(level: plan.management),
-              const SizedBox(height: AppSpacing.lg),
-              for (int index = 0; index < steps.length; index++) ...<Widget>[
-                _StepCard(
-                  number: index + 1,
-                  step: steps[index],
-                  highlighted: next != null && next.kind == steps[index].kind,
-                  busy: opening == steps[index].kind,
-                  enabled: opening == null,
-                  showRestrictedHint: plan.needsRestrictedSettingsHint(steps[index]),
-                  onOpen: () => onOpen(steps[index].kind),
-                  onOpenAppDetails: onOpenAppDetails,
-                ),
-                const SizedBox(height: AppSpacing.md),
-              ],
             ],
           ),
         ),
-        if (setup)
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: AppSpacing.maxContentWidth),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  BusyButton(label: 'Concluir', onPressed: complete ? onFinish : null),
-                  if (!complete)
-                    TextButton(
-                      onPressed: onFinishAnyway,
-                      child: const Text('Continuar mesmo assim'),
-                    ),
-                ],
-              ),
-            ),
-          ),
+        const SectionGap(),
+        AppSection(
+          title: 'Nível de proteção',
+          child: _ManagementPanel(level: plan.management),
+        ),
       ],
     );
   }
 }
 
-class _ManagementCard extends StatelessWidget {
-  const _ManagementCard({required this.level});
-
-  final ManagementLevel level;
-
-  @override
-  Widget build(BuildContext context) {
-    final ManagementText text = managementText(level);
-    final StatusColors colors = StatusColors.of(context);
-    return SectionCard(
-      title: text.title,
-      subtitle: 'Nível de proteção deste aparelho',
-      child: Column(
-        children: <Widget>[
-          BulletLine(
-            icon: Icons.check_circle_outline,
-            color: colors.success,
-            text: text.guaranteed,
-          ),
-          BulletLine(icon: Icons.info_outline, color: colors.warning, text: text.notGuaranteed),
-        ],
-      ),
-    );
-  }
-}
-
-class _StepCard extends StatelessWidget {
-  const _StepCard({
-    required this.number,
+/// O proximo passo, em destaque: para que serve, o que o servico faz e como ligar.
+class _NextStep extends StatelessWidget {
+  const _NextStep({
     required this.step,
-    required this.highlighted,
     required this.busy,
     required this.enabled,
     required this.showRestrictedHint,
@@ -253,9 +223,7 @@ class _StepCard extends StatelessWidget {
     required this.onOpenAppDetails,
   });
 
-  final int number;
   final PermissionStep step;
-  final bool highlighted;
   final bool busy;
   final bool enabled;
   final bool showRestrictedHint;
@@ -264,126 +232,177 @@ class _StepCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final PermissionStepText text = permissionStepText(step.kind);
-    final bool granted = step.granted == true;
-    final bool showAction = !granted;
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(
-          color: highlighted
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outlineVariant.withValues(alpha: 0.6),
-          width: highlighted ? 2 : 1,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: granted
-                        ? StatusColors.of(context).successContainer
-                        : theme.colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(AppRadius.sm),
-                  ),
-                  child: Icon(
-                    granted ? Icons.check_rounded : text.icon,
-                    color: granted
-                        ? StatusColors.of(context).success
-                        : theme.colorScheme.onPrimaryContainer,
-                  ),
+    return AppPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              AppIconTile(icon: text.icon, size: AppSizes.avatarLg - AppSpacing.sm),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Semantics(
+                      header: true,
+                      child: Text(text.title, style: context.text.titleMedium),
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    _StepBadge(step: step),
+                  ],
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text('$number. ${text.title}', style: theme.textTheme.titleMedium),
-                      const SizedBox(height: 6),
-                      _StepPill(step: step),
-                    ],
-                  ),
-                ),
-              ],
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            text.description,
+            style: context.text.bodyLarge?.copyWith(color: context.colors.textSecondary),
+          ),
+          if (step.kind == PermissionKind.accessibility) ...<Widget>[
+            const SizedBox(height: AppSpacing.lg),
+            const AppBanner(
+              icon: AppIcons.privacy,
+              title: 'O que este serviço faz',
+              message: accessibilityDisclosure,
             ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              text.description,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            if (step.kind == PermissionKind.accessibility && !granted) ...<Widget>[
-              const SizedBox(height: AppSpacing.md),
-              const NoticeBanner(
-                icon: Icons.privacy_tip_outlined,
-                title: 'O que este serviço faz',
-                message: accessibilityDisclosure,
-              ),
-            ],
-            if (showRestrictedHint) ...<Widget>[
-              const SizedBox(height: AppSpacing.md),
-              NoticeBanner(
-                tone: Tone.warning,
-                title: 'A opção está apagada?',
-                message: restrictedSettingsHint,
-                actionLabel: 'Abrir informações do app',
-                onAction: enabled ? onOpenAppDetails : null,
-              ),
-            ],
-            if (showAction) ...<Widget>[
-              const SizedBox(height: AppSpacing.md),
-              BusyButton(
-                label: text.actionLabel,
-                busy: busy,
-                tonal: !highlighted,
-                onPressed: enabled ? onOpen : null,
-              ),
-            ],
           ],
-        ),
+          const SizedBox(height: AppSpacing.lg),
+          StepList(steps: permissionHowTo(step.kind)),
+          if (showRestrictedHint) ...<Widget>[
+            const SizedBox(height: AppSpacing.lg),
+            AppBanner(
+              tone: Tone.warning,
+              title: 'A opção está apagada?',
+              message: restrictedSettingsHint,
+              actionLabel: 'Abrir informações do app',
+              onAction: enabled ? onOpenAppDetails : null,
+            ),
+          ],
+          const SizedBox(height: AppSpacing.xl),
+          AppButton.primary(
+            label: text.actionLabel,
+            busy: busy,
+            expand: true,
+            onPressed: enabled ? onOpen : null,
+          ),
+        ],
       ),
     );
   }
 }
 
-class _StepPill extends StatelessWidget {
-  const _StepPill({required this.step});
+/// Uma permissao na lista completa. As que faltam ligar abrem a tela do Android com um toque.
+class _StepRow extends StatelessWidget {
+  const _StepRow({required this.step, required this.onOpen});
+
+  final PermissionStep step;
+  final VoidCallback? onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final PermissionStepText text = permissionStepText(step.kind);
+    final bool granted = step.granted == true;
+    return AppListRow(
+      leading: AppIconTile(
+        icon: granted ? AppIcons.check : text.icon,
+        tone: granted
+            ? Tone.success
+            : step.isRequired
+            ? Tone.warning
+            : Tone.info,
+      ),
+      title: text.title,
+      subtitle: granted ? null : text.description,
+      below: Align(
+        alignment: AlignmentDirectional.centerStart,
+        child: _StepBadge(step: step),
+      ),
+      onTap: onOpen,
+    );
+  }
+}
+
+class _StepBadge extends StatelessWidget {
+  const _StepBadge({required this.step});
 
   final PermissionStep step;
 
   @override
   Widget build(BuildContext context) {
     if (step.granted == true) {
-      return const StatusPill(label: 'Ligada', tone: Tone.success, icon: Icons.check_rounded);
+      return const StatusBadge(label: 'Ligada', tone: Tone.success, icon: AppIcons.check);
     }
     if (step.granted == null) {
-      return const StatusPill(label: 'Passo manual', icon: Icons.touch_app_outlined);
+      return const StatusBadge(label: 'Passo manual', icon: AppIcons.touch);
     }
     return switch (step.importance) {
-      PermissionImportance.required => const StatusPill(
+      PermissionImportance.required => const StatusBadge(
         label: 'Obrigatória, falta ligar',
         tone: Tone.warning,
-        icon: Icons.priority_high_rounded,
+        icon: AppIcons.attention,
       ),
-      PermissionImportance.recommended => const StatusPill(
+      PermissionImportance.recommended => const StatusBadge(
         label: 'Recomendada',
         tone: Tone.info,
-        icon: Icons.thumb_up_alt_outlined,
+        icon: AppIcons.approve,
       ),
-      PermissionImportance.optional => const StatusPill(
+      PermissionImportance.optional => const StatusBadge(
         label: 'Opcional',
-        icon: Icons.add_circle_outline,
+        icon: AppIcons.addCircle,
       ),
     };
+  }
+}
+
+/// O que o nivel de gerenciamento deste aparelho garante e o que nao garante.
+class _ManagementPanel extends StatelessWidget {
+  const _ManagementPanel({required this.level});
+
+  final ManagementLevel level;
+
+  @override
+  Widget build(BuildContext context) {
+    final ManagementText text = managementText(level);
+    return AppPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(text.title, style: context.text.titleSmall),
+          const SizedBox(height: AppSpacing.sm),
+          BulletLine(icon: AppIcons.success, tone: Tone.success, text: text.guaranteed),
+          BulletLine(icon: AppIcons.info, tone: Tone.neutral, text: text.notGuaranteed),
+        ],
+      ),
+    );
+  }
+}
+
+/// Barra fixa da configuracao inicial: concluir quando tudo o que e obrigatorio esta ligado,
+/// ou seguir assim mesmo depois de uma confirmacao.
+class _FinishBar extends StatelessWidget {
+  const _FinishBar({required this.complete, required this.onFinish, required this.onAnyway});
+
+  final bool complete;
+  final VoidCallback onFinish;
+  final VoidCallback onAnyway;
+
+  @override
+  Widget build(BuildContext context) {
+    return StickyActionBar(
+      message: complete
+          ? 'Tudo pronto para o controle funcionar.'
+          : 'Ligue as permissões obrigatórias para concluir.',
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          AppButton.primary(label: 'Concluir', onPressed: complete ? onFinish : null),
+          if (!complete) AppButton.tertiary(label: 'Continuar mesmo assim', onPressed: onAnyway),
+        ],
+      ),
+    );
   }
 }

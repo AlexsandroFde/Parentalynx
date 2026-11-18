@@ -1,5 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../shared/design_system/design_system.dart';
+
 import '../../domain/entities/management_level.dart';
 import '../../domain/entities/permission_step.dart';
 
@@ -23,7 +25,7 @@ class PermissionStepText {
 PermissionStepText permissionStepText(PermissionKind kind) {
   return switch (kind) {
     PermissionKind.usageAccess => const PermissionStepText(
-      icon: Icons.timelapse_rounded,
+      icon: AppIcons.elapsed,
       title: 'Acesso ao uso',
       description:
           'Deixa o app saber quanto tempo cada aplicativo foi usado. É assim que o tempo do '
@@ -31,7 +33,7 @@ PermissionStepText permissionStepText(PermissionKind kind) {
       actionLabel: 'Permitir acesso ao uso',
     ),
     PermissionKind.accessibility => const PermissionStepText(
-      icon: Icons.accessibility_new_rounded,
+      icon: AppIcons.accessibility,
       title: 'Acessibilidade',
       description:
           'Deixa o app perceber na hora qual aplicativo está aberto, para fechar um app '
@@ -39,19 +41,19 @@ PermissionStepText permissionStepText(PermissionKind kind) {
       actionLabel: 'Ativar acessibilidade',
     ),
     PermissionKind.notifications => const PermissionStepText(
-      icon: Icons.notifications_outlined,
+      icon: AppIcons.notification,
       title: 'Notificações',
       description: 'Mostra o tempo que falta e avisa quando ele está acabando.',
       actionLabel: 'Permitir notificações',
     ),
     PermissionKind.batteryOptimization => const PermissionStepText(
-      icon: Icons.battery_charging_full_rounded,
+      icon: AppIcons.battery,
       title: 'Bateria sem restrição',
       description: 'Evita que o Android desligue o controle para economizar bateria.',
       actionLabel: 'Liberar a bateria',
     ),
     PermissionKind.overlay => const PermissionStepText(
-      icon: Icons.layers_outlined,
+      icon: AppIcons.layers,
       title: 'Aparecer sobre outros apps',
       description:
           'É um reforço: deixa o app mostrar a tela de bloqueio mesmo se a acessibilidade '
@@ -59,14 +61,14 @@ PermissionStepText permissionStepText(PermissionKind kind) {
       actionLabel: 'Permitir',
     ),
     PermissionKind.exactAlarms => const PermissionStepText(
-      icon: Icons.alarm_rounded,
+      icon: AppIcons.alarm,
       title: 'Alarmes exatos',
       description:
           'Faz o aparelho ser liberado ou bloqueado na hora certa, mesmo com a tela apagada.',
       actionLabel: 'Permitir alarmes',
     ),
     PermissionKind.deviceAdmin => const PermissionStepText(
-      icon: Icons.admin_panel_settings_outlined,
+      icon: AppIcons.admin,
       title: 'Administrador do dispositivo',
       description:
           'Reforço opcional: para desinstalar o app será preciso desativar o administrador '
@@ -74,13 +76,46 @@ PermissionStepText permissionStepText(PermissionKind kind) {
       actionLabel: 'Ativar administrador',
     ),
     PermissionKind.autostart => const PermissionStepText(
-      icon: Icons.restart_alt_rounded,
+      icon: AppIcons.reset,
       title: 'Início automático',
       description:
           'Neste aparelho os apps não ligam sozinhos depois de reiniciar. Libere o início '
           'automático do ParentaLynx nas configurações.',
       actionLabel: 'Abrir configurações',
     ),
+  };
+}
+
+/// Como ligar cada permissao, passo a passo, na tela do Android que o botao abre. A tela do
+/// app confere sozinha quando a pessoa volta.
+List<String> permissionHowTo(PermissionKind kind) {
+  final PermissionStepText text = permissionStepText(kind);
+  const String back = 'Volte para cá: esta tela confere sozinha.';
+  return switch (kind) {
+    PermissionKind.notifications || PermissionKind.batteryOptimization => <String>[
+      'Toque em "${text.actionLabel}".',
+      'Na pergunta do Android, toque em "Permitir".',
+    ],
+    PermissionKind.accessibility => <String>[
+      'Toque em "${text.actionLabel}".',
+      'Procure ParentaLynx na lista (às vezes fica em "Apps instalados") e toque nele.',
+      'Ligue a opção, confirme e volte para cá.',
+    ],
+    PermissionKind.deviceAdmin => <String>[
+      'Toque em "${text.actionLabel}".',
+      'Leia o aviso do Android e toque em "Ativar".',
+      back,
+    ],
+    PermissionKind.autostart => <String>[
+      'Toque em "${text.actionLabel}".',
+      'Procure ParentaLynx e ligue o início automático.',
+      back,
+    ],
+    PermissionKind.usageAccess || PermissionKind.overlay || PermissionKind.exactAlarms => <String>[
+      'Toque em "${text.actionLabel}".',
+      'Na lista do Android, escolha ParentaLynx e ligue a opção.',
+      back,
+    ],
   };
 }
 

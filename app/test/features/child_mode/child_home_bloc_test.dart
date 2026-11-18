@@ -90,7 +90,7 @@ void main() {
 
     expect(bloc.state.syncing, isFalse);
     expect(bloc.state.notice!.kind, HomeNoticeKind.warning);
-    expect(bloc.state.notice!.message, contains('Sem conexão'));
+    expect(bloc.state.notice!.message, contains('Sem internet'));
     verify(bridge.agent.getTodayUsage).called(1);
   });
 
@@ -105,7 +105,7 @@ void main() {
     );
     await pumpEventQueue();
 
-    expect(bloc.state.notice!.message, 'Não foi possível abrir Escola Digital.');
+    expect(bloc.state.notice!.message, 'Não foi possível abrir Escola Digital. Tente de novo.');
   });
 
   test('abrir o navegador seguro chama o agente e a falha vira aviso', () async {

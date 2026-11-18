@@ -4,10 +4,7 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/constants/app_constants.dart';
 import '../../../../core/constants/route_paths.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/child_layout.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../bloc/child_device_status/child_device_status_bloc.dart';
 import '../texts/transparency_content.dart';
 
@@ -27,107 +24,113 @@ class TransparencyPage extends StatelessWidget {
       (ChildDeviceStatusBloc bloc) => bloc.state.statusOrNull?.guardianName ?? '',
     );
     final String guardian = guardianName.isEmpty ? 'Seu responsável' : guardianName;
-    final StatusColors colors = StatusColors.of(context);
     return Scaffold(
       appBar: setup ? null : AppBar(title: const Text('Sobre o controle')),
+      bottomNavigationBar: setup
+          ? StickyActionBar(
+              message: 'Depois vêm as permissões do controle.',
+              child: AppButton.primary(
+                label: 'Entendi, continuar',
+                onPressed: () => context.go(ChildPaths.setupPermissions),
+              ),
+            )
+          : null,
       body: SafeArea(
-        child: Column(
+        child: ChildPageBody(
           children: <Widget>[
-            Expanded(
-              child: ChildPageBody(
-                padding: EdgeInsets.fromLTRB(20, setup ? 28 : 8, 20, 24),
+            if (setup) ...<Widget>[
+              Text('Primeiros passos · 1 de 2'.toUpperCase(), style: context.textStyles.eyebrow),
+              const SizedBox(height: AppSpacing.md),
+            ],
+            const ChildHeader(
+              icon: AppIcons.privacy,
+              title: 'O que este app faz',
+              message:
+                  'Este aparelho usa o ${AppConstants.appName}, um app de controle parental. Veja '
+                  'o que ele faz e o que ele não vê.',
+            ),
+            const SizedBox(height: AppSpacing.xl),
+            AppPanel(
+              child: Row(
                 children: <Widget>[
-                  const ChildHeader(
-                    icon: Icons.visibility_outlined,
-                    title: 'O que este app faz',
-                    message:
-                        'Este aparelho usa o ${AppConstants.appName}, um app de controle '
-                        'parental. Veja o que ele faz e o que ele não faz.',
-                  ),
-                  const SizedBox(height: AppSpacing.xl),
-                  SectionCard(
-                    title: 'Quem cuida das regras',
-                    child: Row(
-                      children: <Widget>[
-                        CircleAvatar(
-                          radius: 22,
-                          backgroundColor: Theme.of(context).colorScheme.primaryContainer,
-                          child: Icon(
-                            Icons.person_outline,
-                            color: Theme.of(context).colorScheme.onPrimaryContainer,
-                          ),
-                        ),
-                        const SizedBox(width: AppSpacing.md),
-                        Expanded(
-                          child: Text(
-                            '$guardian é o responsável por este aparelho e é quem define as '
-                            'regras.',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                        ),
-                      ],
+                  InitialAvatar(name: guardian, size: AppSizes.avatarLg),
+                  const SizedBox(width: AppSpacing.md),
+                  Expanded(
+                    child: Text(
+                      '$guardian é o responsável por este aparelho e é quem define as regras.',
+                      style: context.text.bodyLarge,
                     ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SectionCard(
-                    title: 'O que o responsável controla',
-                    child: Column(
-                      children: <Widget>[
-                        for (final String item in TransparencyContent.controlled)
-                          BulletLine(icon: Icons.tune_rounded, text: item),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SectionCard(
-                    title: 'O que o responsável consegue ver',
-                    child: Column(
-                      children: <Widget>[
-                        for (final String item in TransparencyContent.collected)
-                          BulletLine(icon: Icons.visibility_outlined, text: item),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  SectionCard(
-                    title: 'O que este app NÃO vê',
-                    subtitle: 'Ele não tem como acessar nada disto.',
-                    child: Column(
-                      children: <Widget>[
-                        for (final String item in TransparencyContent.neverCollected)
-                          BulletLine(icon: Icons.block_rounded, color: colors.success, text: item),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  const NoticeBanner(
-                    icon: Icons.shield_outlined,
-                    title: 'Sempre à vista',
-                    message: TransparencyContent.alwaysVisible,
-                  ),
-                  const SizedBox(height: AppSpacing.md),
-                  const NoticeBanner(
-                    tone: Tone.success,
-                    icon: Icons.emergency_outlined,
-                    title: 'Emergências',
-                    message: TransparencyContent.emergency,
                   ),
                 ],
               ),
             ),
-            if (setup)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 20, 16),
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: AppSpacing.maxContentWidth),
-                  child: BusyButton(
-                    label: 'Entendi, continuar',
-                    onPressed: () => context.go(ChildPaths.setupPermissions),
-                  ),
-                ),
-              ),
+            const SectionGap(),
+            const _BulletSection(
+              title: 'O que o responsável controla',
+              items: TransparencyContent.controlled,
+              icon: AppIcons.rules,
+              tone: Tone.info,
+            ),
+            const SectionGap(),
+            const _BulletSection(
+              title: 'O que o responsável consegue ver',
+              items: TransparencyContent.collected,
+              icon: AppIcons.show,
+              tone: Tone.neutral,
+            ),
+            const SectionGap(),
+            const _BulletSection(
+              title: 'O que este app NÃO vê',
+              subtitle: 'Ele não tem como acessar nada disto.',
+              items: TransparencyContent.neverCollected,
+              icon: AppIcons.hide,
+              tone: Tone.success,
+            ),
+            const SectionGap(),
+            const AppBanner(
+              icon: AppIcons.protection,
+              title: 'Sempre à vista',
+              message: TransparencyContent.alwaysVisible,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            const AppBanner(
+              tone: Tone.success,
+              icon: AppIcons.emergency,
+              title: 'Emergências',
+              message: TransparencyContent.emergency,
+            ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Lista curta de frases com o mesmo marcador, sob um titulo de secao.
+class _BulletSection extends StatelessWidget {
+  const _BulletSection({
+    required this.title,
+    required this.items,
+    required this.icon,
+    required this.tone,
+    this.subtitle,
+  });
+
+  final String title;
+  final String? subtitle;
+  final List<String> items;
+  final IconData icon;
+  final Tone tone;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppSection(
+      title: title,
+      subtitle: subtitle,
+      child: Column(
+        children: <Widget>[
+          for (final String item in items) BulletLine(icon: icon, tone: tone, text: item),
+        ],
       ),
     );
   }
