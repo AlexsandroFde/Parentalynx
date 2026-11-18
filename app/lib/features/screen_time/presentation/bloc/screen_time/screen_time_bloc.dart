@@ -47,6 +47,10 @@ class ScreenTimeBloc extends Bloc<ScreenTimeEvent, ScreenTimeState> {
       ),
     );
     on<ScreenTimeSaveRequested>(_onSaveRequested, transformer: droppable());
+    on<ScreenTimeRejectedChangesRestored>(
+      (ScreenTimeRejectedChangesRestored event, Emitter<ScreenTimeState> emit) =>
+          emit(_editor.restoreRejected(state)),
+    );
     on<ScreenTimeDiscardRequested>(
       (ScreenTimeDiscardRequested event, Emitter<ScreenTimeState> emit) =>
           emit(_editor.discard(state)),

@@ -52,6 +52,19 @@ final class BlockPeriodDraft extends Equatable {
     return null;
   }
 
+  /// Como [problem], conferindo tambem se um periodo pontual ja terminou em [now] (ele nao
+  /// bloquearia nada).
+  String? problemAt(DateTime now) {
+    final String? base = problem;
+    if (base != null) {
+      return base;
+    }
+    if (kind == BlockPeriodKind.once && !endAt.isAfter(now)) {
+      return 'Esse período já terminou. Escolha um fim depois de agora.';
+    }
+    return null;
+  }
+
   /// Regra pronta para a politica. So chame quando [problem] for nulo.
   BlockPeriod toPeriod(String periodId) {
     final String name = label.trim();

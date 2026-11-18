@@ -57,3 +57,8 @@ final class _ProtectionServerVersionChanged extends ProtectionEvent {
   @override
   List<Object?> get props => <Object?>[version];
 }
+
+/// Refaz as alteracoes recusadas por um conflito sobre a versao atual.
+final class ProtectionRejectedChangesRestored extends ProtectionEvent {
+  const ProtectionRejectedChangesRestored();
+}

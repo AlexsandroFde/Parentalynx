@@ -56,6 +56,19 @@ final class PolicySectionEditor<T> {
     return state.copyWith(draft: state.saved, status: SectionSaveStatus.idle);
   }
 
+  /// Refaz as alteracoes recusadas por um conflito sobre a versao atual do servidor. A pessoa
+  /// ve o resultado na tela e decide se salva.
+  PolicySectionState<T> restoreRejected(PolicySectionState<T> state) {
+    if (state is! PolicySectionEditing<T> || state.isSaving) {
+      return state;
+    }
+    final T? rejected = state.rejected;
+    if (rejected == null) {
+      return state;
+    }
+    return state.copyWith(draft: rejected, status: SectionSaveStatus.idle);
+  }
+
   /// Estado de "enviando", ou nulo quando nao ha o que salvar.
   PolicySectionEditing<T>? startSaving(PolicySectionState<T> state) {
     if (state is! PolicySectionEditing<T> || state.isSaving || !state.isDirty) {
@@ -76,7 +89,13 @@ final class PolicySectionEditor<T> {
       case Ok<PolicySaveOutcome>(value: PolicySaved(:final VersionedPolicy policy)):
         return _editing(saving.deviceId, policy, status: SectionSaveStatus.saved);
       case Ok<PolicySaveOutcome>(value: PolicyConflict(:final VersionedPolicy latest)):
-        return _editing(saving.deviceId, latest, status: SectionSaveStatus.conflict);
+        // A versao do servidor entra na tela; as alteracoes recusadas ficam guardadas para a
+        // pessoa poder refaze-las depois de ver o que mudou.
+        return _editing(
+          saving.deviceId,
+          latest,
+          status: SectionSaveStatus.conflict,
+        ).copyWith(rejected: saving.draft);
       case Err<PolicySaveOutcome>(failure: CancelledFailure()):
         // A pessoa desistiu de confirmar a senha: volta a editar, sem aviso.
         return saving.copyWith(status: SectionSaveStatus.idle);

@@ -119,3 +119,19 @@ final class _ScheduleServerVersionChanged extends ScheduleEvent {
   @override
   List<Object?> get props => <Object?>[version];
 }
+
+/// Refaz as alteracoes recusadas por um conflito sobre a versao atual.
+final class ScheduleRejectedChangesRestored extends ScheduleEvent {
+  const ScheduleRejectedChangesRestored();
+}
+
+/// Copia as janelas de um dia para os dias informados (por exemplo, de segunda a sexta).
+final class AllowedHoursDayCopied extends ScheduleEvent {
+  const AllowedHoursDayCopied({required this.weekday, required this.to});
+
+  final int weekday;
+  final List<int> to;
+
+  @override
+  List<Object?> get props => <Object?>[weekday, to];
+}

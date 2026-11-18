@@ -18,6 +18,7 @@ import '../../../support/test_app.dart';
 import '../../../support/test_dependencies.dart';
 
 void main() {
+  const String detailPath = '/v1/guardian/devices/$deviceId';
   const String policyPath = '/v1/guardian/devices/$deviceId/policy';
 
   late TestDependencies deps;
@@ -37,7 +38,11 @@ void main() {
     );
   }
 
-  Future<GoRouter> pumpLimit(WidgetTester tester, {required Size size}) {
+  Future<GoRouter> pumpLimit(
+    WidgetTester tester, {
+    required Size size,
+    Brightness brightness = Brightness.light,
+  }) {
     return pumpGuardianRoutes(
       tester,
       routes: <RouteBase>[
@@ -50,13 +55,14 @@ void main() {
       location: RulesPaths.limit,
       deps: deps,
       size: size,
+      brightness: brightness,
       wrap: withDevices,
     );
   }
 
-  testWidgets('limite diário: alterar mostra a barra de salvar e envia a versão base', (
-    WidgetTester tester,
-  ) async {
+  final Finder unsaved = find.textContaining('Alterações não salvas');
+
+  void acceptSaves() {
     deps.backend.on('PUT', policyPath, (http.Request request) {
       final Map<String, Object?> body = jsonDecode(request.body) as Map<String, Object?>;
       final Map<String, Object?> sent = body['policy']! as Map<String, Object?>;
@@ -65,47 +71,165 @@ void main() {
         'policy': <String, Object?>{...sent, 'overrides': policyJson()['overrides']},
       });
     });
-    await pumpLimit(tester, size: const Size(392, 1300));
+  }
 
-    expect(find.byKey(const ValueKey<String>('daily-limit-value')), findsOneWidget);
-    expect(find.text('2h 30min'), findsOneWidget);
-    expect(find.text('Alterações não salvas'), findsNothing);
+  group('limite diário', () {
+    testWidgets('alterar mostra a barra de salvar, envia a versão base e fica pendente', (
+      WidgetTester tester,
+    ) async {
+      acceptSaves();
+      await pumpLimit(tester, size: const Size(392, 1400));
 
-    await tester.tap(find.text('Limite diferente por dia da semana'));
-    await settle(tester);
+      expect(find.text('JOÃO · MOTO G54'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('daily-limit-value')), findsOneWidget);
+      expect(find.text('Regras aplicadas no aparelho'), findsOneWidget);
+      expect(unsaved, findsNothing);
 
-    expect(find.text('Alterações não salvas'), findsOneWidget);
-    expect(find.text('Sábado'), findsOneWidget);
+      await tester.tap(find.text('Tempo diferente em alguns dias'));
+      await settle(tester);
 
-    await tester.tap(find.text('Salvar'));
-    await settle(tester);
+      expect(unsaved, findsOneWidget);
+      expect(find.text('Sábado'), findsOneWidget);
+      expect(find.text('Todos os dias: 2h 30min'), findsOneWidget);
 
-    final Map<String, Object?> body = deps.backend.lastBody('PUT', policyPath);
-    expect(deps.backend.calls('PUT', policyPath), hasLength(1));
-    expect(body['baseVersion'], 12);
-    final Map<String, Object?> sent = body['policy']! as Map<String, Object?>;
-    final Map<String, Object?> limit = sent['dailyLimit']! as Map<String, Object?>;
-    expect((limit['perWeekday']! as Map<String, Object?>)['6'], 150);
-    expect(sent.containsKey('overrides'), isFalse);
-    expect(find.text('Regras enviadas. Aguardando o aparelho confirmar.'), findsOneWidget);
-    expect(find.text('Alterações não salvas'), findsNothing);
-  });
+      await tester.tap(find.text('Salvar'));
+      await settle(tester);
 
-  testWidgets('limite diário', tags: 'screenshot', (WidgetTester tester) async {
-    await pumpLimit(tester, size: const Size(392, 1000));
-    await expectScreenshot(tester, 'rules_limite_diario');
+      final Map<String, Object?> body = deps.backend.lastBody('PUT', policyPath);
+      expect(deps.backend.calls('PUT', policyPath), hasLength(1));
+      expect(body['baseVersion'], 12);
+      final Map<String, Object?> sent = body['policy']! as Map<String, Object?>;
+      final Map<String, Object?> limit = sent['dailyLimit']! as Map<String, Object?>;
+      expect((limit['perWeekday']! as Map<String, Object?>)['6'], 150);
+      expect(sent.containsKey('overrides'), isFalse);
+      expect(
+        find.text('Alterações salvas. O aparelho de João aplica em instantes.'),
+        findsOneWidget,
+      );
+      expect(unsaved, findsNothing);
+      // A versao 13 ainda nao foi confirmada pelo aparelho: nunca aparece como aplicada.
+      expect(find.text('Aguardando o aparelho confirmar'), findsOneWidget);
+      expect(find.text('Regras aplicadas no aparelho'), findsNothing);
+    });
+
+    testWidgets('atalho de tempo troca o limite no rascunho', (WidgetTester tester) async {
+      await pumpLimit(tester, size: const Size(392, 1400));
+
+      await tester.tap(find.text('3h'));
+      await settle(tester);
+
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey<String>('daily-limit-value'))).data,
+        '3h',
+      );
+      expect(unsaved, findsOneWidget);
+    });
+
+    testWidgets('falha ao salvar explica o que continua valendo e oferece tentar de novo', (
+      WidgetTester tester,
+    ) async {
+      deps.backend.onError('PUT', policyPath, status: 500, code: 'internal');
+      await pumpLimit(tester, size: const Size(392, 1400));
+
+      await tester.tap(find.text('3h'));
+      await settle(tester);
+      await tester.tap(find.text('Salvar'));
+      await settle(tester);
+
+      expect(find.text('Não foi possível salvar'), findsOneWidget);
+      expect(
+        find.textContaining('as regras anteriores continuam valendo e as suas alterações'),
+        findsOneWidget,
+      );
+      expect(find.text('Tentar de novo'), findsWidgets);
+      expect(
+        tester.widget<Text>(find.byKey(const ValueKey<String>('daily-limit-value'))).data,
+        '3h',
+      );
+    });
+
+    testWidgets('conflito mostra a versão atual e permite refazer as alterações', (
+      WidgetTester tester,
+    ) async {
+      bool conflicted = false;
+      deps.backend
+        ..on('GET', detailPath, (http.Request request) {
+          return jsonResponse(<String, Object?>{
+            'device': deviceJson(),
+            'policyVersion': conflicted ? 13 : 12,
+            'policy': policyJson(minutes: conflicted ? 60 : 150),
+          });
+        })
+        ..on('PUT', policyPath, (http.Request request) {
+          conflicted = true;
+          return errorResponse(409, 'version_conflict');
+        });
+      await pumpLimit(tester, size: const Size(392, 1400));
+
+      await tester.tap(find.text('3h'));
+      await settle(tester);
+      await tester.tap(find.text('Salvar'));
+      await settle(tester);
+
+      expect(find.text('As regras mudaram em outra sessão'), findsOneWidget);
+      Text value() => tester.widget<Text>(find.byKey(const ValueKey<String>('daily-limit-value')));
+      expect(value().data, '1h');
+      expect(unsaved, findsNothing);
+
+      await tester.tap(find.text('Refazer minhas alterações'));
+      await settle(tester);
+      expect(value().data, '3h');
+      expect(unsaved, findsOneWidget);
+    });
+
+    for (final Brightness brightness in Brightness.values) {
+      final String theme = brightness == Brightness.light ? 'claro' : 'escuro';
+      testWidgets('limite diário ($theme)', tags: 'screenshot', (WidgetTester tester) async {
+        await pumpLimit(tester, size: const Size(392, 1300), brightness: brightness);
+        await expectScreenshot(tester, 'rules_limite_diario_$theme');
+      });
+    }
+
+    testWidgets('com alterações e limite por dia da semana', tags: 'screenshot', (
+      WidgetTester tester,
+    ) async {
+      await pumpLimit(tester, size: const Size(392, 1500));
+      await tester.tap(find.text('Tempo diferente em alguns dias'));
+      await settle(tester);
+      await expectScreenshot(tester, 'rules_limite_diario_semana');
+    });
+
+    testWidgets('segue as diretrizes de acessibilidade', (WidgetTester tester) async {
+      await pumpLimit(tester, size: const Size(392, 1300));
+      await expectAccessible(tester);
+    });
+
+    testWidgets('funciona com a fonte no maior tamanho', (WidgetTester tester) async {
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await pumpLimit(tester, size: const Size(392, 3000));
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Tempo diferente em alguns dias'));
+      await settle(tester);
+      expect(tester.takeException(), isNull);
+    });
   });
 
   group('pedidos de tempo', () {
     const String listPath = '/v1/guardian/devices/$deviceId/time-requests';
     const String resolvePath = '/v1/guardian/time-requests/r1/resolve';
 
-    Map<String, Object?> request({String status = 'pending', int? grantedMinutes}) {
+    Map<String, Object?> request({
+      String id = 'r1',
+      String status = 'pending',
+      int? grantedMinutes,
+      Duration ago = const Duration(minutes: 5),
+    }) {
       return <String, Object?>{
-        'id': 'r1',
+        'id': id,
         'deviceId': deviceId,
         'childName': 'João',
-        'createdAt': msAgo(const Duration(minutes: 5)),
+        'createdAt': msAgo(ago),
         'minutes': 30,
         'message': 'Falta pouco para acabar o filme',
         'status': status,
@@ -113,7 +237,11 @@ void main() {
       };
     }
 
-    Future<void> pumpRequests(WidgetTester tester) async {
+    Future<void> pumpRequests(
+      WidgetTester tester, {
+      Brightness brightness = Brightness.light,
+      Size size = phoneSize,
+    }) async {
       await pumpGuardianRoutes(
         tester,
         routes: <RouteBase>[
@@ -127,9 +255,20 @@ void main() {
         ],
         location: GuardianPaths.timeRequests,
         deps: deps,
+        brightness: brightness,
+        size: size,
         destinations: const <String>[GuardianPaths.pairing],
         wrap: withDevices,
       );
+    }
+
+    void installRequests() {
+      deps.backend.onJson('GET', listPath, <String, Object?>{
+        'requests': <Object?>[
+          request(),
+          request(id: 'r0', status: 'approved', grantedMinutes: 15, ago: const Duration(hours: 3)),
+        ],
+      });
     }
 
     testWidgets('aprovar pela folha concede os minutos escolhidos', (WidgetTester tester) async {
@@ -160,9 +299,13 @@ void main() {
         'action': 'approve',
         'minutes': 45,
       });
-      expect(find.text('45min a mais para João.'), findsOneWidget);
+      expect(
+        find.text('45min a mais para João hoje. O aparelho recebe em instantes.'),
+        findsOneWidget,
+      );
       expect(find.text('Nenhum pedido aguardando resposta.'), findsOneWidget);
       expect(find.text('Respondidos'), findsOneWidget);
+      expect(find.text('Aprovado: 45min'), findsOneWidget);
     });
 
     testWidgets('negar pede confirmação e não envia minutos', (WidgetTester tester) async {
@@ -176,11 +319,12 @@ void main() {
       await tester.tap(find.text('Negar'));
       await settle(tester);
       expect(find.text('Negar o pedido?'), findsOneWidget);
-      await tester.tap(find.widgetWithText(FilledButton, 'Negar'));
+      expect(find.text('O limite de hoje continua o mesmo.'), findsOneWidget);
+      await tester.tap(find.descendant(of: find.byType(Dialog), matching: find.text('Negar')));
       await settle(tester);
 
       expect(deps.backend.lastBody('POST', resolvePath), <String, Object?>{'action': 'deny'});
-      expect(find.text('Pedido negado.'), findsOneWidget);
+      expect(find.text('Pedido negado. João recebe o aviso.'), findsOneWidget);
     });
 
     testWidgets('sem pedidos mostra o vazio', (WidgetTester tester) async {
@@ -188,6 +332,30 @@ void main() {
       await pumpRequests(tester);
 
       expect(find.text('Nenhum pedido de tempo'), findsOneWidget);
+    });
+
+    for (final Brightness brightness in Brightness.values) {
+      final String theme = brightness == Brightness.light ? 'claro' : 'escuro';
+      testWidgets('pedidos de tempo ($theme)', tags: 'screenshot', (WidgetTester tester) async {
+        installRequests();
+        await pumpRequests(tester, brightness: brightness);
+        await expectScreenshot(tester, 'pedidos_de_tempo_$theme');
+      });
+    }
+
+    testWidgets('pedidos seguem as diretrizes de acessibilidade', (WidgetTester tester) async {
+      installRequests();
+      await pumpRequests(tester);
+      await expectAccessible(tester);
+    });
+
+    testWidgets('pedidos funcionam com a fonte no maior tamanho', (WidgetTester tester) async {
+      installRequests();
+      tester.platformDispatcher.textScaleFactorTestValue = 2;
+      addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+      await pumpRequests(tester, size: const Size(392, 1900));
+      expect(tester.takeException(), isNull);
+      expect(find.text('Aprovar'), findsOneWidget);
     });
   });
 }

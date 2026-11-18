@@ -76,7 +76,8 @@ void main() {
     build: build,
     act: (ScheduleBloc bloc) async {
       await start(bloc);
-      const DayWindow sunday = DayWindow(LocalTime(10, 0), LocalTime(18, 0));
+      // Depois da janela padrao (07:00 as 21:00): janelas sobrepostas sao recusadas.
+      const DayWindow sunday = DayWindow(LocalTime(21, 30), LocalTime(23, 0));
       bloc
         ..add(const AllowedHoursToggled(true))
         ..add(const AllowedHoursWindowAdded(weekday: 7, window: sunday))

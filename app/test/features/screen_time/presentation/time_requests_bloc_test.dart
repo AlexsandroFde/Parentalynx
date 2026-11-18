@@ -100,7 +100,9 @@ void main() {
             .having(
               (TimeRequestsLoaded s) => s.action,
               'andamento',
-              const ActionSucceeded(message: '45min a mais para João.'),
+              const ActionSucceeded(
+                message: '45min a mais para João hoje. O aparelho recebe em instantes.',
+              ),
             ),
       ],
       verify: (_) {

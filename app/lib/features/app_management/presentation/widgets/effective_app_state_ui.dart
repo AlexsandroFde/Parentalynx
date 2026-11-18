@@ -1,9 +1,10 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../shared/widgets/feedback_views.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/entities/effective_app_state.dart';
 
-/// Cor e icone de cada estado efetivo de um app.
+/// Tom e icone de cada estado efetivo de um app. O estado sempre aparece com icone e texto,
+/// nunca so pela cor.
 extension EffectiveAppStateUi on EffectiveAppState {
   Tone get tone {
     return switch (this) {
@@ -17,11 +18,11 @@ extension EffectiveAppStateUi on EffectiveAppState {
 
   IconData get icon {
     return switch (this) {
-      EffectiveAppState.allowed => Icons.check,
-      EffectiveAppState.blocked => Icons.block,
-      EffectiveAppState.exception => Icons.verified_outlined,
-      EffectiveAppState.pendingApproval => Icons.hourglass_empty,
-      EffectiveAppState.essential => Icons.lock_outline,
+      EffectiveAppState.allowed => AppIcons.check,
+      EffectiveAppState.blocked => AppIcons.blocked,
+      EffectiveAppState.exception => AppIcons.exception,
+      EffectiveAppState.pendingApproval => AppIcons.pending,
+      EffectiveAppState.essential => AppIcons.lock,
     };
   }
 }

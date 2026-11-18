@@ -39,7 +39,12 @@ void main() {
 
   tearDown(() => deps.dispose());
 
-  Future<GoRouter> pumpRules(WidgetTester tester, {required String location, required Size size}) {
+  Future<GoRouter> pumpRules(
+    WidgetTester tester, {
+    required String location,
+    required Size size,
+    Brightness brightness = Brightness.light,
+  }) {
     return pumpGuardianRoutes(
       tester,
       routes: <RouteBase>[
@@ -62,6 +67,7 @@ void main() {
       location: location,
       deps: deps,
       size: size,
+      brightness: brightness,
       wrap: (Widget app) => BlocProvider<DevicesBloc>(
         create: (BuildContext context) => deps.di<DevicesBloc>()..add(const DevicesStarted()),
         child: app,
@@ -69,17 +75,62 @@ void main() {
     );
   }
 
-  testWidgets('visão geral resume cada grupo de regras', tags: 'screenshot', (
+  for (final Brightness brightness in Brightness.values) {
+    final String theme = brightness == Brightness.light ? 'claro' : 'escuro';
+    testWidgets('visão geral resume cada grupo de regras ($theme)', tags: 'screenshot', (
+      WidgetTester tester,
+    ) async {
+      await pumpRules(
+        tester,
+        location: GuardianPaths.rules,
+        size: const Size(392, 1180),
+        brightness: brightness,
+      );
+
+      expect(find.text('Regras de João'), findsOneWidget);
+      expect(find.text('Tempo e horários'), findsOneWidget);
+      expect(find.text('Uso dos aplicativos'), findsOneWidget);
+      expect(find.text('Internet e segurança'), findsOneWidget);
+      expect(find.text('2h 30min por dia'), findsOneWidget);
+      expect(find.text('1 ativo: Hora de dormir'), findsOneWidget);
+      expect(find.text('1 bloqueado, 1 exceção, 1 com limite próprio'), findsOneWidget);
+      expect(find.text('Regras aplicadas no aparelho'), findsOneWidget);
+      await expectScreenshot(tester, 'rules_visao_geral_$theme');
+    });
+  }
+
+  testWidgets('visão geral segue as diretrizes de acessibilidade', (WidgetTester tester) async {
+    await pumpRules(tester, location: GuardianPaths.rules, size: const Size(392, 1180));
+    await expectAccessible(tester);
+  });
+
+  testWidgets('visão geral funciona com a fonte no maior tamanho', (WidgetTester tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpRules(tester, location: GuardianPaths.rules, size: const Size(392, 2600));
+    expect(tester.takeException(), isNull);
+    expect(find.text('Regras de João'), findsOneWidget);
+  });
+
+  testWidgets('versão salva e ainda não confirmada aparece como pendente', (
     WidgetTester tester,
   ) async {
-    await pumpRules(tester, location: GuardianPaths.rules, size: const Size(392, 1100));
+    installStandardRoutes(
+      deps.backend,
+      device: deviceJson(policyVersion: 13, appliedPolicyVersion: 12),
+      policyVersion: 13,
+    );
+    await pumpRules(tester, location: GuardianPaths.rules, size: const Size(392, 1180));
 
-    expect(find.text('Regras de João'), findsOneWidget);
-    expect(find.text('2h 30min por dia'), findsOneWidget);
-    expect(find.text('1 ativo: Hora de dormir'), findsOneWidget);
-    expect(find.text('1 bloqueado, 1 exceção, 1 com limite próprio'), findsOneWidget);
-    await expectScreenshot(tester, 'rules_visao_geral');
+    expect(find.text('Aguardando o aparelho confirmar'), findsOneWidget);
+    expect(find.text('Regras aplicadas no aparelho'), findsNothing);
+  });
 
+  testWidgets('regra desligada aparece com o resumo do que vale', (WidgetTester tester) async {
+    installStandardRoutes(deps.backend, policy: policyJson(limitEnabled: false));
+    await pumpRules(tester, location: GuardianPaths.rules, size: const Size(392, 1180));
+
+    expect(find.text('Desligado'), findsOneWidget);
     await tester.tap(find.text('Limite diário'));
     await settle(tester);
     expect(find.text('Limitar o tempo de uso por dia'), findsOneWidget);
@@ -89,10 +140,11 @@ void main() {
     final GoRouter router = await pumpRules(
       tester,
       location: GuardianPaths.rules,
-      size: const Size(392, 1100),
+      size: const Size(392, 1180),
     );
 
     final Map<String, String> pages = <String, String>{
+      'Limite diário': RulesPaths.limit,
       'Horários permitidos': RulesPaths.hours,
       'Períodos de bloqueio': RulesPaths.periods,
       'Aplicativos': RulesPaths.apps,
@@ -113,9 +165,19 @@ void main() {
     deps.backend.onJson('GET', '/v1/guardian/devices', <String, Object?>{'devices': <Object?>[]});
     await pumpRules(tester, location: GuardianPaths.rules, size: const Size(392, 850));
 
-    expect(find.text('Vincular aparelho'), findsOneWidget);
+    expect(find.text('Nenhum aparelho vinculado'), findsOneWidget);
     await tester.tap(find.text('Vincular aparelho'));
     await settle(tester);
     expect(find.text('destino ${GuardianPaths.pairing}'), findsOneWidget);
+  });
+
+  testWidgets('editor sem aparelho vinculado também leva à vinculação', (
+    WidgetTester tester,
+  ) async {
+    deps.backend.onJson('GET', '/v1/guardian/devices', <String, Object?>{'devices': <Object?>[]});
+    await pumpRules(tester, location: RulesPaths.limit, size: const Size(392, 850));
+
+    expect(find.text('Nenhum aparelho vinculado'), findsOneWidget);
+    expect(find.text('Vincular aparelho'), findsOneWidget);
   });
 }

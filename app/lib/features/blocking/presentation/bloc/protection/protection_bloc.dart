@@ -28,6 +28,10 @@ class ProtectionBloc extends Bloc<ProtectionEvent, ProtectionState> {
           _edit(emit, (ProtectionPolicy protection) => event.lock.apply(protection, event.enabled)),
     );
     on<ProtectionSaveRequested>(_onSaveRequested, transformer: droppable());
+    on<ProtectionRejectedChangesRestored>(
+      (ProtectionRejectedChangesRestored event, Emitter<ProtectionState> emit) =>
+          emit(_editor.restoreRejected(state)),
+    );
     on<ProtectionDiscardRequested>(
       (ProtectionDiscardRequested event, Emitter<ProtectionState> emit) =>
           emit(_editor.discard(state)),

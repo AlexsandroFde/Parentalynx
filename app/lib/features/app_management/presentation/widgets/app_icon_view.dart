@@ -1,13 +1,15 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/entities/app_entry.dart';
 import '../services/app_icon_images.dart';
 
 /// Icone de um app do aparelho monitorado.
 ///
 /// O icone vem do servidor pelo [AppIconImages] da arvore de widgets. Enquanto carrega, se nao
-/// existir ou se falhar, mostra a inicial do app sobre uma cor derivada do nome do pacote.
+/// existir ou se falhar, mostra a inicial do app em um quadrado com a cor da marca (sem cores
+/// aleatorias: o nome do app ao lado identifica o app). Decorativo para o leitor de tela.
 class AppIconView extends StatelessWidget {
   const AppIconView({
     required this.package,
@@ -34,13 +36,13 @@ class AppIconView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final Widget fallback = _LetterIcon(package: package, label: label, size: size);
+    final Widget fallback = _LetterIcon(label: label, size: size);
     final ImageProvider<Object>? image = context.read<AppIconImages>().imageFor(iconPath);
     if (image == null) {
       return fallback;
     }
     return ClipRRect(
-      borderRadius: BorderRadius.circular(size * 0.24),
+      borderRadius: context.shapes.tileRadius,
       child: Image(
         image: image,
         width: size,
@@ -58,18 +60,13 @@ class AppIconView extends StatelessWidget {
 }
 
 class _LetterIcon extends StatelessWidget {
-  const _LetterIcon({required this.package, required this.label, required this.size});
+  const _LetterIcon({required this.label, required this.size});
 
-  final String package;
   final String label;
   final double size;
 
   @override
   Widget build(BuildContext context) {
-    final bool dark = Theme.of(context).brightness == Brightness.dark;
-    // Matiz estavel por pacote: o mesmo app tem sempre a mesma cor.
-    final double hue = (package.hashCode & 0x7fffffff) % 360.0;
-    final Color background = HSLColor.fromAHSL(1, hue, 0.45, dark ? 0.36 : 0.46).toColor();
     final String trimmed = label.trim();
     final String initial = trimmed.isEmpty
         ? '?'
@@ -80,16 +77,22 @@ class _LetterIcon extends StatelessWidget {
         height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(size * 0.24),
+          color: Tone.info.background(context),
+          borderRadius: context.shapes.tileRadius,
         ),
-        child: Text(
-          initial,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: size * 0.46,
-            fontWeight: FontWeight.w700,
-            height: 1,
+        // A letra acompanha o tamanho do quadrado, sem depender da escala de fonte.
+        child: SizedBox.square(
+          dimension: size / 2,
+          child: FittedBox(
+            child: Text(
+              initial,
+              textScaler: TextScaler.noScaling,
+              style: context.text.titleLarge?.copyWith(
+                height: 1,
+                fontWeight: FontWeight.w800,
+                color: Tone.info.foreground(context),
+              ),
+            ),
           ),
         ),
       ),

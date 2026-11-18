@@ -56,6 +56,10 @@ class WebFilterBloc extends Bloc<WebFilterEvent, WebFilterState> {
       ),
     );
     on<WebFilterSaveRequested>(_onSaveRequested, transformer: droppable());
+    on<WebFilterRejectedChangesRestored>(
+      (WebFilterRejectedChangesRestored event, Emitter<WebFilterState> emit) =>
+          emit(_editor.restoreRejected(state)),
+    );
     on<WebFilterDiscardRequested>(
       (WebFilterDiscardRequested event, Emitter<WebFilterState> emit) =>
           emit(_editor.discard(state)),

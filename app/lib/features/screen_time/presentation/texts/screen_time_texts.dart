@@ -23,3 +23,24 @@ String dailyLimitSummary(DailyLimit limit) {
   final int count = overrides.length;
   return '$base, com valor próprio em $count ${count == 1 ? 'dia' : 'dias'}';
 }
+
+/// Tempo de cada dia da semana agrupado por valor, para conferir a semana de uma vez:
+/// `seg a sex: 2h 30min · sáb e dom: 4h`, ou `Todos os dias: 2h`.
+String weekLimitsSummary(DailyLimit limit) {
+  final Map<int, List<int>> daysByMinutes = <int, List<int>>{};
+  for (int day = 1; day <= 7; day++) {
+    daysByMinutes.putIfAbsent(limit.minutesFor(day), () => <int>[]).add(day);
+  }
+  if (daysByMinutes.length == 1) {
+    return 'Todos os dias: ${formatMinutes(daysByMinutes.keys.single)}';
+  }
+  final List<MapEntry<int, List<int>>> groups = daysByMinutes.entries.toList()
+    ..sort((MapEntry<int, List<int>> a, MapEntry<int, List<int>> b) {
+      return a.value.first.compareTo(b.value.first);
+    });
+  return capitalizeFirst(
+    groups
+        .map((MapEntry<int, List<int>> e) => '${describeDays(e.value)}: ${formatMinutes(e.key)}')
+        .join(' · '),
+  );
+}

@@ -7,11 +7,11 @@ import '../../domain/entities/system_lock.dart';
 /// Resumo da navegacao na internet para a visao geral das regras.
 String webSummary(WebPolicy web) {
   if (!web.managedBrowser) {
-    return 'Navegador gerenciado desligado';
+    return 'Navegador ParentaLynx desligado';
   }
   if (web.mode == WebMode.allowlist) {
     final int count = web.allowedDomains.length;
-    return 'Só sites autorizados ($count)';
+    return count == 1 ? 'Só 1 site autorizado' : 'Só $count sites autorizados';
   }
   final int categories = web.blockedCategories.length;
   final int domains = web.blockedDomains.length;
@@ -20,7 +20,7 @@ String webSummary(WebPolicy web) {
     if (domains > 0) '$domains ${domains == 1 ? 'site' : 'sites'}',
     if (web.safeDns) 'filtro familiar',
   ];
-  return parts.isEmpty ? 'Navegador gerenciado sem filtros' : 'Bloqueia: ${parts.join(', ')}';
+  return parts.isEmpty ? 'Navegador ParentaLynx sem filtros' : 'Bloqueia: ${parts.join(', ')}';
 }
 
 /// Resumo da protecao para a visao geral das regras.

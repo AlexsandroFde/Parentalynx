@@ -104,3 +104,23 @@ List<int> blockedDays(WeekWindows byDay) {
       if ((byDay[day] ?? const <DayWindow>[]).isEmpty) day,
   ];
 }
+
+/// Motivo pelo qual a janela nao pode entrar no dia, ou nulo se ela pode: o fim precisa ser
+/// depois do inicio e a janela nao pode cobrir horarios que outra janela do dia ja libera.
+String? validateNewDayWindow(List<DayWindow> existing, DayWindow window) {
+  final String? order = validateDayWindow(window.start, window.end);
+  if (order != null) {
+    return order;
+  }
+  for (final DayWindow other in existing) {
+    if (other == window) {
+      return 'Esse horário já está liberado neste dia.';
+    }
+    final bool overlaps =
+        window.start.compareTo(other.end) < 0 && other.start.compareTo(window.end) < 0;
+    if (overlaps) {
+      return 'Esse horário se sobrepõe a $other. Ajuste o início ou o fim.';
+    }
+  }
+  return null;
+}

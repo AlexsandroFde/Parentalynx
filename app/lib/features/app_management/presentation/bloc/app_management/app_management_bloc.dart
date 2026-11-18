@@ -37,6 +37,10 @@ class AppManagementBloc extends Bloc<AppManagementEvent, AppManagementState> {
       ),
     );
     on<AppManagementSaveRequested>(_onSaveRequested, transformer: droppable());
+    on<AppManagementRejectedChangesRestored>(
+      (AppManagementRejectedChangesRestored event, Emitter<AppManagementState> emit) =>
+          emit(_editor.restoreRejected(state)),
+    );
     on<AppManagementDiscardRequested>(
       (AppManagementDiscardRequested event, Emitter<AppManagementState> emit) =>
           emit(_editor.discard(state)),

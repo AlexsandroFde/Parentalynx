@@ -35,8 +35,14 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
       ),
     );
     on<AllowedHoursWindowAdded>(
-      (AllowedHoursWindowAdded event, Emitter<ScheduleState> emit) =>
-          _editWeek(emit, (WeekWindows week) => addDayWindow(week, event.weekday, event.window)),
+      (AllowedHoursWindowAdded event, Emitter<ScheduleState> emit) => _editWeek(
+        emit,
+        // Janela invalida ou sobreposta a outra do dia nao entra (a tela explica antes).
+        (WeekWindows week) =>
+            validateNewDayWindow(week[event.weekday] ?? const <DayWindow>[], event.window) == null
+            ? addDayWindow(week, event.weekday, event.window)
+            : week,
+      ),
     );
     on<AllowedHoursWindowRemoved>(
       (AllowedHoursWindowRemoved event, Emitter<ScheduleState> emit) =>
@@ -47,6 +53,12 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
         emit,
         (WeekWindows week) =>
             copyDayWindows(week, from: event.weekday, to: const <int>[1, 2, 3, 4, 5, 6, 7]),
+      ),
+    );
+    on<AllowedHoursDayCopied>(
+      (AllowedHoursDayCopied event, Emitter<ScheduleState> emit) => _editWeek(
+        emit,
+        (WeekWindows week) => copyDayWindows(week, from: event.weekday, to: event.to),
       ),
     );
     on<BlockPeriodSaved>(_onBlockPeriodSaved);
@@ -82,6 +94,10 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
       ),
     );
     on<ScheduleSaveRequested>(_onSaveRequested, transformer: droppable());
+    on<ScheduleRejectedChangesRestored>(
+      (ScheduleRejectedChangesRestored event, Emitter<ScheduleState> emit) =>
+          emit(_editor.restoreRejected(state)),
+    );
     on<ScheduleDiscardRequested>(
       (ScheduleDiscardRequested event, Emitter<ScheduleState> emit) => emit(_editor.discard(state)),
     );

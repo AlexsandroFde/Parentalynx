@@ -10,6 +10,7 @@ import 'package:parentalynx/features/child_device/presentation/bloc/devices/devi
 import 'package:parentalynx/features/device_policy/device_policy_routes.dart';
 
 import '../../../support/guardian_api_fixtures.dart';
+import '../../../support/test_app.dart';
 import '../../../support/test_dependencies.dart';
 
 void main() {
@@ -22,7 +23,14 @@ void main() {
 
   tearDown(() => deps.dispose());
 
-  Future<GoRouter> pumpBlocking(WidgetTester tester, {required String location}) {
+  final Finder unsaved = find.textContaining('Alterações não salvas');
+
+  Future<GoRouter> pumpBlocking(
+    WidgetTester tester, {
+    required String location,
+    Size size = const Size(392, 2400),
+    Brightness brightness = Brightness.light,
+  }) {
     return pumpGuardianRoutes(
       tester,
       routes: <RouteBase>[
@@ -43,7 +51,8 @@ void main() {
       ],
       location: location,
       deps: deps,
-      size: const Size(392, 1600),
+      size: size,
+      brightness: brightness,
       wrap: (Widget app) => BlocProvider<DevicesBloc>(
         create: (BuildContext context) => deps.di<DevicesBloc>()..add(const DevicesStarted()),
         child: app,
@@ -62,25 +71,26 @@ void main() {
       await tester.tap(find.byTooltip('Adicionar site'));
       await tester.pump();
       expect(find.text('Digite um endereço válido, por exemplo exemplo.com.br'), findsOneWidget);
-      expect(find.text('Alterações não salvas'), findsNothing);
+      expect(unsaved, findsNothing);
 
       await tester.enterText(find.byType(TextField), 'https://www.Jogos.com/inicio');
       await tester.tap(find.byTooltip('Adicionar site'));
       await settle(tester);
       expect(find.text('jogos.com'), findsOneWidget);
       expect(find.text('Digite um endereço válido, por exemplo exemplo.com.br'), findsNothing);
-      expect(find.text('Alterações não salvas'), findsOneWidget);
+      expect(unsaved, findsOneWidget);
 
       await tester.enterText(find.byType(TextField), 'jogos.com');
       await tester.tap(find.byTooltip('Adicionar site'));
       await tester.pump();
       expect(find.text('Esse site já está na lista.'), findsOneWidget);
 
-      final InputChip chip = tester.widget<InputChip>(find.widgetWithText(InputChip, 'jogos.com'));
-      expect(chip.deleteButtonTooltipMessage, 'Remover jogos.com');
-      chip.onDeleted!();
+      await tester.tap(find.byTooltip('Remover jogos.com'));
       await settle(tester);
       expect(find.text('Nenhum site bloqueado individualmente.'), findsOneWidget);
+      await tester.tap(find.text('Desfazer'));
+      await settle(tester);
+      expect(find.byTooltip('Remover jogos.com'), findsOneWidget);
     });
 
     testWidgets('modo só autorizados troca as listas e avisa da lista vazia', (
@@ -90,7 +100,7 @@ void main() {
       await pumpBlocking(tester, location: RulesPaths.web);
 
       expect(find.text('Categorias bloqueadas'), findsOneWidget);
-      await tester.tap(find.text('Só autorizados'));
+      await tester.tap(find.text('Só os sites que você autorizar'));
       await settle(tester);
 
       expect(find.text('Categorias bloqueadas'), findsNothing);
@@ -123,14 +133,18 @@ void main() {
       await pumpBlocking(tester, location: RulesPaths.protection);
 
       expect(find.text('Disponíveis só no modo dispositivo gerenciado.'), findsOneWidget);
-      final SwitchListTile uninstall = tester.widget<SwitchListTile>(
-        find.widgetWithText(SwitchListTile, 'Impedir a desinstalação do ParentaLynx'),
-      );
-      expect(uninstall.onChanged, isNull);
+      // Sem dispositivo gerenciado as travas nao aparecem como ligadas: so a explicacao.
+      expect(find.text('Impedir a desinstalação do ParentaLynx'), findsNothing);
+      expect(find.byType(Switch), findsOneWidget);
+      await tester.tap(find.text('Ver o que as travas fazem'));
+      await settle(tester);
+      expect(find.text('Impedir a desinstalação do ParentaLynx'), findsOneWidget);
+      await tester.tap(find.byTooltip('Fechar'));
+      await settle(tester);
 
       await tester.tap(find.text('Bloquear se a proteção for desativada'));
       await settle(tester);
-      expect(find.text('Alterações não salvas'), findsOneWidget);
+      expect(unsaved, findsOneWidget);
     });
 
     testWidgets('dispositivo gerenciado libera as travas do sistema', (WidgetTester tester) async {
@@ -140,7 +154,58 @@ void main() {
       expect(find.text('Aplicadas pelo próprio Android neste aparelho.'), findsOneWidget);
       await tester.tap(find.text('Impedir a depuração USB'));
       await settle(tester);
-      expect(find.text('Alterações não salvas'), findsOneWidget);
+      expect(unsaved, findsOneWidget);
     });
+  });
+
+  group('aparência', () {
+    for (final Brightness brightness in Brightness.values) {
+      final String theme = brightness == Brightness.light ? 'claro' : 'escuro';
+      testWidgets('navegação ($theme)', tags: 'screenshot', (WidgetTester tester) async {
+        installStandardRoutes(deps.backend);
+        await pumpBlocking(
+          tester,
+          location: RulesPaths.web,
+          size: const Size(392, 2000),
+          brightness: brightness,
+        );
+        await expectScreenshot(tester, 'rules_navegacao_$theme');
+      });
+
+      testWidgets('proteção ($theme)', tags: 'screenshot', (WidgetTester tester) async {
+        installStandardRoutes(deps.backend);
+        await pumpBlocking(
+          tester,
+          location: RulesPaths.protection,
+          size: const Size(392, 1500),
+          brightness: brightness,
+        );
+        await expectScreenshot(tester, 'rules_protecao_$theme');
+      });
+    }
+
+    testWidgets('proteção com dispositivo gerenciado', tags: 'screenshot', (
+      WidgetTester tester,
+    ) async {
+      installStandardRoutes(deps.backend, device: deviceJson(managementMode: 'device_owner'));
+      await pumpBlocking(tester, location: RulesPaths.protection, size: const Size(392, 1900));
+      await expectScreenshot(tester, 'rules_protecao_gerenciado');
+    });
+
+    for (final String location in <String>[RulesPaths.web, RulesPaths.protection]) {
+      testWidgets('$location segue as diretrizes de acessibilidade', (WidgetTester tester) async {
+        installStandardRoutes(deps.backend);
+        await pumpBlocking(tester, location: location, size: const Size(392, 2000));
+        await expectAccessible(tester);
+      });
+
+      testWidgets('$location funciona com a fonte no maior tamanho', (WidgetTester tester) async {
+        installStandardRoutes(deps.backend, device: deviceJson(managementMode: 'device_owner'));
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        await pumpBlocking(tester, location: location, size: const Size(392, 5000));
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 }

@@ -15,7 +15,7 @@ enum SectionSaveStatus {
   saved,
 
   /// A mesma secao mudou em outra sessao. A versao do servidor foi carregada e as alteracoes
-  /// locais descartadas.
+  /// locais ficaram guardadas em [PolicySectionEditing.rejected].
   conflict,
 
   /// O envio falhou. As alteracoes continuam no rascunho.
@@ -59,6 +59,7 @@ final class PolicySectionEditing<T> extends PolicySectionState<T> {
     required this.draft,
     this.status = SectionSaveStatus.idle,
     this.failure,
+    this.rejected,
   });
 
   final String deviceId;
@@ -76,6 +77,10 @@ final class PolicySectionEditing<T> extends PolicySectionState<T> {
   /// Motivo da ultima falha de envio, quando [status] e [SectionSaveStatus.failed].
   final AppFailure? failure;
 
+  /// Alteracoes recusadas pelo ultimo conflito, quando [status] e
+  /// [SectionSaveStatus.conflict]: a pessoa pode refaze-las sobre a versao nova.
+  final T? rejected;
+
   /// Verdadeiro quando ha alteracoes locais nao salvas.
   bool get isDirty => draft != saved;
 
@@ -87,6 +92,7 @@ final class PolicySectionEditing<T> extends PolicySectionState<T> {
     T? draft,
     SectionSaveStatus? status,
     AppFailure? failure,
+    T? rejected,
   }) {
     return PolicySectionEditing<T>(
       deviceId: deviceId,
@@ -95,9 +101,10 @@ final class PolicySectionEditing<T> extends PolicySectionState<T> {
       draft: draft ?? this.draft,
       status: status ?? this.status,
       failure: failure,
+      rejected: rejected,
     );
   }
 
   @override
-  List<Object?> get props => <Object?>[deviceId, base, saved, draft, status, failure];
+  List<Object?> get props => <Object?>[deviceId, base, saved, draft, status, failure, rejected];
 }

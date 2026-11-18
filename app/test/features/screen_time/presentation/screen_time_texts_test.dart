@@ -20,5 +20,15 @@ void main() {
         '6h 15min por dia',
       );
     });
+
+    test('semana por valor', () {
+      expect(weekLimitsSummary(const DailyLimit(enabled: true, minutes: 120)), 'Todos os dias: 2h');
+      expect(
+        weekLimitsSummary(
+          const DailyLimit(enabled: true, minutes: 150, perWeekday: <int, int>{6: 240, 7: 240}),
+        ),
+        'Seg a sex: 2h 30min · sáb e dom: 4h',
+      );
+    });
   });
 }

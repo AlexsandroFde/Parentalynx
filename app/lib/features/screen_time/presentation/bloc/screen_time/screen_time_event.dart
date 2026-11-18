@@ -98,3 +98,8 @@ final class _ScreenTimeServerVersionChanged extends ScreenTimeEvent {
   @override
   List<Object?> get props => <Object?>[version];
 }
+
+/// Refaz as alteracoes recusadas por um conflito sobre a versao atual.
+final class ScreenTimeRejectedChangesRestored extends ScreenTimeEvent {
+  const ScreenTimeRejectedChangesRestored();
+}

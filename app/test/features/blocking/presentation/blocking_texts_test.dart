@@ -6,10 +6,10 @@ import 'package:parentalynx/features/device_policy/domain/entities/policy.dart';
 void main() {
   group('resumos', () {
     test('web e protecao', () {
-      expect(webSummary(const WebPolicy(managedBrowser: false)), 'Navegador gerenciado desligado');
+      expect(webSummary(const WebPolicy(managedBrowser: false)), 'Navegador ParentaLynx desligado');
       expect(
         webSummary(const WebPolicy(mode: WebMode.allowlist, allowedDomains: <String>['a.com'])),
-        'Só sites autorizados (1)',
+        'Só 1 site autorizado',
       );
       expect(webSummary(const WebPolicy()), 'Bloqueia: 2 categorias, filtro familiar');
       expect(

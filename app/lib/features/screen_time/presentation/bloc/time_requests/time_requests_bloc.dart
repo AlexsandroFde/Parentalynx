@@ -98,7 +98,8 @@ class TimeRequestsBloc extends Bloc<TimeRequestsEvent, TimeRequestsState> {
       emit,
       event.request,
       () => _approveTimeRequest(event.request.id, minutes: event.minutes),
-      success: '${formatMinutes(event.minutes)} a mais para $who.',
+      success:
+          '${formatMinutes(event.minutes)} a mais para $who hoje. O aparelho recebe em instantes.',
     );
   }
 
@@ -107,7 +108,7 @@ class TimeRequestsBloc extends Bloc<TimeRequestsEvent, TimeRequestsState> {
       emit,
       event.request,
       () => _denyTimeRequest(event.request.id),
-      success: 'Pedido negado.',
+      success: 'Pedido negado. ${_who(event.request)} recebe o aviso.',
     );
   }
 

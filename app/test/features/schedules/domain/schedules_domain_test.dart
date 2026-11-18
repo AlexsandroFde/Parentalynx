@@ -54,6 +54,27 @@ void main() {
       expect(validateDayWindow(const LocalTime(8, 0), LocalTime.endOfDay), isNull);
     });
 
+    test('janela nova nao pode cobrir horario ja liberado no dia', () {
+      const List<DayWindow> day = <DayWindow>[DayWindow(LocalTime(7, 0), LocalTime(12, 0))];
+      expect(
+        validateNewDayWindow(day, const DayWindow(LocalTime(11, 0), LocalTime(14, 0))),
+        'Esse horário se sobrepõe a 07:00 às 12:00. Ajuste o início ou o fim.',
+      );
+      expect(
+        validateNewDayWindow(day, const DayWindow(LocalTime(7, 0), LocalTime(12, 0))),
+        'Esse horário já está liberado neste dia.',
+      );
+      expect(
+        validateNewDayWindow(day, const DayWindow(LocalTime(14, 0), LocalTime(12, 0))),
+        isNotNull,
+      );
+      // Encostar no fim de outra janela nao e sobrepor.
+      expect(
+        validateNewDayWindow(day, const DayWindow(LocalTime(12, 0), LocalTime(14, 0))),
+        isNull,
+      );
+    });
+
     test('ligar sem janelas comeca com um horario comum todos os dias', () {
       final AllowedHours enabled = withAllowedHoursEnabled(AllowedHours.disabled, true);
       expect(enabled.enabled, isTrue);
@@ -92,6 +113,14 @@ void main() {
         'O fim precisa ser depois do início.',
       );
       expect(draft().problem, isNull);
+      expect(
+        draft(
+          kind: BlockPeriodKind.once,
+          endAt: now.add(const Duration(hours: 1)),
+        ).problemAt(now.add(const Duration(hours: 2))),
+        'Esse período já terminou. Escolha um fim depois de agora.',
+      );
+      expect(draft().problemAt(now.add(const Duration(days: 30))), isNull);
 
       final BlockPeriod period = draft(label: ' Hora de dormir ').toPeriod('p9');
       expect(period.id, 'p9');

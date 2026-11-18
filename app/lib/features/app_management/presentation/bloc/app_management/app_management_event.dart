@@ -69,3 +69,8 @@ final class _AppManagementServerVersionChanged extends AppManagementEvent {
   @override
   List<Object?> get props => <Object?>[version];
 }
+
+/// Refaz as alteracoes recusadas por um conflito sobre a versao atual.
+final class AppManagementRejectedChangesRestored extends AppManagementEvent {
+  const AppManagementRejectedChangesRestored();
+}

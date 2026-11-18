@@ -119,3 +119,8 @@ final class _WebFilterServerVersionChanged extends WebFilterEvent {
   @override
   List<Object?> get props => <Object?>[version];
 }
+
+/// Refaz as alteracoes recusadas por um conflito sobre a versao atual.
+final class WebFilterRejectedChangesRestored extends WebFilterEvent {
+  const WebFilterRejectedChangesRestored();
+}
