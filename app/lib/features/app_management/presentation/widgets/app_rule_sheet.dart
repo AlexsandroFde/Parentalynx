@@ -1,37 +1,15 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../../../core/time/formatters.dart';
-import '../../../../shared/domain/policy.dart';
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/duration_picker.dart';
 import '../../../../shared/widgets/feedback_views.dart';
-import '../../apps/domain/app_entry.dart';
-import '../../apps/presentation/app_icon.dart';
-import '../domain/app_rules_editing.dart';
-import 'widgets/duration_picker.dart';
-import 'widgets/rule_scaffold.dart';
-
-/// Cor, icone e texto de cada estado efetivo de um app.
-extension EffectiveAppStateUi on EffectiveAppState {
-  Tone get tone {
-    return switch (this) {
-      EffectiveAppState.allowed => Tone.neutral,
-      EffectiveAppState.blocked => Tone.danger,
-      EffectiveAppState.exception => Tone.success,
-      EffectiveAppState.pendingApproval => Tone.warning,
-      EffectiveAppState.essential => Tone.info,
-    };
-  }
-
-  IconData get icon {
-    return switch (this) {
-      EffectiveAppState.allowed => Icons.check,
-      EffectiveAppState.blocked => Icons.block,
-      EffectiveAppState.exception => Icons.verified_outlined,
-      EffectiveAppState.pendingApproval => Icons.hourglass_empty,
-      EffectiveAppState.essential => Icons.lock_outline,
-    };
-  }
-}
+import '../../../device_policy/domain/entities/policy.dart';
+import '../../../device_policy/presentation/widgets/rule_editor_scaffold.dart';
+import '../../domain/entities/app_entry.dart';
+import '../../domain/entities/effective_app_state.dart';
+import '../../domain/services/app_rules_editing.dart';
+import 'app_icon_view.dart';
 
 /// Abre a folha de regra de um app. Devolve a regra escolhida, ou nulo se nada mudou.
 Future<AppRule?> showAppRuleSheet(
@@ -89,13 +67,8 @@ class _AppRuleSheetState extends State<_AppRuleSheet> {
       Navigator.of(context).pop();
       return;
     }
-    Navigator.of(context).pop(
-      AppRule(
-        state: state,
-        countsTowardLimit: state == AppRuleState.exception && _counts,
-        dailyLimitMinutes: state == AppRuleState.blocked ? null : _limit,
-      ),
-    );
+    Navigator.of(context)
+        .pop(composeAppRule(state: state, countsTowardLimit: _counts, dailyLimitMinutes: _limit));
   }
 
   @override

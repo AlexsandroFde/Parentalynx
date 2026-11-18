@@ -1,56 +1,46 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../../../core/time/formatters.dart';
-import '../../../../shared/domain/policy.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../apps/data/apps_repository.dart';
-import '../../apps/domain/app_entry.dart';
-import '../../apps/presentation/app_icon.dart';
-import '../domain/app_rules_editing.dart';
-import 'app_rule_sheet.dart';
-import 'widgets/policy_sync_status.dart';
-import 'widgets/rule_scaffold.dart';
-
-enum _StateFilter {
-  all('Todos'),
-  allowed('Permitidos'),
-  blocked('Bloqueados'),
-  exception('Exceções'),
-  pending('Aguardando');
-
-  const _StateFilter(this.label);
-
-  final String label;
-
-  bool matches(EffectiveAppState state) {
-    return switch (this) {
-      _StateFilter.all => true,
-      _StateFilter.allowed => state == EffectiveAppState.allowed,
-      _StateFilter.blocked => state == EffectiveAppState.blocked,
-      _StateFilter.exception => state == EffectiveAppState.exception,
-      _StateFilter.pending => state == EffectiveAppState.pendingApproval,
-    };
-  }
-}
+import '../../../child_device/domain/entities/child_device.dart';
+import '../../../device_policy/domain/entities/policy.dart';
+import '../../../device_policy/presentation/widgets/rule_editor_scaffold.dart';
+import '../../../device_sync/presentation/widgets/policy_sync_status_view.dart';
+import '../../domain/entities/app_entry.dart';
+import '../../domain/entities/app_list_filter.dart';
+import '../../domain/entities/effective_app_state.dart';
+import '../../domain/services/app_list_query.dart';
+import '../../domain/services/app_rules_editing.dart';
+import '../bloc/app_inventory/app_inventory_bloc.dart';
+import '../bloc/app_management/app_management_bloc.dart';
+import '../widgets/app_icon_view.dart';
+import '../widgets/app_rule_sheet.dart';
+import '../widgets/effective_app_state_ui.dart';
 
 /// Lista dos apps instalados no aparelho, com o estado de cada um e a edicao por app.
-class AppsRulesPage extends ConsumerStatefulWidget {
-  const AppsRulesPage({this.initialCategory, super.key});
+///
+/// Espera um [AppManagementBloc] (regras) e um [AppInventoryBloc] (inventario e filtros)
+/// acima na arvore, ja iniciados para [device].
+class AppsRulesPage extends StatefulWidget {
+  const AppsRulesPage({required this.device, super.key});
 
-  /// Categoria ja selecionada ao abrir (por exemplo navegadores).
-  final AppCategory? initialCategory;
+  final ChildDevice device;
 
   @override
-  ConsumerState<AppsRulesPage> createState() => _AppsRulesPageState();
+  State<AppsRulesPage> createState() => _AppsRulesPageState();
 }
 
-class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
+class _AppsRulesPageState extends State<AppsRulesPage> {
   final TextEditingController _search = TextEditingController();
-  _StateFilter _filter = _StateFilter.all;
-  late AppCategory? _category = widget.initialCategory;
+
+  @override
+  void initState() {
+    super.initState();
+    _search.text = context.read<AppInventoryBloc>().state.filter.query;
+  }
 
   @override
   void dispose() {
@@ -58,64 +48,21 @@ class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
     super.dispose();
   }
 
-  static KnownApp _known(AppEntry app) {
-    return (package: app.package, system: app.system, essential: app.essential);
-  }
-
-  List<AppEntry> _visible(List<AppEntry> apps, AppsPolicy policy) {
-    final String query = _search.text.trim().toLowerCase();
-    final List<AppEntry> result = apps.where((AppEntry app) {
-      final bool listed = app.isUserFacing || policy.rules.containsKey(app.package);
-      if (!listed || (app.removed && !policy.rules.containsKey(app.package))) {
-        return false;
-      }
-      if (_category != null && app.category != _category) {
-        return false;
-      }
-      if (query.isNotEmpty &&
-          !app.label.toLowerCase().contains(query) &&
-          !app.package.toLowerCase().contains(query)) {
-        return false;
-      }
-      return _filter.matches(
-        effectiveAppState(
-          policy,
-          package: app.package,
-          system: app.system,
-          essential: app.essential,
-        ),
-      );
-    }).toList();
-    result.sort((AppEntry a, AppEntry b) {
-      if (a.essential != b.essential) {
-        return a.essential ? 1 : -1;
-      }
-      return a.label.toLowerCase().compareTo(b.label.toLowerCase());
-    });
-    return result;
-  }
-
-  Future<void> _openApp(RuleEditing editing, AppEntry app) async {
-    final AppsPolicy policy = editing.draft.apps;
+  Future<void> _openApp(AppsPolicy policy, AppEntry app) async {
+    final AppManagementBloc rules = context.read<AppManagementBloc>();
     final AppRule? rule = await showAppRuleSheet(
       context,
       app: app,
       rule: policy.rules[app.package],
-      state: effectiveAppState(
-        policy,
-        package: app.package,
-        system: app.system,
-        essential: app.essential,
-      ),
+      state: effectiveStateOf(policy, app),
     );
     if (rule != null) {
-      editing.update(
-        (Policy p) => p.copyWith(apps: setAppRule(p.apps, app.package, rule, system: app.system)),
-      );
+      rules.add(AppRuleChanged(app: knownAppOf(app), rule: rule));
     }
   }
 
-  Future<void> _applyToAll(RuleEditing editing, List<AppEntry> listed, AppRuleState state) async {
+  Future<void> _applyToAll(List<AppEntry> listed, AppRuleState state) async {
+    final AppManagementBloc rules = context.read<AppManagementBloc>();
     final List<AppEntry> targets = listed.where((AppEntry app) => !app.essential).toList();
     if (targets.isEmpty) {
       return;
@@ -133,38 +80,47 @@ class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
       destructive: state == AppRuleState.blocked,
     );
     if (confirmed) {
-      editing.update(
-        (Policy p) => p.copyWith(apps: setStateForMany(p.apps, targets.map(_known), state)),
-      );
+      rules.add(AppRulesAppliedToMany(apps: targets.map(knownAppOf).toList(), state: state));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return RuleEditorScaffold(
+    final AppManagementBloc rules = context.read<AppManagementBloc>();
+    return RuleEditorScaffold<AppManagementBloc, AppsPolicy>(
       title: 'Aplicativos',
-      body: (BuildContext context, RuleEditing editing) {
-        final AsyncValue<DeviceApps> apps = ref.watch(deviceAppsProvider(editing.device.id));
-        return AsyncValueView<DeviceApps>(
-          value: apps,
-          loadingMessage: 'Carregando os apps do aparelho',
-          onRetry: () => ref.invalidate(deviceAppsProvider(editing.device.id)),
-          data: (DeviceApps data) => _buildList(context, editing, data),
+      device: widget.device,
+      onSave: () => rules.add(const AppManagementSaveRequested()),
+      onDiscard: () => rules.add(const AppManagementDiscardRequested()),
+      onRetry: () => rules.add(AppManagementStarted(widget.device.id)),
+      body: (BuildContext context, AppsPolicy policy) {
+        return BlocBuilder<AppInventoryBloc, AppInventoryState>(
+          builder: (BuildContext context, AppInventoryState inventory) {
+            return switch (inventory) {
+              AppInventoryLoading() => const LoadingView(message: 'Carregando os apps do aparelho'),
+              AppInventoryError(:final failure) => FailureView(
+                error: failure,
+                onRetry: () {
+                  context.read<AppInventoryBloc>().add(const AppInventoryRetryRequested());
+                },
+              ),
+              AppInventoryLoaded() => _buildList(context, policy, inventory),
+            };
+          },
         );
       },
     );
   }
 
-  Widget _buildList(BuildContext context, RuleEditing editing, DeviceApps data) {
+  Widget _buildList(BuildContext context, AppsPolicy policy, AppInventoryLoaded inventory) {
     final ThemeData theme = Theme.of(context);
-    final AppsPolicy policy = editing.draft.apps;
-    final List<AppEntry> visible = _visible(data.apps, policy);
-    final Set<AppCategory> categories = data.apps
-        .where((AppEntry app) => app.isUserFacing)
-        .map((AppEntry app) => app.category)
-        .toSet();
-    final bool narrowed =
-        _filter != _StateFilter.all || _category != null || _search.text.trim().isNotEmpty;
+    final AppManagementBloc rules = context.read<AppManagementBloc>();
+    final AppInventoryBloc list = context.read<AppInventoryBloc>();
+    final AppListFilter filter = inventory.filter;
+    final List<AppEntry> apps = inventory.inventory.apps;
+    final List<AppEntry> visible = visibleApps(apps, policy, filter);
+    final Set<AppCategory> categories = categoriesOf(apps);
+    final bool narrowed = filter.isNarrowed;
 
     return Align(
       alignment: Alignment.topCenter,
@@ -176,20 +132,21 @@ class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
               sliver: SliverList.list(
                 children: <Widget>[
-                  PolicySyncStatus(device: editing.device),
+                  PolicySyncStatusView(status: widget.device.policySync),
                   const SizedBox(height: AppSpacing.md),
                   _NewAppsCard(
                     value: policy.defaultForNewApps,
-                    onChanged: (NewAppDefault value) => editing.update(
-                      (Policy p) => p.copyWith(
-                        apps: setNewAppDefault(p.apps, value, knownApps: data.apps.map(_known)),
+                    onChanged: (NewAppDefault value) => rules.add(
+                      NewAppDefaultChanged(
+                        value: value,
+                        installedApps: apps.map(knownAppOf).toList(),
                       ),
                     ),
                   ),
                   const SizedBox(height: AppSpacing.md),
                   TextField(
                     controller: _search,
-                    onChanged: (_) => setState(() {}),
+                    onChanged: (String value) => list.add(AppListQueryChanged(value)),
                     textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
                       hintText: 'Buscar por nome ou pacote',
@@ -199,7 +156,10 @@ class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
                           : IconButton(
                               tooltip: 'Limpar busca',
                               icon: const Icon(Icons.close),
-                              onPressed: () => setState(_search.clear),
+                              onPressed: () {
+                                _search.clear();
+                                list.add(const AppListQueryChanged(''));
+                              },
                             ),
                     ),
                   ),
@@ -208,15 +168,15 @@ class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
                     scrollDirection: Axis.horizontal,
                     child: Row(
                       children: <Widget>[
-                        for (final _StateFilter filter in _StateFilter.values)
-                          if (filter != _StateFilter.pending ||
+                        for (final AppStateFilter option in AppStateFilter.values)
+                          if (option != AppStateFilter.pending ||
                               policy.defaultForNewApps == NewAppDefault.blocked)
                             Padding(
                               padding: const EdgeInsets.only(right: AppSpacing.sm),
                               child: ChoiceChip(
-                                label: Text(filter.label),
-                                selected: _filter == filter,
-                                onSelected: (_) => setState(() => _filter = filter),
+                                label: Text(option.label),
+                                selected: filter.state == option,
+                                onSelected: (_) => list.add(AppListStateFilterChanged(option)),
                               ),
                             ),
                       ],
@@ -229,7 +189,9 @@ class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
                           alignment: Alignment.centerLeft,
                           child: PopupMenuButton<AppCategory?>(
                             tooltip: 'Filtrar por categoria',
-                            onSelected: (AppCategory? value) => setState(() => _category = value),
+                            onSelected: (AppCategory? value) {
+                              list.add(AppListCategoryChanged(value));
+                            },
                             itemBuilder: (BuildContext context) {
                               return <PopupMenuEntry<AppCategory?>>[
                                 const PopupMenuItem<AppCategory?>(
@@ -251,7 +213,7 @@ class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
                                   const Icon(Icons.filter_list, size: 20),
                                   const SizedBox(width: 6),
                                   Text(
-                                    _category?.label ?? 'Todas as categorias',
+                                    filter.category?.label ?? 'Todas as categorias',
                                     style: theme.textTheme.labelLarge,
                                   ),
                                   const Icon(Icons.arrow_drop_down),
@@ -264,7 +226,7 @@ class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
                       if (narrowed && visible.isNotEmpty)
                         PopupMenuButton<AppRuleState>(
                           tooltip: 'Aplicar a todos da lista',
-                          onSelected: (AppRuleState state) => _applyToAll(editing, visible, state),
+                          onSelected: (AppRuleState state) => _applyToAll(visible, state),
                           itemBuilder: (BuildContext context) {
                             return const <PopupMenuEntry<AppRuleState>>[
                               PopupMenuItem<AppRuleState>(
@@ -322,13 +284,8 @@ class _AppsRulesPageState extends ConsumerState<AppsRulesPage> {
                     return _AppTile(
                       app: app,
                       rule: policy.rules[app.package],
-                      state: effectiveAppState(
-                        policy,
-                        package: app.package,
-                        system: app.system,
-                        essential: app.essential,
-                      ),
-                      onTap: () => _openApp(editing, app),
+                      state: effectiveStateOf(policy, app),
+                      onTap: () => _openApp(policy, app),
                     );
                   },
                 ),

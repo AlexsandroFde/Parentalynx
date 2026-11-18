@@ -1,30 +1,18 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../core/errors/app_failure.dart';
-import '../../../../core/network/api_client.dart';
-import '../../../../core/network/network_providers.dart';
-import '../domain/app_entry.dart';
-
-/// Cria o provedor de imagem de um icone autenticado. Os testes trocam por um que devolve
-/// nulo, para nao fazer rede.
-typedef AppIconImageFactory = ImageProvider<Object>? Function(Uri uri, Map<String, String> headers);
-
-final Provider<AppIconImageFactory> appIconImageFactoryProvider = Provider<AppIconImageFactory>((
-  Ref ref,
-) {
-  return (Uri uri, Map<String, String> headers) => NetworkImage(uri.toString(), headers: headers);
-});
+import '../../domain/entities/app_entry.dart';
+import '../services/app_icon_images.dart';
 
 /// Icone de um app do aparelho monitorado.
 ///
-/// O icone vem do servidor por um caminho autenticado. Enquanto carrega, se nao existir ou se
-/// falhar, mostra a inicial do app sobre uma cor derivada do nome do pacote.
-class AppIconView extends ConsumerWidget {
+/// O icone vem do servidor pelo [AppIconImages] da arvore de widgets. Enquanto carrega, se nao
+/// existir ou se falhar, mostra a inicial do app sobre uma cor derivada do nome do pacote.
+class AppIconView extends StatelessWidget {
   const AppIconView({
     required this.package,
     required this.label,
-    this.iconUrl,
+    this.iconPath,
     this.size = 40,
     super.key,
   });
@@ -33,7 +21,7 @@ class AppIconView extends ConsumerWidget {
     return AppIconView(
       package: app.package,
       label: app.label,
-      iconUrl: app.iconUrl,
+      iconPath: app.iconPath,
       size: size,
       key: key,
     );
@@ -41,13 +29,13 @@ class AppIconView extends ConsumerWidget {
 
   final String package;
   final String label;
-  final String? iconUrl;
+  final String? iconPath;
   final double size;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     final Widget fallback = _LetterIcon(package: package, label: label, size: size);
-    final ImageProvider<Object>? image = _resolveImage(ref);
+    final ImageProvider<Object>? image = context.read<AppIconImages>().imageFor(iconPath);
     if (image == null) {
       return fallback;
     }
@@ -66,25 +54,6 @@ class AppIconView extends ConsumerWidget {
         errorBuilder: (BuildContext context, Object error, StackTrace? stack) => fallback,
       ),
     );
-  }
-
-  ImageProvider<Object>? _resolveImage(WidgetRef ref) {
-    final String? path = iconUrl;
-    if (path == null || path.isEmpty) {
-      return null;
-    }
-    final ApiClient api = ref.watch(apiClientProvider);
-    try {
-      final Uri relative = Uri.parse(path);
-      final Uri absolute = relative.hasScheme
-          ? relative
-          : api.resolve(relative.path, query: relative.queryParameters);
-      return ref.watch(appIconImageFactoryProvider)(absolute, api.sessionHeaders());
-    } on AppFailure {
-      return null;
-    } on FormatException {
-      return null;
-    }
   }
 }
 

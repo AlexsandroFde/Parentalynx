@@ -1,7 +1,11 @@
-import '../../../../core/json/json_reader.dart';
-import '../../../../shared/domain/policy.dart';
+import 'package:equatable/equatable.dart';
+
+import '../../../device_policy/domain/entities/policy.dart';
 
 /// Categoria de um app, como o aparelho a identifica (protocolo, secao 5.1).
+///
+/// O [code] e o identificador usado na politica e nos caminhos de navegacao (filtro por
+/// categoria).
 enum AppCategory {
   games('games', 'Jogos'),
   social('social', 'Redes sociais'),
@@ -32,7 +36,7 @@ enum AppCategory {
 }
 
 /// App do inventario do aparelho visto pelo responsavel (protocolo, secao 5.1, `AppEntry`).
-class AppEntry {
+final class AppEntry extends Equatable {
   const AppEntry({
     required this.package,
     required this.label,
@@ -47,31 +51,9 @@ class AppEntry {
     required this.removed,
     this.versionName,
     this.installedAt,
-    this.iconUrl,
+    this.iconPath,
     this.dailyLimitMinutes,
   });
-
-  factory AppEntry.fromJson(JsonMap json) {
-    final String package = json.str('package');
-    final String? label = json.strOrNull('label');
-    return AppEntry(
-      package: package,
-      label: label == null || label.trim().isEmpty ? package : label,
-      category: AppCategory.parse(json.strOrNull('category')),
-      system: json.boolOr('system', fallback: false),
-      launchable: json.boolOr('launchable', fallback: true),
-      essential: json.boolOr('essential', fallback: false),
-      versionName: json.strOrNull('versionName'),
-      installedAt: json.intOrNull('installedAt'),
-      iconUrl: json.strOrNull('iconUrl'),
-      state: AppRuleState.parse(json.strOrNull('state') ?? 'allowed'),
-      countsTowardLimit: json.boolOr('countsTowardLimit', fallback: false),
-      dailyLimitMinutes: json.intOrNull('dailyLimitMinutes'),
-      todayMs: json.intOr('todayMs', fallback: 0),
-      weekMs: json.intOr('weekMs', fallback: 0),
-      removed: json.boolOr('removed', fallback: false),
-    );
-  }
 
   final String package;
   final String label;
@@ -86,8 +68,8 @@ class AppEntry {
   final String? versionName;
   final int? installedAt;
 
-  /// Caminho relativo e autenticado do icone, ou nulo.
-  final String? iconUrl;
+  /// Caminho do icone no servidor, quando ha um.
+  final String? iconPath;
 
   /// Estado gravado na politica do servidor. As telas de edicao usam o rascunho local.
   final AppRuleState state;
@@ -102,18 +84,30 @@ class AppEntry {
   /// Apps que fazem sentido na lista de regras: com icone no launcher ou instalados pelo
   /// usuario. Componentes internos do sistema ficam de fora.
   bool get isUserFacing => launchable || !system;
+
+  @override
+  List<Object?> get props => <Object?>[
+    package,
+    label,
+    category,
+    system,
+    launchable,
+    essential,
+    versionName,
+    installedAt,
+    iconPath,
+    state,
+    countsTowardLimit,
+    dailyLimitMinutes,
+    todayMs,
+    weekMs,
+    removed,
+  ];
 }
 
 /// Inventario de um aparelho com o dia da cota a que os tempos de hoje se referem.
-class DeviceApps {
+final class DeviceApps extends Equatable {
   const DeviceApps({required this.day, required this.apps});
-
-  factory DeviceApps.fromJson(JsonMap json) {
-    return DeviceApps(
-      day: json.strOrNull('day') ?? '',
-      apps: json.objList('apps').map(AppEntry.fromJson).toList(),
-    );
-  }
 
   final String day;
   final List<AppEntry> apps;
@@ -124,4 +118,7 @@ class DeviceApps {
       ..sort((AppEntry a, AppEntry b) => b.todayMs.compareTo(a.todayMs));
     return used.length > limit ? used.sublist(0, limit) : used;
   }
+
+  @override
+  List<Object?> get props => <Object?>[day, apps];
 }

@@ -1,6 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../domain/app_entry.dart';
+import '../../domain/entities/app_entry.dart';
 
 /// Icone que representa cada categoria de app na interface.
 extension AppCategoryUi on AppCategory {

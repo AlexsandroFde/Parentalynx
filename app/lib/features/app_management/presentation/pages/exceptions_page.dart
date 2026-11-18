@@ -1,42 +1,47 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
+import '../../../../core/constants/route_paths.dart';
 import '../../../../core/time/formatters.dart';
-import '../../../../shared/domain/policy.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../apps/data/apps_repository.dart';
-import '../../apps/domain/app_entry.dart';
-import '../../apps/presentation/app_icon.dart';
-import '../domain/app_rules_editing.dart';
-import '../rules_paths.dart';
-import 'widgets/rule_scaffold.dart';
+import '../../../child_device/domain/entities/child_device.dart';
+import '../../../device_policy/domain/entities/policy.dart';
+import '../../../device_policy/presentation/widgets/rule_editor_scaffold.dart';
+import '../../domain/entities/app_entry.dart';
+import '../../domain/services/app_list_query.dart';
+import '../bloc/app_inventory/app_inventory_bloc.dart';
+import '../bloc/app_management/app_management_bloc.dart';
+import '../widgets/app_icon_view.dart';
 
 /// O que continua disponivel durante um bloqueio geral: o que o sistema sempre mantem e os
 /// apps que o responsavel liberou como excecao.
-class ExceptionsPage extends ConsumerWidget {
-  const ExceptionsPage({super.key});
+///
+/// Espera um [AppManagementBloc] e um [AppInventoryBloc] acima na arvore, ja iniciados.
+class ExceptionsPage extends StatelessWidget {
+  const ExceptionsPage({required this.device, super.key});
+
+  final ChildDevice device;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return RuleEditorScaffold(
+  Widget build(BuildContext context) {
+    final AppManagementBloc rules = context.read<AppManagementBloc>();
+    return RuleEditorScaffold<AppManagementBloc, AppsPolicy>(
       title: 'Exceções e funções essenciais',
-      children: (BuildContext context, RuleEditing editing) {
+      device: device,
+      onSave: () => rules.add(const AppManagementSaveRequested()),
+      onDiscard: () => rules.add(const AppManagementDiscardRequested()),
+      onRetry: () => rules.add(AppManagementStarted(device.id)),
+      children: (BuildContext context, AppsPolicy apps) {
         final ThemeData theme = Theme.of(context);
-        final List<AppEntry> inventory =
-            ref.watch(deviceAppsProvider(editing.device.id)).value?.apps ?? const <AppEntry>[];
+        final List<AppEntry> inventory = context.watch<AppInventoryBloc>().state.appsOrEmpty;
         final Map<String, AppEntry> byPackage = <String, AppEntry>{
           for (final AppEntry app in inventory) app.package: app,
         };
-        final AppsPolicy apps = editing.draft.apps;
-        final List<MapEntry<String, AppRule>> exceptions = apps.rules.entries
-            .where((MapEntry<String, AppRule> entry) => entry.value.state == AppRuleState.exception)
-            .toList();
-        final List<AppEntry> essentials = inventory
-            .where((AppEntry app) => app.essential && app.launchable)
-            .toList();
+        final List<MapEntry<String, AppRule>> exceptions = exceptionRules(apps);
+        final List<AppEntry> essentials = essentialApps(inventory);
 
         return <Widget>[
           const NoticeBanner(
@@ -115,14 +120,14 @@ class ExceptionsPage extends ConsumerWidget {
                       package: entry.key,
                       app: byPackage[entry.key],
                       rule: entry.value,
-                      onRemove: () => editing.update(
-                        (Policy p) => p.copyWith(
-                          apps: setAppRule(
-                            p.apps,
-                            entry.key,
-                            entry.value.withState(AppRuleState.allowed),
+                      onRemove: () => rules.add(
+                        AppRuleChanged(
+                          app: (
+                            package: entry.key,
                             system: byPackage[entry.key]?.system ?? false,
+                            essential: false,
                           ),
+                          rule: entry.value.withState(AppRuleState.allowed),
                         ),
                       ),
                     ),
@@ -183,7 +188,7 @@ class _ExceptionRow extends StatelessWidget {
     ];
     return ListTile(
       contentPadding: EdgeInsets.zero,
-      leading: AppIconView(package: package, label: label, iconUrl: app?.iconUrl),
+      leading: AppIconView(package: package, label: label, iconPath: app?.iconPath),
       title: Text(label),
       subtitle: Text(notes.join(', ')),
       trailing: IconButton(

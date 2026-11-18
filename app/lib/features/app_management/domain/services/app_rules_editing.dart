@@ -1,28 +1,15 @@
-import '../../../../shared/domain/policy.dart';
+import '../../../device_policy/domain/entities/policy.dart';
+import '../entities/app_entry.dart';
+import '../entities/effective_app_state.dart';
 
-/// Regras puras de edicao das regras por app. Sem Flutter e sem rede, para serem testadas
-/// isoladamente.
+/// Regras puras de edicao das regras por app. Sem Flutter e sem rede.
 
-/// Estado de um app como o responsavel deve enxerga-lo.
-enum EffectiveAppState {
-  allowed('Permitido'),
-  blocked('Bloqueado'),
-  exception('Exceção'),
+/// App conhecido do aparelho, no minimo necessario para ajustar as regras.
+typedef KnownApp = ({String package, bool system, bool essential});
 
-  /// Sem regra, com "bloquear apps novos" ligado: bloqueado ate o responsavel decidir.
-  pendingApproval('Aguardando aprovação'),
-
-  /// Funcao essencial do sistema: nunca e bloqueada e nao pode ser configurada.
-  essential('Essencial');
-
-  const EffectiveAppState(this.label);
-
-  final String label;
-
-  /// Verdadeiro quando o app nao pode ser aberto.
-  bool get isBlocked {
-    return this == EffectiveAppState.blocked || this == EffectiveAppState.pendingApproval;
-  }
+/// Dados de um app do inventario que importam para as regras.
+KnownApp knownAppOf(AppEntry app) {
+  return (package: app.package, system: app.system, essential: app.essential);
 }
 
 /// Estado efetivo de um pacote na politica, seguindo a secao 4.2 do protocolo: pacote sem
@@ -49,6 +36,30 @@ EffectiveAppState effectiveAppState(
   };
 }
 
+/// Estado efetivo de um app do inventario.
+EffectiveAppState effectiveStateOf(AppsPolicy apps, AppEntry app) {
+  return effectiveAppState(
+    apps,
+    package: app.package,
+    system: app.system,
+    essential: app.essential,
+  );
+}
+
+/// Regra montada a partir das escolhas da folha de um app: contar na cota so vale para
+/// excecoes e app bloqueado nao tem limite proprio.
+AppRule composeAppRule({
+  required AppRuleState state,
+  required bool countsTowardLimit,
+  required int? dailyLimitMinutes,
+}) {
+  return AppRule(
+    state: state,
+    countsTowardLimit: state == AppRuleState.exception && countsTowardLimit,
+    dailyLimitMinutes: state == AppRuleState.blocked ? null : dailyLimitMinutes,
+  );
+}
+
 /// Verdadeiro quando a regra equivale a nao ter regra para esse app.
 ///
 /// Com "bloquear apps novos" ligado, "permitido" deixa de ser o padrao de um app de usuario:
@@ -70,9 +81,6 @@ AppsPolicy setAppRule(AppsPolicy apps, String package, AppRule rule, {required b
   }
   return apps.copyWith(rules: next);
 }
-
-/// App conhecido do aparelho, no minimo necessario para ajustar o padrao de apps novos.
-typedef KnownApp = ({String package, bool system, bool essential});
 
 /// Troca o padrao para apps novos sem mudar o que vale para os apps ja instalados.
 ///
