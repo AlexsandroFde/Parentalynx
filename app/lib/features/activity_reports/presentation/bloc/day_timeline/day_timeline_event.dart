@@ -33,6 +33,26 @@ final class DayTimelineNextDayRequested extends DayTimelineEvent {
   const DayTimelineNextDayRequested();
 }
 
+/// Mostrar um dia escolhido no calendario (ou voltar para hoje). Nunca passa do dia corrente.
+final class DayTimelineDaySelected extends DayTimelineEvent {
+  const DayTimelineDaySelected(this.day);
+
+  /// Dia (AAAA-MM-DD).
+  final String day;
+
+  @override
+  List<Object?> get props => <Object?>[day];
+}
+
+/// Recarregar o dia mostrado (puxar para atualizar) sem apagar a linha do tempo da tela.
+///
+/// [completer] recebe a falha, ou nulo quando deu certo. Nao entra na comparacao do evento.
+final class DayTimelineRefreshRequested extends DayTimelineEvent {
+  const DayTimelineRefreshRequested({this.completer});
+
+  final Completer<AppFailure?>? completer;
+}
+
 /// Tentar de novo depois de uma falha.
 final class DayTimelineRetried extends DayTimelineEvent {
   const DayTimelineRetried();

@@ -35,6 +35,37 @@ final class BrowsingHistoryOnlyBlockedChanged extends BrowsingHistoryEvent {
   List<Object?> get props => <Object?>[onlyBlocked];
 }
 
+/// Texto da busca (titulo, site ou endereco) nas paginas ja carregadas.
+final class BrowsingHistoryQueryChanged extends BrowsingHistoryEvent {
+  const BrowsingHistoryQueryChanged(this.query);
+
+  final String query;
+
+  @override
+  List<Object?> get props => <Object?>[query];
+}
+
+/// A pessoa escolheu outro periodo no calendario. O periodo nao passa do dia corrente nem do
+/// maximo de dias de uma consulta.
+final class BrowsingHistoryPeriodChanged extends BrowsingHistoryEvent {
+  const BrowsingHistoryPeriodChanged({required this.from, required this.to});
+
+  final String from;
+  final String to;
+
+  @override
+  List<Object?> get props => <Object?>[from, to];
+}
+
+/// Recarregar a primeira pagina (puxar para atualizar) sem apagar a lista da tela.
+///
+/// [completer] recebe a falha, ou nulo quando deu certo. Nao entra na comparacao do evento.
+final class BrowsingHistoryRefreshRequested extends BrowsingHistoryEvent {
+  const BrowsingHistoryRefreshRequested({this.completer});
+
+  final Completer<AppFailure?>? completer;
+}
+
 /// Carregar a pagina seguinte.
 final class BrowsingHistoryMoreRequested extends BrowsingHistoryEvent {
   const BrowsingHistoryMoreRequested();

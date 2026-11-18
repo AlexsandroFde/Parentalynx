@@ -18,6 +18,37 @@ void main() {
     });
   });
 
+  test('periodo por extenso, dados do aparelho e dias da lista', () {
+    final ReportPeriod today = ReportPeriod.preset(ReportPreset.today, today: '2026-11-17');
+    final ReportPeriod week = ReportPeriod.preset(ReportPreset.last7, today: '2026-11-17');
+    expect(today.describe(today: '2026-11-17'), 'Hoje, ter 17/11');
+    expect(week.describe(today: '2026-11-17'), '11/11 a 17/11 · 7 dias');
+    expect(week.totalCaption(today: '2026-11-17'), 'de uso em 7 dias');
+    final DateTime now = DateTime(2026, 11, 17, 15, 30);
+    expect(
+      deviceDataFreshness(
+        lastSyncAt: DateTime(2026, 11, 17, 15, 29).millisecondsSinceEpoch,
+        online: true,
+        now: now,
+      ),
+      'Dados recebidos do aparelho há 1 min.',
+    );
+    expect(
+      deviceDataFreshness(lastSyncAt: null, online: true, now: now),
+      'O aparelho ainda não enviou dados de uso.',
+    );
+    expect(dayHeading(DateTime(2026, 11, 16, 23, 59), now: now), 'Ontem');
+    expect(dayHeading(DateTime(2026, 11, 12, 8), now: now), 'qui 12/11');
+    expect(timelineDayTitle('2026-11-11', today: '2026-11-17'), 'Quarta-feira');
+  });
+
+  test('evento de tipo desconhecido nunca mostra o codigo interno', () {
+    final ({String title, String? detail}) text = describeEvent(
+      const DeviceEvent(id: 1, type: 'novo_tipo_x', ts: 0),
+    );
+    expect(text.title, 'Outro registro do aparelho');
+  });
+
   test('descricao do periodo', () {
     expect(
       ReportPeriod.preset(ReportPreset.last7, today: '2026-11-17').rangeLabel,
@@ -63,7 +94,7 @@ void main() {
     });
 
     test('motivos de navegacao', () {
-      expect(browsingReasonLabel('safe_dns'), 'Filtro DNS familiar');
+      expect(browsingReasonLabel('safe_dns'), 'Filtro familiar');
       expect(browsingReasonLabel(null), 'Bloqueado');
     });
   });

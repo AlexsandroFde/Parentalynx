@@ -15,6 +15,7 @@ import '../../../support/test_dependencies.dart';
 
 void main() {
   const String summaryPath = '/v1/guardian/devices/$deviceId/reports/summary';
+  const String eventsPath = '/v1/guardian/devices/$deviceId/events';
 
   late TestDependencies deps;
 
@@ -26,13 +27,18 @@ void main() {
 
   tearDown(() => deps.dispose());
 
-  Future<GoRouter> pumpReports(WidgetTester tester, {Size size = const Size(392, 850)}) {
+  Future<GoRouter> pumpReports(
+    WidgetTester tester, {
+    Size size = phoneSize,
+    Brightness brightness = Brightness.light,
+  }) {
     return pumpGuardianRoutes(
       tester,
       routes: activityReportsRoutes(deps.di),
       location: GuardianPaths.reports,
       deps: deps,
       size: size,
+      brightness: brightness,
       wrap: (Widget app) => BlocProvider<DevicesBloc>(
         create: (BuildContext context) => deps.di<DevicesBloc>()..add(const DevicesStarted()),
         child: app,
@@ -40,27 +46,60 @@ void main() {
     );
   }
 
-  testWidgets('relatório de 7 dias com resumo, gráficos e tabela', tags: 'screenshot', (
-    WidgetTester tester,
-  ) async {
-    await pumpReports(tester, size: const Size(392, 2900));
+  const Size fullPage = Size(392, 2900);
 
-    final Uri requested = deps.backend.calls('GET', summaryPath).single.url;
-    expect(requested.queryParameters, <String, String>{'from': '2026-11-11', 'to': '2026-11-17'});
-    expect(find.byKey(const ValueKey<String>('report-total')), findsOneWidget);
+  testWidgets(
+    'relatório de 7 dias: resumo primeiro, gráficos e listas com o valor exato',
+    tags: 'screenshot',
+    (WidgetTester tester) async {
+      await pumpReports(tester, size: fullPage);
+
+      final Uri requested = deps.backend.calls('GET', summaryPath).single.url;
+      expect(requested.queryParameters, <String, String>{'from': '2026-11-11', 'to': '2026-11-17'});
+      // Contexto sempre visivel: crianca, aparelho, periodo e de quando sao os dados.
+      expect(find.text('João'), findsOneWidget);
+      expect(find.text('Moto G de João'), findsOneWidget);
+      expect(find.text('11/11 a 17/11 · 7 dias'), findsOneWidget);
+      expect(find.text('Dados recebidos do aparelho há 1 min.'), findsOneWidget);
+      expect(find.byKey(const ValueKey<String>('report-total')), findsOneWidget);
+      expect(find.text('14h 40min'), findsOneWidget);
+      expect(find.text('Uso por dia'), findsOneWidget);
+      expect(find.text('Mais uso em seg 16/11, 4h. Média de 2h 6min por dia.'), findsOneWidget);
+      expect(find.text('Horários de uso'), findsOneWidget);
+      expect(find.text('Aplicativos mais usados'), findsOneWidget);
+      expect(find.text('Por categoria'), findsOneWidget);
+      expect(find.text('Apps bloqueados que tentou abrir'), findsOneWidget);
+      // Os graficos que repetiam os mesmos dados sairam.
+      expect(find.text('Evolução do uso'), findsNothing);
+      await expectScreenshot(tester, 'reports_7_dias');
+
+      // Os valores exatos de cada dia, sem depender do toque no grafico.
+      await tester.tap(find.byTooltip('Ver valores').first);
+      await settle(tester);
+      expect(find.text('qua 11/11'), findsOneWidget);
+      expect(find.text('no limite 2h 10min de 2h 30min · 2 bloqueios'), findsOneWidget);
+    },
+  );
+
+  testWidgets('relatório no tema escuro', tags: 'screenshot', (WidgetTester tester) async {
+    await pumpReports(tester, size: fullPage, brightness: Brightness.dark);
+    await expectScreenshot(tester, 'reports_7_dias_escuro');
+  });
+
+  testWidgets('relatório segue as diretrizes de acessibilidade', (WidgetTester tester) async {
+    await pumpReports(tester, size: fullPage);
+    await expectAccessible(tester);
+  });
+
+  testWidgets('relatório funciona com a fonte no maior tamanho', (WidgetTester tester) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpReports(tester, size: const Size(392, 6400));
+
+    expect(tester.takeException(), isNull);
     expect(find.text('14h 40min'), findsOneWidget);
-    expect(find.text('Uso por dia'), findsOneWidget);
-    expect(find.text('Horários de maior atividade'), findsOneWidget);
-    expect(find.text('Evolução do uso'), findsOneWidget);
-    expect(find.text('Tentativas de acesso bloqueadas'), findsOneWidget);
-    expect(find.text('Tempo por categoria'), findsOneWidget);
-    await expectScreenshot(tester, 'reports_7_dias');
-
-    // A visao em tabela mostra os mesmos valores sem depender do toque no grafico.
-    await tester.tap(find.byTooltip('Ver em tabela').first);
-    await tester.pump();
-    expect(find.text('No limite'), findsOneWidget);
-    expect(find.text('qua 11/11'), findsOneWidget);
+    // Com fonte grande, os atalhos de periodo quebram linha em vez de espremer.
+    expect(find.widgetWithText(ChoiceChip, '30 dias'), findsOneWidget);
   });
 
   testWidgets('atalho Hoje consulta só o dia da cota do aparelho', (WidgetTester tester) async {
@@ -72,17 +111,33 @@ void main() {
       }
       return jsonResponse(body);
     });
-    await pumpReports(tester, size: const Size(392, 2400));
+    await pumpReports(tester, size: fullPage);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, 'Hoje'));
+    await tester.tap(find.text('Hoje'));
     await settle(tester);
 
     final Uri last = deps.backend.calls('GET', summaryPath).last.url;
     expect(last.queryParameters, <String, String>{'from': fixtureToday, 'to': fixtureToday});
-    // Com um unico dia, os graficos por dia dao lugar ao resumo e as horas.
+    expect(find.text('Hoje, ter 17/11'), findsOneWidget);
+    // Com um unico dia, o grafico por dia da lugar ao limite do dia e as horas.
     expect(find.text('Uso por dia'), findsNothing);
-    expect(find.text('Dentro do limite'), findsOneWidget);
-    expect(find.text('Horários de maior atividade'), findsOneWidget);
+    expect(find.text('Conta no limite'), findsOneWidget);
+    expect(find.text('Limite do dia'), findsOneWidget);
+    expect(find.text('Horários de uso'), findsOneWidget);
+  });
+
+  testWidgets('falha ao trocar o período mantém o anterior e diz qual está na tela', (
+    WidgetTester tester,
+  ) async {
+    await pumpReports(tester, size: fullPage);
+    deps.backend.on('GET', summaryPath, (_) => errorResponse(500, 'internal'));
+
+    await tester.tap(find.text('Ontem'));
+    await settle(tester);
+
+    expect(find.text('Não foi possível atualizar o relatório'), findsOneWidget);
+    expect(find.textContaining('Mostrando 11/11 a 17/11'), findsOneWidget);
+    expect(find.text('14h 40min'), findsOneWidget);
   });
 
   testWidgets('período sem uso explica o estado vazio', (WidgetTester tester) async {
@@ -96,15 +151,21 @@ void main() {
     await pumpReports(tester, size: const Size(392, 1400));
 
     expect(find.text('Sem uso registrado neste período'), findsOneWidget);
-    expect(find.text('Uso por aplicativo'), findsNothing);
+    expect(find.text('Aplicativos mais usados'), findsNothing);
+    expect(find.text('Detalhes do período'), findsOneWidget);
   });
 
-  testWidgets('falha ao carregar oferece tentar de novo', (WidgetTester tester) async {
+  testWidgets('falha ao carregar diz o que falhou e oferece tentar de novo', (
+    WidgetTester tester,
+  ) async {
     deps.backend.on('GET', summaryPath, (_) => errorResponse(500, 'internal'));
     await pumpReports(tester);
 
-    expect(find.text('Não foi possível carregar'), findsOneWidget);
-    expect(find.text('Tentar de novo'), findsOneWidget);
+    expect(find.text('Não foi possível carregar o relatório'), findsOneWidget);
+    deps.backend.onJson('GET', summaryPath, summaryJson());
+    await tester.tap(find.text('Tentar de novo'));
+    await settle(tester);
+    expect(find.text('14h 40min'), findsOneWidget);
   });
 
   testWidgets('sem aparelho vinculado oferece vincular', (WidgetTester tester) async {
@@ -115,6 +176,24 @@ void main() {
     await tester.tap(find.text('Vincular aparelho'));
     await settle(tester);
     expect(find.text('destino ${GuardianPaths.pairing}'), findsOneWidget);
+  });
+
+  testWidgets('tentativas bloqueadas levam aos eventos de bloqueio do mesmo período', (
+    WidgetTester tester,
+  ) async {
+    deps.backend.onJson('GET', eventsPath, <String, Object?>{
+      'events': <Object?>[],
+      'nextBefore': null,
+    });
+    await pumpReports(tester, size: fullPage);
+
+    await tester.tap(find.text('Ver eventos'));
+    await settle(tester);
+
+    final Uri request = deps.backend.calls('GET', eventsPath).single.url;
+    expect(request.queryParameters['types'], 'blocked_attempt,lock_started,lock_ended');
+    expect(request.queryParameters['from'], '2026-11-11');
+    expect(find.text('Nenhum evento de bloqueios no período'), findsOneWidget);
   });
 
   testWidgets('linha do tempo, eventos e navegação abrem pelos detalhes', (
@@ -134,7 +213,7 @@ void main() {
           },
         ],
       })
-      ..onJson('GET', '/v1/guardian/devices/$deviceId/events', <String, Object?>{
+      ..onJson('GET', eventsPath, <String, Object?>{
         'events': <Object?>[
           <String, Object?>{
             'id': 1,
@@ -159,12 +238,12 @@ void main() {
           },
         ],
       });
-    final GoRouter router = await pumpReports(tester, size: const Size(392, 2900));
+    final GoRouter router = await pumpReports(tester, size: fullPage);
 
-    await tester.tap(find.text('Linha do tempo das sessões'));
+    await tester.tap(find.text('Linha do tempo'));
     await settle(tester);
     expect(find.text('WhatsApp'), findsOneWidget);
-    expect(find.textContaining('1 sessão, 20min de uso'), findsOneWidget);
+    expect(find.text('Sessão'), findsOneWidget);
     expect(
       deps.backend
           .calls('GET', '/v1/guardian/devices/$deviceId/sessions')
@@ -176,17 +255,13 @@ void main() {
     router.pop();
     await settle(tester);
 
-    await tester.tap(find.text('Eventos'));
+    await tester.tap(find.text('Eventos do aparelho'));
     await settle(tester);
     expect(find.text('Tentou abrir TikTok'), findsOneWidget);
     await tester.tap(find.widgetWithText(ChoiceChip, 'Bloqueios'));
     await settle(tester);
     expect(
-      deps.backend
-          .calls('GET', '/v1/guardian/devices/$deviceId/events')
-          .last
-          .url
-          .queryParameters['types'],
+      deps.backend.calls('GET', eventsPath).last.url.queryParameters['types'],
       'blocked_attempt,lock_started,lock_ended',
     );
     router.pop();

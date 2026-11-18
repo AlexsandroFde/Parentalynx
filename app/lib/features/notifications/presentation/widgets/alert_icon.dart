@@ -1,9 +1,13 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../shared/widgets/feedback_views.dart';
+import '../../../../shared/design_system/design_system.dart';
 
 /// Icone e tom de um tipo de alerta. O tom reforca a gravidade, mas o icone e o titulo ja
-/// dizem do que se trata.
+/// dizem do que se trata (a cor nunca e o unico sinal).
+///
+/// Tentativa bloqueada, falha das regras e eventos de seguranca usam [Tone.danger]; limite,
+/// pouco tempo e aparelho sem conexao usam [Tone.warning]; pedidos e avisos informativos
+/// usam [Tone.info]. Usado tambem pela previa de alertas do painel.
 class AlertVisual {
   const AlertVisual(this.icon, this.tone);
 
@@ -12,26 +16,27 @@ class AlertVisual {
 
   static AlertVisual forType(String type) {
     return switch (type) {
-      'limit_reached' => const AlertVisual(Icons.hourglass_bottom, Tone.warning),
-      'low_time' => const AlertVisual(Icons.timelapse, Tone.info),
-      'blocked_app_attempt' => const AlertVisual(Icons.block, Tone.warning),
-      'time_request' => const AlertVisual(Icons.more_time, Tone.info),
-      'sync_stale' => const AlertVisual(Icons.sync_problem, Tone.warning),
-      'device_offline' => const AlertVisual(Icons.cloud_off_outlined, Tone.danger),
-      'permission_changed' => const AlertVisual(Icons.admin_panel_settings_outlined, Tone.warning),
-      'enforcement_failure' => const AlertVisual(Icons.report_problem_outlined, Tone.danger),
-      'security_event' => const AlertVisual(Icons.gpp_maybe_outlined, Tone.danger),
-      'new_app_installed' => const AlertVisual(Icons.install_mobile_outlined, Tone.info),
-      'policy_changed' => const AlertVisual(Icons.tune, Tone.info),
-      'device_linked' => const AlertVisual(Icons.link, Tone.success),
-      _ => const AlertVisual(Icons.notifications_none, Tone.neutral),
+      'limit_reached' => const AlertVisual(AppIcons.timeRunningOut, Tone.warning),
+      'low_time' => const AlertVisual(AppIcons.elapsed, Tone.warning),
+      'blocked_app_attempt' => const AlertVisual(AppIcons.blocked, Tone.danger),
+      'time_request' => const AlertVisual(AppIcons.timeRequest, Tone.info),
+      'sync_stale' => const AlertVisual(AppIcons.syncProblem, Tone.warning),
+      'device_offline' => const AlertVisual(AppIcons.offline, Tone.warning),
+      'permission_changed' => const AlertVisual(AppIcons.protectionWeak, Tone.warning),
+      'enforcement_failure' => const AlertVisual(AppIcons.protectionOff, Tone.danger),
+      'security_event' => const AlertVisual(AppIcons.security, Tone.danger),
+      'new_app_installed' => const AlertVisual(AppIcons.newApp, Tone.info),
+      'policy_changed' => const AlertVisual(AppIcons.rules, Tone.info),
+      'device_linked' => const AlertVisual(AppIcons.link, Tone.success),
+      _ => const AlertVisual(AppIcons.notification, Tone.neutral),
     };
   }
 }
 
-/// Circulo com o icone do tipo de alerta.
+/// Quadrado com o icone do tipo de alerta, no tom da gravidade. Decorativo: o titulo do
+/// alerta ao lado diz do que se trata.
 class AlertIcon extends StatelessWidget {
-  const AlertIcon({required this.type, this.size = 40, super.key});
+  const AlertIcon({required this.type, this.size = AppSizes.iconTile, super.key});
 
   final String type;
   final double size;
@@ -39,11 +44,6 @@ class AlertIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final AlertVisual visual = AlertVisual.forType(type);
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(color: visual.tone.background(context), shape: BoxShape.circle),
-      child: Icon(visual.icon, size: size * 0.52, color: visual.tone.foreground(context)),
-    );
+    return AppIconTile(icon: visual.icon, tone: visual.tone, size: size);
   }
 }

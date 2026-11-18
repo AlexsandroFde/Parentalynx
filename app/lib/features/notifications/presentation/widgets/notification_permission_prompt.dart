@@ -3,41 +3,28 @@ import 'dart:async';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../shared/widgets/feedback_views.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../bloc/notification_permission/notification_permission_bloc.dart';
 import '../texts/notification_texts.dart';
 
 /// Explica para que servem as notificacoes e, se a pessoa aceitar, pede a permissao ao
 /// sistema pelo [NotificationPermissionBloc] da arvore. Devolve verdadeiro se a permissao foi
 /// concedida.
+///
+/// A explicacao vem antes do pedido do sistema (que so pode ser recusado uma vez): diz o que
+/// sera avisado, quanto tempo os avisos podem demorar e onde escolher quais receber.
 Future<bool> requestNotificationsWithExplanation(BuildContext context) async {
   final NotificationPermissionBloc bloc = context.read<NotificationPermissionBloc>();
-  final bool? proceed = await showDialog<bool>(
-    context: context,
-    builder: (BuildContext context) {
-      return AlertDialog(
-        icon: const Icon(Icons.notifications_active_outlined),
-        title: const Text('Ativar notificações?'),
-        content: const Text(
-          'O ParentaLynx avisa quando o limite diário é atingido, quando a criança pede mais '
-          'tempo e quando alguma proteção é desativada.\n\n$alertDeliveryNote\n\n'
-          'Você escolhe quais avisos quer receber nas preferências de notificação.',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Agora não'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Ativar'),
-          ),
-        ],
-      );
-    },
+  final bool proceed = await showConfirmDialog(
+    context,
+    icon: AppIcons.notificationActive,
+    title: 'Ativar notificações?',
+    message: notificationRationale,
+    consequence: 'Você escolhe quais avisos receber nas preferências de notificação.',
+    confirmLabel: 'Ativar',
+    cancelLabel: 'Agora não',
   );
-  if (proceed != true) {
+  if (!proceed) {
     return false;
   }
   final Completer<bool> completer = Completer<bool>();
@@ -46,21 +33,21 @@ Future<bool> requestNotificationsWithExplanation(BuildContext context) async {
   if (!context.mounted) {
     return granted;
   }
-  if (!granted) {
-    final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(context);
-    messenger
-      ?..hideCurrentSnackBar()
-      ..showSnackBar(
-        SnackBar(
-          content: const Text('As notificações continuam desativadas para o ParentaLynx.'),
-          action: SnackBarAction(
-            label: 'Configurações',
-            onPressed: () => bloc.add(const NotificationSettingsOpened()),
-          ),
-        ),
-      );
+  if (granted) {
+    showAppSnackBar(
+      context,
+      'Notificações ativadas. Os avisos chegam mesmo com o app fechado.',
+      tone: Tone.success,
+    );
   } else {
-    showAppSnackBar(context, 'Notificações ativadas.', tone: Tone.success);
+    // Depois de uma recusa o sistema nao mostra mais o pedido: o caminho e pelas configuracoes.
+    showAppSnackBar(
+      context,
+      'As notificações continuam desativadas. Ative nas configurações do aparelho.',
+      tone: Tone.warning,
+      actionLabel: 'Configurações',
+      onAction: () => bloc.add(const NotificationSettingsOpened()),
+    );
   }
   return granted;
 }

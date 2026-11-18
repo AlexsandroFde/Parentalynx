@@ -1,5 +1,6 @@
 import '../../../../core/time/formatters.dart';
 import '../../domain/entities/device_event.dart';
+import '../../domain/entities/event_group.dart';
 
 /// Textos em portugues dos eventos do aparelho (protocolo, secao 5.3). Funcoes puras.
 
@@ -22,7 +23,7 @@ String browsingReasonLabel(String? reason) {
   return switch (reason) {
     'domain_blocked' => 'Site bloqueado',
     'category' => 'Categoria bloqueada',
-    'safe_dns' => 'Filtro DNS familiar',
+    'safe_dns' => 'Filtro familiar',
     'not_in_allowlist' => 'Fora dos sites autorizados',
     _ => 'Bloqueado',
   };
@@ -76,7 +77,7 @@ String _permissionLabel(String? permission) {
       final int? version = details.version;
       return (
         title: 'Regras aplicadas no aparelho',
-        detail: version == null ? null : 'Versão $version.',
+        detail: version == null ? null : 'As regras mais recentes passaram a valer.',
       );
     case 'policy_apply_failed':
       return (title: 'Falha ao aplicar as regras', detail: details.error);
@@ -127,6 +128,19 @@ String _permissionLabel(String? permission) {
     case 'app_removed':
       return (title: 'App removido: $app', detail: null);
     default:
-      return (title: event.type, detail: null);
+      // Tipo de uma versao mais nova do aparelho: nunca mostra o codigo interno.
+      return (title: 'Outro registro do aparelho', detail: null);
   }
+}
+
+/// Nome do grupo de eventos no filtro da tela.
+String eventGroupLabel(EventGroup group) {
+  return switch (group) {
+    EventGroup.all => 'Todos',
+    EventGroup.blocks => 'Bloqueios',
+    EventGroup.limit => 'Tempo',
+    EventGroup.security => 'Segurança',
+    EventGroup.apps => 'Apps',
+    EventGroup.system => 'Sistema',
+  };
 }
