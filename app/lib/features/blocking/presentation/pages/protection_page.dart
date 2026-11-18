@@ -1,31 +1,40 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
-import '../../../../shared/domain/policy.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../devices/domain/device.dart';
-import 'widgets/rule_scaffold.dart';
+import '../../../child_device/domain/entities/child_device.dart';
+import '../../../device_policy/domain/entities/policy.dart';
+import '../../../device_policy/presentation/widgets/rule_editor_scaffold.dart';
+import '../../domain/entities/system_lock.dart';
+import '../bloc/protection/protection_bloc.dart';
+import '../texts/blocking_texts.dart';
 
 /// Protecao contra adulteracao e travas do modo dispositivo gerenciado (Device Owner).
+///
+/// Espera um [ProtectionBloc] acima na arvore, ja iniciado para [device].
 class ProtectionPage extends StatelessWidget {
-  const ProtectionPage({super.key});
+  const ProtectionPage({required this.device, super.key});
+
+  final ChildDevice device;
 
   @override
   Widget build(BuildContext context) {
-    return RuleEditorScaffold(
+    final ProtectionBloc bloc = context.read<ProtectionBloc>();
+    final DeviceManagementMode mode = device.managementMode;
+    final bool owner = SystemLock.availableIn(mode);
+    return RuleEditorScaffold<ProtectionBloc, ProtectionPolicy>(
       title: 'Proteção',
-      children: (BuildContext context, RuleEditing editing) {
-        final ProtectionPolicy protection = editing.draft.protection;
-        final DeviceManagementMode mode = editing.device.managementMode;
-        final bool owner = mode == DeviceManagementMode.deviceOwner;
-
-        void change(ProtectionPolicy Function(ProtectionPolicy current) update) {
-          editing.update((Policy p) => p.copyWith(protection: update(p.protection)));
-        }
-
-        ValueChanged<bool>? ownerOnly(ProtectionPolicy Function(ProtectionPolicy, bool) update) {
-          return owner ? (bool v) => change((ProtectionPolicy p) => update(p, v)) : null;
+      device: device,
+      onSave: () => bloc.add(const ProtectionSaveRequested()),
+      onDiscard: () => bloc.add(const ProtectionDiscardRequested()),
+      onRetry: () => bloc.add(ProtectionStarted(device.id)),
+      children: (BuildContext context, ProtectionPolicy protection) {
+        ValueChanged<bool>? ownerOnly(SystemLock lock) {
+          return owner
+              ? (bool value) => bloc.add(ProtectionSystemLockChanged(lock: lock, enabled: value))
+              : null;
         }
 
         return <Widget>[
@@ -50,7 +59,7 @@ class ProtectionPage extends StatelessWidget {
                 'bloquear, tudo que não for exceção fica bloqueado. Desligado, você só recebe '
                 'o alerta.',
             value: protection.lockOnTamper,
-            onChanged: (bool v) => change((ProtectionPolicy p) => p.copyWith(lockOnTamper: v)),
+            onChanged: (bool value) => bloc.add(ProtectionLockOnTamperChanged(value)),
           ),
           const SizedBox(height: AppSpacing.md),
           SectionCard(
@@ -75,49 +84,37 @@ class ProtectionPage extends StatelessWidget {
                 SwitchRow(
                   title: 'Impedir a desinstalação do ParentaLynx',
                   value: protection.blockUninstall,
-                  onChanged: ownerOnly(
-                    (ProtectionPolicy p, bool v) => p.copyWith(blockUninstall: v),
-                  ),
+                  onChanged: ownerOnly(SystemLock.uninstall),
                 ),
                 SwitchRow(
                   title: 'Impedir o modo de segurança',
                   value: protection.blockSafeBoot,
-                  onChanged: ownerOnly(
-                    (ProtectionPolicy p, bool v) => p.copyWith(blockSafeBoot: v),
-                  ),
+                  onChanged: ownerOnly(SystemLock.safeBoot),
                 ),
                 SwitchRow(
                   title: 'Impedir a restauração de fábrica pelas Configurações',
                   value: protection.blockFactoryReset,
-                  onChanged: ownerOnly(
-                    (ProtectionPolicy p, bool v) => p.copyWith(blockFactoryReset: v),
-                  ),
+                  onChanged: ownerOnly(SystemLock.factoryReset),
                 ),
                 SwitchRow(
                   title: 'Impedir a alteração de data e hora',
                   value: protection.blockDateTimeChange,
-                  onChanged: ownerOnly(
-                    (ProtectionPolicy p, bool v) => p.copyWith(blockDateTimeChange: v),
-                  ),
+                  onChanged: ownerOnly(SystemLock.dateTimeChange),
                 ),
                 SwitchRow(
                   title: 'Impedir a criação de outros usuários',
                   value: protection.blockAddUser,
-                  onChanged: ownerOnly((ProtectionPolicy p, bool v) => p.copyWith(blockAddUser: v)),
+                  onChanged: ownerOnly(SystemLock.addUser),
                 ),
                 SwitchRow(
                   title: 'Impedir a instalação de fontes desconhecidas',
                   value: protection.blockUnknownSources,
-                  onChanged: ownerOnly(
-                    (ProtectionPolicy p, bool v) => p.copyWith(blockUnknownSources: v),
-                  ),
+                  onChanged: ownerOnly(SystemLock.unknownSources),
                 ),
                 SwitchRow(
                   title: 'Impedir a depuração USB',
                   value: protection.blockUsbDebugging,
-                  onChanged: ownerOnly(
-                    (ProtectionPolicy p, bool v) => p.copyWith(blockUsbDebugging: v),
-                  ),
+                  onChanged: ownerOnly(SystemLock.usbDebugging),
                 ),
               ],
             ),
@@ -125,49 +122,6 @@ class ProtectionPage extends StatelessWidget {
         ];
       },
     );
-  }
-}
-
-/// O que cada modo de gerenciamento garante e o que nao garante (resumo de
-/// `docs/01-capacidades-android.md`).
-({List<String> guaranteed, List<String> notGuaranteed}) guaranteesOf(DeviceManagementMode mode) {
-  switch (mode) {
-    case DeviceManagementMode.deviceOwner:
-      return (
-        guaranteed: const <String>[
-          'Apps bloqueados são suspensos pelo sistema e não chegam a abrir.',
-          'O bloqueio continua valendo depois de reiniciar e se o app for encerrado.',
-          'A desinstalação e o modo de segurança podem ser impedidos.',
-        ],
-        notGuaranteed: const <String>[
-          'A restauração pelo modo de recuperação do aparelho não pode ser impedida.',
-        ],
-      );
-    case DeviceManagementMode.deviceAdmin:
-      return (
-        guaranteed: const <String>[
-          'Contagem de tempo e bloqueio de apps funcionam enquanto as permissões estiverem '
-              'ativas.',
-          'Desinstalar exige desativar o administrador antes, e isso gera um alerta.',
-        ],
-        notGuaranteed: const <String>[
-          'A criança consegue desativar as permissões. Você é avisado quando isso acontece.',
-          'Modo de segurança e restauração de fábrica não podem ser impedidos.',
-        ],
-      );
-    case DeviceManagementMode.standard:
-      return (
-        guaranteed: const <String>[
-          'Contagem de tempo e bloqueio de apps funcionam enquanto as permissões estiverem '
-              'ativas.',
-          'Toda adulteração que o app consegue detectar gera um alerta.',
-        ],
-        notGuaranteed: const <String>[
-          'A criança consegue desativar as permissões ou desinstalar o app.',
-          'Um app bloqueado pode aparecer por uma fração de segundo antes do bloqueio.',
-          'Modo de segurança e restauração de fábrica não podem ser impedidos.',
-        ],
-      );
   }
 }
 

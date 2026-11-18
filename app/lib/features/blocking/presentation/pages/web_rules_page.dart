@@ -1,30 +1,44 @@
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
-import '../../../../shared/domain/policy.dart';
+import '../../../../core/constants/route_paths.dart';
+import '../../../../core/errors/app_failure.dart';
+import '../../../../core/result/result.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../devices/domain/device.dart';
-import '../rules_paths.dart';
-import 'widgets/rule_scaffold.dart';
-
-const int _maxDomains = 500;
+import '../../../child_device/domain/entities/child_device.dart';
+import '../../../device_policy/domain/entities/policy.dart';
+import '../../../device_policy/presentation/widgets/rule_editor_scaffold.dart';
+import '../../domain/services/web_policy_editing.dart';
+import '../bloc/web_filter/web_filter_bloc.dart';
 
 /// Regras de navegacao na internet: navegador gerenciado, filtros e listas de sites.
+///
+/// Espera um [WebFilterBloc] acima na arvore, ja iniciado para [device].
 class WebRulesPage extends StatelessWidget {
-  const WebRulesPage({super.key});
+  const WebRulesPage({required this.device, super.key});
+
+  final ChildDevice device;
 
   @override
   Widget build(BuildContext context) {
-    return RuleEditorScaffold(
+    final WebFilterBloc bloc = context.read<WebFilterBloc>();
+    final bool managed = device.managementMode == DeviceManagementMode.deviceOwner;
+    return RuleEditorScaffold<WebFilterBloc, WebPolicy>(
       title: 'Navegação na internet',
-      children: (BuildContext context, RuleEditing editing) {
-        final WebPolicy web = editing.draft.web;
-        final bool managed = editing.device.managementMode == DeviceManagementMode.deviceOwner;
+      device: device,
+      onSave: () => bloc.add(const WebFilterSaveRequested()),
+      onDiscard: () => bloc.add(const WebFilterDiscardRequested()),
+      onRetry: () => bloc.add(WebFilterStarted(device.id)),
+      children: (BuildContext context, WebPolicy web) {
+        void addDomain(WebDomainList list, String domain) {
+          bloc.add(WebDomainAdded(list: list, domain: domain));
+        }
 
-        void change(WebPolicy Function(WebPolicy current) update) {
-          editing.update((Policy p) => p.copyWith(web: update(p.web)));
+        void removeDomain(WebDomainList list, String domain) {
+          bloc.add(WebDomainRemoved(list: list, domain: domain));
         }
 
         return <Widget>[
@@ -47,14 +61,14 @@ class WebRulesPage extends StatelessWidget {
                   title: 'Disponibilizar o navegador ParentaLynx',
                   subtitle: 'Aparece no aparelho da criança como um app separado.',
                   value: web.managedBrowser,
-                  onChanged: (bool v) => change((WebPolicy w) => w.copyWith(managedBrowser: v)),
+                  onChanged: (bool value) => bloc.add(WebManagedBrowserChanged(value)),
                 ),
                 SwitchRow(
                   title: 'Registrar o histórico',
                   subtitle: 'Endereço, título e horário das páginas. A criança é avisada.',
                   value: web.logHistory,
                   onChanged: web.managedBrowser
-                      ? (bool v) => change((WebPolicy w) => w.copyWith(logHistory: v))
+                      ? (bool value) => bloc.add(WebHistoryLoggingChanged(value))
                       : null,
                 ),
                 SwitchRow(
@@ -62,7 +76,7 @@ class WebRulesPage extends StatelessWidget {
                   subtitle: 'Força o modo seguro nos buscadores conhecidos.',
                   value: web.safeSearch,
                   onChanged: web.managedBrowser
-                      ? (bool v) => change((WebPolicy w) => w.copyWith(safeSearch: v))
+                      ? (bool value) => bloc.add(WebSafeSearchChanged(value))
                       : null,
                 ),
                 SwitchRow(
@@ -72,7 +86,7 @@ class WebRulesPage extends StatelessWidget {
                       : 'Bloqueia conteúdo adulto e sites maliciosos no navegador gerenciado. '
                             'No aparelho inteiro só é garantido no modo dispositivo gerenciado.',
                   value: web.safeDns,
-                  onChanged: (bool v) => change((WebPolicy w) => w.copyWith(safeDns: v)),
+                  onChanged: (bool value) => bloc.add(WebSafeDnsChanged(value)),
                 ),
               ],
             ),
@@ -94,7 +108,7 @@ class WebRulesPage extends StatelessWidget {
                   ],
                   selected: <WebMode>{web.mode},
                   onSelectionChanged: (Set<WebMode> value) {
-                    change((WebPolicy w) => w.copyWith(mode: value.first));
+                    bloc.add(WebModeChanged(value.first));
                   },
                 ),
                 const SizedBox(height: AppSpacing.sm),
@@ -114,7 +128,8 @@ class WebRulesPage extends StatelessWidget {
               emptyText: 'Nenhum site autorizado. Nesse modo, nada poderá ser aberto.',
               emptyTone: Tone.warning,
               domains: web.allowedDomains,
-              onChanged: (List<String> v) => change((WebPolicy w) => w.copyWith(allowedDomains: v)),
+              onAdd: (String domain) => addDomain(WebDomainList.allowed, domain),
+              onRemove: (String domain) => removeDomain(WebDomainList.allowed, domain),
             )
           else ...<Widget>[
             SectionCard(
@@ -129,14 +144,9 @@ class WebRulesPage extends StatelessWidget {
                       contentPadding: EdgeInsets.zero,
                       title: Text(category.label),
                       value: web.blockedCategories.contains(category.code),
-                      onChanged: (bool? checked) => change((WebPolicy w) {
-                        final List<String> next = <String>[...w.blockedCategories]
-                          ..remove(category.code);
-                        if (checked ?? false) {
-                          next.add(category.code);
-                        }
-                        return w.copyWith(blockedCategories: next);
-                      }),
+                      onChanged: (bool? checked) {
+                        bloc.add(WebCategoryToggled(category: category, blocked: checked ?? false));
+                      },
                     ),
                 ],
               ),
@@ -146,7 +156,8 @@ class WebRulesPage extends StatelessWidget {
               title: 'Sites bloqueados',
               emptyText: 'Nenhum site bloqueado individualmente.',
               domains: web.blockedDomains,
-              onChanged: (List<String> v) => change((WebPolicy w) => w.copyWith(blockedDomains: v)),
+              onAdd: (String domain) => addDomain(WebDomainList.blocked, domain),
+              onRemove: (String domain) => removeDomain(WebDomainList.blocked, domain),
             ),
           ],
         ];
@@ -160,7 +171,8 @@ class _DomainListCard extends StatefulWidget {
     required this.title,
     required this.emptyText,
     required this.domains,
-    required this.onChanged,
+    required this.onAdd,
+    required this.onRemove,
     this.emptyTone = Tone.neutral,
   });
 
@@ -168,7 +180,8 @@ class _DomainListCard extends StatefulWidget {
   final String emptyText;
   final Tone emptyTone;
   final List<String> domains;
-  final ValueChanged<List<String>> onChanged;
+  final ValueChanged<String> onAdd;
+  final ValueChanged<String> onRemove;
 
   @override
   State<_DomainListCard> createState() => _DomainListCardState();
@@ -185,24 +198,16 @@ class _DomainListCardState extends State<_DomainListCard> {
   }
 
   void _add() {
-    final String? domain = WebPolicy.normalizeDomain(_input.text);
-    if (domain == null) {
-      setState(() => _error = 'Digite um endereço válido, por exemplo exemplo.com.br');
-      return;
+    switch (WebPolicyEditing.validateNewDomain(widget.domains, _input.text)) {
+      case Ok<String>(:final String value):
+        widget.onAdd(value);
+        setState(() {
+          _input.clear();
+          _error = null;
+        });
+      case Err<String>(:final AppFailure failure):
+        setState(() => _error = failure.message);
     }
-    if (widget.domains.contains(domain)) {
-      setState(() => _error = 'Esse site já está na lista.');
-      return;
-    }
-    if (widget.domains.length >= _maxDomains) {
-      setState(() => _error = 'A lista chegou ao limite de $_maxDomains sites.');
-      return;
-    }
-    widget.onChanged(<String>[...widget.domains, domain]);
-    setState(() {
-      _input.clear();
-      _error = null;
-    });
   }
 
   @override
@@ -252,9 +257,7 @@ class _DomainListCardState extends State<_DomainListCard> {
                   InputChip(
                     label: Text(domain),
                     deleteButtonTooltipMessage: 'Remover $domain',
-                    onDeleted: () => widget.onChanged(
-                      widget.domains.where((String item) => item != domain).toList(),
-                    ),
+                    onDeleted: () => widget.onRemove(domain),
                   ),
               ],
             ),
