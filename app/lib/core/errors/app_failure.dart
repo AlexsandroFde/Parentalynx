@@ -118,7 +118,10 @@ final class ValidationFailure extends AppFailure {
 
 /// Resposta fora do formato esperado ou erro interno do app.
 final class UnexpectedFailure extends AppFailure {
-  const UnexpectedFailure([super.message = 'Algo deu errado. Tente de novo.', this.cause]);
+  const UnexpectedFailure([
+    super.message = 'Ocorreu um erro inesperado e a operação não foi concluída. Tente de novo.',
+    this.cause,
+  ]);
 
   /// Excecao original, para registro. Nao entra na comparacao.
   final Object? cause;
@@ -136,7 +139,14 @@ AppFailure toFailure(Object error) {
     return error;
   }
   if (error is JsonFormatException) {
-    return UnexpectedFailure('O servidor respondeu em um formato inesperado.', error);
+    return UnexpectedFailure(
+      'O servidor respondeu em um formato inesperado. Confira se a mudança aparece e, se não, '
+      'tente de novo.',
+      error,
+    );
   }
-  return UnexpectedFailure('Algo deu errado. Tente de novo.', error);
+  return UnexpectedFailure(
+    'Ocorreu um erro inesperado e a operação não foi concluída. Tente de novo.',
+    error,
+  );
 }
