@@ -1,87 +1,12 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../../app/theme/app_theme.dart';
-import '../../../../../core/errors/app_failure.dart';
-import '../../../../../shared/domain/policy.dart';
-import '../../../../../shared/widgets/feedback_views.dart';
-import '../../../../../shared/widgets/form_widgets.dart';
-import '../../../auth/presentation/elevation.dart';
-import '../../../devices/domain/device.dart';
-import '../../../devices/presentation/devices_providers.dart';
-import '../policy_editor.dart';
-import 'policy_sync_status.dart';
-
-/// O que uma pagina de regras recebe para desenhar e editar: o aparelho, o rascunho e a
-/// forma de altera-lo.
-class RuleEditing {
-  const RuleEditing({required this.device, required this.state, required this.editor});
-
-  final Device device;
-  final PolicyEditorState state;
-  final PolicyEditor editor;
-
-  /// Politica com as alteracoes locais.
-  Policy get draft => state.draft;
-
-  /// Aplica uma alteracao ao rascunho.
-  void update(Policy Function(Policy policy) change) => editor.edit(change);
-}
-
-/// Salva o rascunho das regras, pedindo a senha administrativa se o servidor exigir, e mostra
-/// o resultado. Devolve verdadeiro quando as regras foram enviadas.
-Future<bool> savePolicyDraft(BuildContext context, WidgetRef ref, String deviceId) async {
-  final PolicySaveResult result;
-  try {
-    result = await runElevated<PolicySaveResult>(
-      context,
-      ref,
-      () => ref.read(policyEditorProvider(deviceId).notifier).save(),
-    );
-  } on CancelledFailure {
-    return false;
-  } on Object catch (error) {
-    if (context.mounted) {
-      showFailure(context, error);
-    }
-    return false;
-  }
-  if (!context.mounted) {
-    return result == PolicySaveResult.saved;
-  }
-  switch (result) {
-    case PolicySaveResult.saved:
-      showAppSnackBar(
-        context,
-        'Regras enviadas. Aguardando o aparelho confirmar.',
-        tone: Tone.success,
-      );
-      return true;
-    case PolicySaveResult.conflictReloaded:
-      await showDialog<void>(
-        context: context,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            icon: const Icon(Icons.sync_problem_outlined),
-            title: const Text('As regras mudaram'),
-            content: const Text(
-              'Outra sessão alterou as regras deste aparelho enquanto você editava. '
-              'Carregamos a versão mais recente e suas alterações não foram aplicadas. '
-              'Revise e refaça o que ainda for necessário.',
-            ),
-            actions: <Widget>[
-              FilledButton(
-                style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
-                onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Entendi'),
-              ),
-            ],
-          );
-        },
-      );
-      return false;
-  }
-}
+import '../../../../shared/theme/app_theme.dart';
+import '../../../../shared/widgets/feedback_views.dart';
+import '../../../../shared/widgets/form_widgets.dart';
+import '../../../child_device/domain/entities/child_device.dart';
+import '../../../device_sync/presentation/widgets/policy_sync_status_view.dart';
+import '../editing/policy_section_state.dart';
 
 enum _LeaveChoice { save, discard, keepEditing }
 
@@ -114,13 +39,45 @@ Future<_LeaveChoice> _askBeforeLeaving(BuildContext context) async {
   return choice ?? _LeaveChoice.keepEditing;
 }
 
+Future<void> _showConflict(BuildContext context) {
+  return showDialog<void>(
+    context: context,
+    builder: (BuildContext context) {
+      return AlertDialog(
+        icon: const Icon(Icons.sync_problem_outlined),
+        title: const Text('As regras mudaram'),
+        content: const Text(
+          'Outra sessão alterou as regras deste aparelho enquanto você editava. '
+          'Carregamos a versão mais recente e suas alterações não foram aplicadas. '
+          'Revise e refaça o que ainda for necessário.',
+        ),
+        actions: <Widget>[
+          FilledButton(
+            style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Entendi'),
+          ),
+        ],
+      );
+    },
+  );
+}
+
 /// Estrutura comum das paginas de edicao de regras.
 ///
-/// Carrega a politica do aparelho em foco, mostra o estado de aplicacao no aparelho, a barra
-/// de salvar quando ha alteracoes e pede confirmacao ao sair sem salvar.
-class RuleEditorScaffold extends ConsumerWidget {
+/// Mostra a secao carregada pelo BLoC [B] (qualquer BLoC de regras cujo estado seja
+/// [PolicySectionState]), o estado de aplicacao no aparelho, a barra de salvar quando ha
+/// alteracoes, os avisos de envio e de conflito, e pede confirmacao ao sair sem salvar.
+///
+/// Nao conhece os eventos de cada BLoC: recebe as acoes de salvar, descartar e tentar de novo.
+class RuleEditorScaffold<B extends StateStreamable<PolicySectionState<T>>, T>
+    extends StatefulWidget {
   const RuleEditorScaffold({
     required this.title,
+    required this.device,
+    required this.onSave,
+    required this.onDiscard,
+    required this.onRetry,
     this.children,
     this.body,
     this.floatingActionButton,
@@ -131,61 +88,102 @@ class RuleEditorScaffold extends ConsumerWidget {
 
   final String title;
 
+  /// Aparelho em edicao, para mostrar a confirmacao de aplicacao das regras.
+  final ChildDevice device;
+  final VoidCallback onSave;
+  final VoidCallback onDiscard;
+  final VoidCallback onRetry;
+
   /// Conteudo em lista rolavel, com a margem padrao de pagina.
-  final List<Widget> Function(BuildContext context, RuleEditing editing)? children;
+  final List<Widget> Function(BuildContext context, T draft)? children;
 
   /// Corpo proprio (para listas longas construidas sob demanda).
-  final Widget Function(BuildContext context, RuleEditing editing)? body;
-  final Widget? Function(BuildContext context, RuleEditing editing)? floatingActionButton;
-  final List<Widget> Function(BuildContext context, RuleEditing editing)? actions;
+  final Widget Function(BuildContext context, T draft)? body;
+  final Widget? Function(BuildContext context, T draft)? floatingActionButton;
+  final List<Widget> Function(BuildContext context, T draft)? actions;
   final bool showSyncStatus;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final Device? device = ref.watch(selectedDeviceProvider);
-    if (device == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(title)),
-        body: const EmptyState(
-          icon: Icons.phonelink_off_outlined,
-          title: 'Nenhum aparelho vinculado',
-          message: 'Vincule o aparelho da criança para definir as regras.',
-        ),
-      );
-    }
-    final AsyncValue<PolicyEditorState> value = ref.watch(policyEditorProvider(device.id));
-    final PolicyEditorState? state = value.value;
-    if (state == null) {
-      return Scaffold(
-        appBar: AppBar(title: Text(title)),
-        body: value.hasError
-            ? FailureView(
-                error: value.error!,
-                onRetry: () => ref.invalidate(policyEditorProvider(device.id)),
-              )
-            : const LoadingView(message: 'Carregando as regras'),
-      );
-    }
+  State<RuleEditorScaffold<B, T>> createState() => _RuleEditorScaffoldState<B, T>();
+}
 
-    final PolicyEditor editor = ref.read(policyEditorProvider(device.id).notifier);
-    final RuleEditing editing = RuleEditing(device: device, state: state, editor: editor);
+class _RuleEditorScaffoldState<B extends StateStreamable<PolicySectionState<T>>, T>
+    extends State<RuleEditorScaffold<B, T>> {
+  /// A pessoa escolheu "Salvar" ao sair: depois do envio aceito, a pagina fecha.
+  bool _leaveAfterSave = false;
+
+  bool _statusChanged(PolicySectionState<T> previous, PolicySectionState<T> current) {
+    return current is PolicySectionEditing<T> &&
+        (previous is! PolicySectionEditing<T> || previous.status != current.status);
+  }
+
+  void _onStatus(BuildContext context, PolicySectionState<T> state) {
+    if (state is! PolicySectionEditing<T>) {
+      return;
+    }
+    switch (state.status) {
+      case SectionSaveStatus.saving:
+        return;
+      case SectionSaveStatus.saved:
+        showAppSnackBar(
+          context,
+          'Regras enviadas. Aguardando o aparelho confirmar.',
+          tone: Tone.success,
+        );
+        if (_leaveAfterSave) {
+          _leaveAfterSave = false;
+          Navigator.of(context).pop();
+        }
+      case SectionSaveStatus.conflict:
+        _leaveAfterSave = false;
+        _showConflict(context);
+      case SectionSaveStatus.failed:
+        _leaveAfterSave = false;
+        final Object? failure = state.failure;
+        if (failure != null) {
+          showFailure(context, failure);
+        }
+      case SectionSaveStatus.idle:
+        _leaveAfterSave = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocConsumer<B, PolicySectionState<T>>(
+      listenWhen: _statusChanged,
+      listener: _onStatus,
+      builder: (BuildContext context, PolicySectionState<T> state) {
+        return switch (state) {
+          PolicySectionLoading<T>() => Scaffold(
+            appBar: AppBar(title: Text(widget.title)),
+            body: const LoadingView(message: 'Carregando as regras'),
+          ),
+          PolicySectionError<T>(:final failure) => Scaffold(
+            appBar: AppBar(title: Text(widget.title)),
+            body: FailureView(error: failure, onRetry: widget.onRetry),
+          ),
+          PolicySectionEditing<T>() => _editor(context, state),
+        };
+      },
+    );
+  }
+
+  Widget _editor(BuildContext context, PolicySectionEditing<T> state) {
     final bool dirty = state.isDirty;
-
-    Future<void> save() => savePolicyDraft(context, ref, device.id);
-
-    final List<Widget> Function(BuildContext, RuleEditing)? childrenBuilder = children;
+    final List<Widget> Function(BuildContext, T)? childrenBuilder = widget.children;
     final Widget content = childrenBuilder != null
         ? PageBody(
             children: <Widget>[
-              if (showSyncStatus) ...<Widget>[
-                PolicySyncStatus(device: device),
+              if (widget.showSyncStatus) ...<Widget>[
+                PolicySyncStatusView(status: widget.device.policySync),
                 const SizedBox(height: AppSpacing.md),
               ],
-              ...childrenBuilder(context, editing),
+              ...childrenBuilder(context, state.draft),
               const SizedBox(height: AppSpacing.xl),
             ],
           )
-        : body!(context, editing);
+        : widget.body!(context, state.draft);
 
     return PopScope<Object?>(
       canPop: !dirty,
@@ -201,21 +199,22 @@ class RuleEditorScaffold extends ConsumerWidget {
           case _LeaveChoice.keepEditing:
             return;
           case _LeaveChoice.discard:
-            editor.discard();
+            widget.onDiscard();
             Navigator.of(context).pop();
           case _LeaveChoice.save:
-            final bool saved = await savePolicyDraft(context, ref, device.id);
-            if (saved && context.mounted) {
-              Navigator.of(context).pop();
-            }
+            _leaveAfterSave = true;
+            widget.onSave();
         }
       },
       child: Scaffold(
-        appBar: AppBar(title: Text(title), actions: actions?.call(context, editing)),
+        appBar: AppBar(
+          title: Text(widget.title),
+          actions: widget.actions?.call(context, state.draft),
+        ),
         body: content,
-        floatingActionButton: floatingActionButton?.call(context, editing),
+        floatingActionButton: widget.floatingActionButton?.call(context, state.draft),
         bottomNavigationBar: dirty
-            ? SaveBar(saving: state.saving, onSave: save, onDiscard: editor.discard)
+            ? SaveBar(saving: state.isSaving, onSave: widget.onSave, onDiscard: widget.onDiscard)
             : null,
       ),
     );
