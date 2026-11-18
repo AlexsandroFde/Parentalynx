@@ -2,15 +2,18 @@ import 'package:material_ui/material_ui.dart';
 
 /// Raios de borda.
 ///
-/// As constantes sao a escala do perfil do responsavel. Os componentes leem a forma do perfil
-/// atual com `context.shapes` ([AppShapes]): no modo crianca tudo fica mais arredondado, sem
-/// que cada tela precise saber disso.
+/// Raios contidos: controles em 8, paineis em 12, folhas em 16. Elementos dentro de um painel
+/// usam um raio menor que o do painel, para os cantos acompanharem uns aos outros. As
+/// constantes sao a escala do perfil do responsavel; os componentes leem a forma do perfil
+/// atual com `context.shapes` ([AppShapes]): no modo crianca os cantos ficam um pouco mais
+/// suaves, sem que cada tela precise saber disso.
 abstract final class AppRadius {
-  static const double xs = 6;
-  static const double sm = 10;
-  static const double md = 14;
-  static const double lg = 20;
-  static const double xl = 28;
+  static const double xs = 4;
+  static const double sm = 6;
+  static const double md = 8;
+  static const double lg = 12;
+  static const double xl = 16;
+  static const double xxl = 20;
   static const double pill = 999;
 }
 
@@ -25,26 +28,31 @@ class AppShapes extends ThemeExtension<AppShapes> {
     required this.tile,
   });
 
-  /// Botoes, campos, chips grandes.
+  /// Botoes, campos, chips.
   final double control;
 
-  /// Paineis, listas agrupadas, cartoes.
+  /// Paineis, listas agrupadas, avisos.
   final double container;
 
   /// Folhas inferiores e dialogos.
   final double sheet;
 
-  /// Quadrados de icone e de app.
+  /// Icones de app e quadrados de icone.
   final double tile;
 
   static const AppShapes guardian = AppShapes(
     control: AppRadius.md,
     container: AppRadius.lg,
     sheet: AppRadius.xl,
-    tile: AppRadius.sm,
+    tile: AppRadius.md,
   );
 
-  static const AppShapes child = AppShapes(control: 20, container: 28, sheet: 32, tile: 16);
+  static const AppShapes child = AppShapes(
+    control: AppRadius.lg,
+    container: AppRadius.xl,
+    sheet: AppRadius.xxl,
+    tile: AppRadius.lg,
+  );
 
   BorderRadius get controlRadius => BorderRadius.circular(control);
 

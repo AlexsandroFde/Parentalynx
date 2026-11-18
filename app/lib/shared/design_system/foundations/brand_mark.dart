@@ -26,7 +26,7 @@ class BrandMark extends StatelessWidget {
   }
 }
 
-/// Simbolo seguido do nome do app.
+/// Simbolo seguido do nome do app, em uma cor so.
 class BrandLockup extends StatelessWidget {
   const BrandLockup({this.markSize = 40, super.key});
 
@@ -35,8 +35,8 @@ class BrandLockup extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final TextStyle? style = context.text.titleLarge?.copyWith(
-      fontWeight: FontWeight.w800,
-      letterSpacing: -0.4,
+      fontWeight: FontWeight.w700,
+      letterSpacing: -0.3,
     );
     return Semantics(
       label: 'ParentaLynx',
@@ -46,20 +46,7 @@ class BrandLockup extends StatelessWidget {
           children: <Widget>[
             BrandMark(size: markSize),
             const SizedBox(width: AppSpacing.md),
-            Flexible(
-              child: Text.rich(
-                TextSpan(
-                  children: <TextSpan>[
-                    const TextSpan(text: 'Parenta'),
-                    TextSpan(
-                      text: 'Lynx',
-                      style: TextStyle(color: context.colors.primary),
-                    ),
-                  ],
-                ),
-                style: style,
-              ),
-            ),
+            Flexible(child: Text('ParentaLynx', style: style)),
           ],
         ),
       ),
@@ -108,13 +95,13 @@ class _LynxPainter extends CustomPainter {
       head = Path.combine(PathOperation.union, head, part);
     }
     final Paint white = Paint()
-      ..color = AppPalette.sand0
+      ..color = AppPalette.graphite0
       ..isAntiAlias = true;
     canvas.drawPath(head, white);
 
     // Tufos das orelhas.
     final Paint tuft = Paint()
-      ..color = AppPalette.sand0
+      ..color = AppPalette.graphite0
       ..strokeWidth = 3.6 * s
       ..strokeCap = StrokeCap.round;
     canvas

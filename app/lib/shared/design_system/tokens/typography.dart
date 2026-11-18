@@ -2,10 +2,13 @@ import 'package:material_ui/material_ui.dart';
 
 /// Tipografia: a familia Manrope, embutida no app.
 ///
-/// Manrope tem desenho geometrico e humano ao mesmo tempo: firme o bastante para o painel do
-/// responsavel e amigavel para a crianca. Os titulos usam espacamento entre letras levemente
-/// negativo (mais compacto e com mais personalidade); o corpo usa peso 500, que fica mais
-/// legivel em telas de baixa densidade.
+/// A hierarquia vem do tamanho e da cor, nao do excesso de peso: titulos, rotulos e numeros em
+/// seminegrito (600) e texto corrido em medio (500), que na Manrope fica firme sem pesar e
+/// continua legivel em telas de baixa densidade. Titulos grandes tem espacamento entre letras
+/// levemente negativo, para ficarem compactos sem precisar de mais peso.
+///
+/// Textos de ate 13 pontos usam 600: com hastes mais finas, a medicao de contraste dos testes
+/// (feita em uma imagem de 1x) confunde o serrilhado com a cor do texto.
 abstract final class AppTypography {
   static const String family = 'Manrope';
 
@@ -34,21 +37,21 @@ abstract final class AppTypography {
     }
 
     return TextTheme(
-      displayLarge: style(52, 56, FontWeight.w800, letterSpacing: -1.6),
-      displayMedium: style(44, 48, FontWeight.w800, letterSpacing: -1.2),
-      displaySmall: style(36, 42, FontWeight.w800, letterSpacing: -0.9),
-      headlineLarge: style(30, 36, FontWeight.w800, letterSpacing: -0.7),
-      headlineMedium: style(26, 32, FontWeight.w700, letterSpacing: -0.5),
-      headlineSmall: style(22, 28, FontWeight.w700, letterSpacing: -0.3),
-      titleLarge: style(19, 26, FontWeight.w700, letterSpacing: -0.2),
-      titleMedium: style(16, 22, FontWeight.w700, letterSpacing: -0.1),
-      titleSmall: style(14, 20, FontWeight.w700),
+      displayLarge: style(48, 52, FontWeight.w600, letterSpacing: -1.4),
+      displayMedium: style(40, 46, FontWeight.w600, letterSpacing: -1.1),
+      displaySmall: style(34, 40, FontWeight.w600, letterSpacing: -0.8),
+      headlineLarge: style(28, 34, FontWeight.w600, letterSpacing: -0.6),
+      headlineMedium: style(24, 30, FontWeight.w600, letterSpacing: -0.5),
+      headlineSmall: style(20, 26, FontWeight.w600, letterSpacing: -0.3),
+      titleLarge: style(18, 24, FontWeight.w600, letterSpacing: -0.2),
+      titleMedium: style(15, 20, FontWeight.w600, letterSpacing: -0.1),
+      titleSmall: style(14, 20, FontWeight.w600),
       bodyLarge: style(16, 24, FontWeight.w500),
       bodyMedium: style(14, 20, FontWeight.w500),
-      bodySmall: style(12.5, 17, FontWeight.w500, letterSpacing: 0.1, color: secondary),
-      labelLarge: style(15, 20, FontWeight.w700),
-      labelMedium: style(13, 18, FontWeight.w700, letterSpacing: 0.1),
-      labelSmall: style(11.5, 16, FontWeight.w700, letterSpacing: 0.4),
+      bodySmall: style(12.5, 18, FontWeight.w500, letterSpacing: 0.1, color: secondary),
+      labelLarge: style(15, 20, FontWeight.w600),
+      labelMedium: style(13, 18, FontWeight.w600),
+      labelSmall: style(11.5, 16, FontWeight.w600, letterSpacing: 0.2),
     );
   }
 }
@@ -77,7 +80,7 @@ class AppTextStyles extends ThemeExtension<AppTextStyles> {
   /// Valores pequenos alinhados em listas (minutos de cada app).
   final TextStyle metricSmall;
 
-  /// Rotulo curto acima de um titulo ("APARELHO", "HOJE").
+  /// Rotulo curto acima de um titulo ("Hoje", "Passo 1 de 3"), em caixa normal.
   final TextStyle eyebrow;
 
   static AppTextStyles build({required Color primary, required Color secondary, double scale = 1}) {
@@ -95,17 +98,17 @@ class AppTextStyles extends ThemeExtension<AppTextStyles> {
     }
 
     return AppTextStyles(
-      metricHero: numeric(52, 56, FontWeight.w800, -1.8),
-      metricLarge: numeric(38, 44, FontWeight.w800, -1.2),
-      metricMedium: numeric(22, 28, FontWeight.w700, -0.4),
-      metricSmall: numeric(14, 20, FontWeight.w700, 0),
+      metricHero: numeric(48, 52, FontWeight.w600, -1.6),
+      metricLarge: numeric(34, 40, FontWeight.w600, -1.0),
+      metricMedium: numeric(20, 26, FontWeight.w600, -0.4),
+      metricSmall: numeric(14, 20, FontWeight.w600, 0),
       eyebrow: TextStyle(
         fontFamily: AppTypography.family,
-        fontSize: 11.5 * scale,
-        height: 16 / 11.5,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 1.1,
+        fontSize: 13 * scale,
+        height: 18 / 13,
+        fontWeight: FontWeight.w600,
         color: secondary,
+        leadingDistribution: TextLeadingDistribution.even,
       ),
     );
   }
