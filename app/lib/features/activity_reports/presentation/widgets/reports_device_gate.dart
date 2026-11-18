@@ -84,7 +84,6 @@ class ReportHeader extends StatelessWidget {
       title: device.displayName,
       subtitle: subtitle,
       bottomSpacing: AppSpacing.lg,
-      trailing: InitialAvatar(name: device.displayName, size: AppSizes.avatarLg),
     );
   }
 }

@@ -241,7 +241,7 @@ BarTouchData _touch(
         final ({String value, String detail}) text = describe(index);
         return BarTooltipItem(
           '${text.value}\n',
-          style.tooltipText.copyWith(fontWeight: FontWeight.w800),
+          style.tooltipText.copyWith(fontWeight: FontWeight.w600),
           children: <TextSpan>[TextSpan(text: text.detail, style: style.tooltipText)],
         );
       },

@@ -340,7 +340,7 @@ class _TimePanel extends StatelessWidget {
           TimeRing(
             progress: display.progress,
             size: _ringSize,
-            strokeWidth: AppSpacing.lg,
+            strokeWidth: AppSpacing.md,
             color: ring,
             semanticLabel: display.spoken,
             child: Column(
@@ -410,36 +410,21 @@ class _HeroValue extends StatelessWidget {
   }
 }
 
-/// Icone em destaque dentro de um circulo, no topo dos paineis de estado.
+/// Icone em destaque no topo dos paineis de estado.
 class _Medallion extends StatelessWidget {
-  const _Medallion({required this.icon, required this.tone, this.onTone = false});
+  const _Medallion({required this.icon, required this.tone});
 
   final IconData icon;
   final Tone tone;
 
-  /// Verdadeiro quando o circulo fica sobre o fundo do proprio tom (painel colorido).
-  final bool onTone;
-
-  static const double _size = AppSizes.avatarLg + AppSpacing.lg;
-
   @override
   Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: Container(
-        width: _size,
-        height: _size,
-        decoration: BoxDecoration(
-          color: onTone ? context.colors.surface : tone.background(context),
-          shape: BoxShape.circle,
-        ),
-        child: Icon(icon, size: AppSizes.iconXl, color: tone.foreground(context)),
-      ),
-    );
+    return IconMedallion(icon: icon, tone: tone, size: AppSizes.illustration);
   }
 }
 
-/// Bloqueio em vigor: o motivo, quando acaba e o que continua funcionando. Usa o tom de
-/// descanso (nunca o vermelho): uma pausa combinada, nao um castigo.
+/// Bloqueio em vigor: o motivo, quando acaba e o que continua funcionando. O icone usa o tom
+/// de descanso (nunca o vermelho): uma pausa combinada, nao um castigo.
 class _LockPanel extends StatelessWidget {
   const _LockPanel({required this.lock, required this.message, required this.onPermissions});
 
@@ -450,7 +435,7 @@ class _LockPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Tone tone = lock == ChildLock.tamperLock ? Tone.neutral : Tone.rest;
-    final Color onTone = tone.onBackground(context);
+    final Color secondary = context.colors.textSecondary;
     final IconData icon = switch (lock) {
       ChildLock.dailyLimit => AppIcons.timeRunningOut,
       ChildLock.schedule => AppIcons.bedtime,
@@ -462,32 +447,25 @@ class _LockPanel extends StatelessWidget {
       liveRegion: true,
       container: true,
       child: AppPanel(
-        tone: tone,
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _Medallion(icon: icon, tone: tone, onTone: true),
+            _Medallion(icon: icon, tone: tone),
             const SizedBox(height: AppSpacing.lg),
-            Semantics(
-              header: true,
-              child: Text(
-                message.title,
-                style: context.text.headlineSmall?.copyWith(color: onTone),
-              ),
-            ),
+            Semantics(header: true, child: Text(message.title, style: context.text.headlineSmall)),
             const SizedBox(height: AppSpacing.sm),
-            Text(message.body, style: context.text.bodyLarge?.copyWith(color: onTone)),
+            Text(message.body, style: context.text.bodyLarge?.copyWith(color: secondary)),
             const SizedBox(height: AppSpacing.lg),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Icon(AppIcons.allowed, size: AppSizes.iconMd, color: onTone),
+                Icon(AppIcons.allowed, size: AppSizes.iconMd, color: secondary),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
                   child: Text(
                     lockedStillWorks,
-                    style: context.text.bodyMedium?.copyWith(color: onTone),
+                    style: context.text.bodyMedium?.copyWith(color: secondary),
                   ),
                 ),
               ],

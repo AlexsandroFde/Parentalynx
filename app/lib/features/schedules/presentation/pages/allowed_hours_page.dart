@@ -267,13 +267,12 @@ class _DaySheetState extends State<_DaySheet> {
               )
             else
               AppListGroup(
-                dividerIndent: AppSpacing.lg,
                 children: <Widget>[
                   for (final DayWindow window in windows)
                     AppListRow(
                       title: '$window',
                       titleStyle: context.text.bodyLarge?.copyWith(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         fontFeatures: AppTypography.tabularFigures,
                       ),
                       trailing: AppIconButton(

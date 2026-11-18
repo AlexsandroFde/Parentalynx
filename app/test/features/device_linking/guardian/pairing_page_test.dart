@@ -104,7 +104,7 @@ void main() {
     codeCanBeGenerated();
     await pumpPairing(tester);
     expect(find.text('Gere um código de vinculação'), findsOneWidget);
-    expect(find.text('Passo 1 de 4'.toUpperCase()), findsOneWidget);
+    expect(find.text('Passo 1 de 4'), findsOneWidget);
 
     backend.onJson('GET', _activePath, <String, Object?>{
       'code': <String, Object?>{'id': 'c1', 'expiresAt': minutesAfterClock(14)},

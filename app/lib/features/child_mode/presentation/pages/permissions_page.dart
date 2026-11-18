@@ -150,7 +150,7 @@ class _Content extends StatelessWidget {
     return ChildPageBody(
       children: <Widget>[
         if (setup) ...<Widget>[
-          Text('Primeiros passos · 2 de 2'.toUpperCase(), style: context.textStyles.eyebrow),
+          Text('Primeiros passos · 2 de 2', style: context.textStyles.eyebrow),
           const SizedBox(height: AppSpacing.md),
           const ChildHeader(
             icon: AppIcons.protection,
@@ -239,7 +239,7 @@ class _NextStep extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              AppIconTile(icon: text.icon, size: AppSizes.avatarLg - AppSpacing.sm),
+              IconMedallion(icon: text.icon, size: AppSizes.avatarLg - AppSpacing.sm),
               const SizedBox(width: AppSpacing.md),
               Expanded(
                 child: Column(

@@ -295,7 +295,7 @@ class _WaitingView extends StatelessWidget {
           padding: const EdgeInsets.all(AppSpacing.xl),
           child: Column(
             children: <Widget>[
-              Text('Número de confirmação'.toUpperCase(), style: context.textStyles.eyebrow),
+              Text('Número de confirmação', style: context.textStyles.eyebrow),
               const SizedBox(height: AppSpacing.md),
               Semantics(
                 label: 'Número de confirmação: $digits',

@@ -80,7 +80,7 @@ class AuthScaffold extends StatelessWidget {
                     if (icon != null) ...<Widget>[
                       Align(
                         alignment: AlignmentDirectional.centerStart,
-                        child: AppIconTile(icon: icon!, size: AppSizes.avatarLg),
+                        child: IconMedallion(icon: icon!, tone: Tone.info),
                       ),
                       const SizedBox(height: AppSpacing.lg),
                     ],
@@ -253,7 +253,7 @@ class RecoveryKeyBox extends StatelessWidget {
         child: Column(
           children: <Widget>[
             Text(
-              'Chave de recuperação'.toUpperCase(),
+              'Chave de recuperação',
               textAlign: TextAlign.center,
               style: context.textStyles.eyebrow,
             ),
@@ -365,16 +365,10 @@ class FormDialogFrame extends StatelessWidget {
             children: <Widget>[
               Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: ExcludeSemantics(
-                  child: Container(
-                    width: AppSizes.avatarLg - AppSpacing.sm,
-                    height: AppSizes.avatarLg - AppSpacing.sm,
-                    decoration: BoxDecoration(
-                      color: tone.background(context),
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(icon, color: tone.foreground(context)),
-                  ),
+                child: IconMedallion(
+                  icon: icon,
+                  tone: tone,
+                  size: AppSizes.avatarLg - AppSpacing.sm,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -388,7 +382,7 @@ class FormDialogFrame extends StatelessWidget {
                 const SizedBox(height: AppSpacing.md),
                 Text(
                   consequence!,
-                  style: context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                  style: context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
                 ),
               ],
               const SizedBox(height: AppSpacing.xl),

@@ -320,7 +320,7 @@ class _AlertRow extends StatelessWidget {
       leading: AlertIcon(type: alert.type),
       title: alert.title,
       titleStyle: context.text.bodyLarge?.copyWith(
-        fontWeight: unread ? FontWeight.w800 : FontWeight.w500,
+        fontWeight: unread ? FontWeight.w600 : FontWeight.w500,
       ),
       subtitle: alert.body.isEmpty ? null : alert.body,
       below: Text(meta, style: context.text.bodySmall),

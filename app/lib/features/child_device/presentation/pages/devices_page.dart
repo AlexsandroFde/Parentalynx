@@ -114,7 +114,6 @@ class _DevicesList extends StatelessWidget {
           AppSection(
             title: 'Ativos',
             child: AppListGroup(
-              dividerIndent: AppSpacing.lg + AppSizes.avatarMd + AppSpacing.md,
               children: <Widget>[
                 for (final ChildDevice device in active)
                   _ActiveRow(device: device, now: now, onTap: () => open(device)),

@@ -605,10 +605,7 @@ class _ActionRow extends StatelessWidget {
         leading: AppIconTile(icon: icon, tone: destructive ? Tone.danger : Tone.info),
         title: title,
         titleStyle: destructive
-            ? context.text.bodyLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: context.colors.danger,
-              )
+            ? context.text.bodyLarge?.copyWith(color: context.colors.danger)
             : null,
         subtitle: subtitle,
         trailing: running

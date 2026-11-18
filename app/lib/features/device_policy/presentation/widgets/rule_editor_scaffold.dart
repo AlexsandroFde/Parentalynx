@@ -501,7 +501,7 @@ class _LeaveDialog extends StatelessWidget {
             children: <Widget>[
               const Align(
                 alignment: AlignmentDirectional.centerStart,
-                child: AppIconTile(icon: AppIcons.edit, size: AppSizes.avatarLg - AppSpacing.sm),
+                child: IconMedallion(icon: AppIcons.edit, size: AppSizes.avatarLg - AppSpacing.sm),
               ),
               const SizedBox(height: AppSpacing.lg),
               Semantics(
@@ -516,7 +516,7 @@ class _LeaveDialog extends StatelessWidget {
               const SizedBox(height: AppSpacing.md),
               Text(
                 'Se descartar, as regras atuais continuam valendo.',
-                style: context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w700),
+                style: context.text.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
               const SizedBox(height: AppSpacing.xl),
               AppButton.primary(

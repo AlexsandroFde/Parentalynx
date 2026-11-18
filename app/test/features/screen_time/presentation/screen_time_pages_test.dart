@@ -80,7 +80,7 @@ void main() {
       acceptSaves();
       await pumpLimit(tester, size: const Size(392, 1400));
 
-      expect(find.text('JOÃO · MOTO G54'), findsOneWidget);
+      expect(find.text('João · moto g54'), findsOneWidget);
       expect(find.byKey(const ValueKey<String>('daily-limit-value')), findsOneWidget);
       expect(find.text('Regras aplicadas no aparelho'), findsOneWidget);
       expect(unsaved, findsNothing);

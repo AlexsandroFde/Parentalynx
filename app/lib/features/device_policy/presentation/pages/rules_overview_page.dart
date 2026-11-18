@@ -128,11 +128,7 @@ class RulesOverviewBody extends StatelessWidget {
           onRefresh: () => _refresh(context),
           children: <Widget>[
             const DeviceSelector(),
-            AppPageHeader(
-              title: 'Regras de $name',
-              subtitle: device.hardwareLabel,
-              trailing: InitialAvatar(name: name, size: AppSizes.avatarLg),
-            ),
+            AppPageHeader(title: 'Regras de $name', subtitle: device.hardwareLabel),
             StateSwitcher(
               child: switch (state) {
                 PolicyOverviewLoading() => const KeyedSubtree(

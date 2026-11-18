@@ -39,7 +39,7 @@ class TransparencyPage extends StatelessWidget {
         child: ChildPageBody(
           children: <Widget>[
             if (setup) ...<Widget>[
-              Text('Primeiros passos · 1 de 2'.toUpperCase(), style: context.textStyles.eyebrow),
+              Text('Primeiros passos · 1 de 2', style: context.textStyles.eyebrow),
               const SizedBox(height: AppSpacing.md),
             ],
             const ChildHeader(

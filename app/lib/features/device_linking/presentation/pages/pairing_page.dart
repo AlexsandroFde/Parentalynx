@@ -397,7 +397,7 @@ class _CodePanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           Text(
-            'CÓDIGO DE VINCULAÇÃO',
+            'Código de vinculação',
             textAlign: TextAlign.center,
             style: context.textStyles.eyebrow,
           ),
@@ -621,25 +621,14 @@ class _SuccessView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const double blob = AppSizes.illustration + AppSpacing.xl;
     return AppPageBody(
       children: <Widget>[
         const SizedBox(height: AppSpacing.lg),
-        Center(
-          child: ExcludeSemantics(
-            child: Container(
-              width: blob,
-              height: blob,
-              decoration: BoxDecoration(
-                color: Tone.success.background(context),
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                AppIcons.check,
-                size: blob * 0.5,
-                color: Tone.success.foreground(context),
-              ),
-            ),
+        const Center(
+          child: IconMedallion(
+            icon: AppIcons.check,
+            tone: Tone.success,
+            size: AppSizes.illustration,
           ),
         ),
         const SizedBox(height: AppSpacing.xl),

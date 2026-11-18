@@ -33,10 +33,10 @@ class AlertVisual {
   }
 }
 
-/// Quadrado com o icone do tipo de alerta, no tom da gravidade. Decorativo: o titulo do
-/// alerta ao lado diz do que se trata.
+/// Icone do tipo de alerta, na cor da gravidade (cinza quando so informa). Decorativo: o
+/// titulo do alerta ao lado diz do que se trata.
 class AlertIcon extends StatelessWidget {
-  const AlertIcon({required this.type, this.size = AppSizes.iconTile, super.key});
+  const AlertIcon({required this.type, this.size = AppSizes.rowIcon, super.key});
 
   final String type;
   final double size;

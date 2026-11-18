@@ -436,23 +436,33 @@ class _GroupedRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final Radius radius = Radius.circular(context.shapes.container);
-    return Material(
-      color: context.colors.surface,
+    // Cada linha desenha a sua parte do contorno do grupo: as laterais sempre, o topo so na
+    // primeira e a base so na ultima. Juntas, parecem um AppListGroup.
+    final BorderSide side = BorderSide(color: context.colors.hairline, width: AppSizes.hairline);
+    return Container(
       clipBehavior: Clip.antiAlias,
-      borderRadius: BorderRadius.vertical(
-        top: first ? radius : Radius.zero,
-        bottom: last ? radius : Radius.zero,
+      decoration: BoxDecoration(
+        color: context.colors.surface,
+        borderRadius: BorderRadius.vertical(
+          top: first ? radius : Radius.zero,
+          bottom: last ? radius : Radius.zero,
+        ),
+        border: Border(
+          left: side,
+          right: side,
+          top: first ? side : BorderSide.none,
+          bottom: last ? side : BorderSide.none,
+        ),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          if (!first)
-            const Divider(
-              height: AppSizes.hairline,
-              indent: AppSpacing.lg + AppSizes.iconTile + AppSpacing.md,
-            ),
-          child,
-        ],
+      child: Material(
+        type: MaterialType.transparency,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (!first) const Divider(height: AppSizes.hairline),
+            child,
+          ],
+        ),
       ),
     );
   }

@@ -304,25 +304,16 @@ class _Overlay extends StatelessWidget {
   }
 }
 
-/// Icone em destaque dentro de um circulo, no topo das paginas do navegador.
+/// Icone em destaque no topo das paginas do navegador.
 class _Medallion extends StatelessWidget {
   const _Medallion({required this.icon, required this.tone});
 
   final IconData icon;
   final Tone tone;
 
-  static const double _size = AppSizes.avatarLg + AppSpacing.xl;
-
   @override
   Widget build(BuildContext context) {
-    return ExcludeSemantics(
-      child: Container(
-        width: _size,
-        height: _size,
-        decoration: BoxDecoration(color: tone.background(context), shape: BoxShape.circle),
-        child: Icon(icon, size: AppSizes.iconXl, color: tone.foreground(context)),
-      ),
-    );
+    return IconMedallion(icon: icon, tone: tone, size: AppSizes.illustration);
   }
 }
 

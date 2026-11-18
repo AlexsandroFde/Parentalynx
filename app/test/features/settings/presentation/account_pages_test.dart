@@ -147,7 +147,7 @@ void main() {
         'password': 'Girassol-azul-42',
       });
       expect(find.text('Guarde a chave de recuperação'), findsOneWidget);
-      expect(find.text('NOVA CHAVE GERADA'), findsOneWidget);
+      expect(find.text('Nova chave gerada'), findsOneWidget);
       expect(find.textContaining('RK-7H2KD-9QWXA'), findsOneWidget);
 
       await tester.ensureVisible(find.text('Guardei a chave em um lugar seguro'));

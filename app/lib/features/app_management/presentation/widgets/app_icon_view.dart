@@ -77,7 +77,7 @@ class _LetterIcon extends StatelessWidget {
         height: size,
         alignment: Alignment.center,
         decoration: BoxDecoration(
-          color: Tone.info.background(context),
+          color: context.colors.surfaceMuted,
           borderRadius: context.shapes.tileRadius,
         ),
         // A letra acompanha o tamanho do quadrado, sem depender da escala de fonte.
@@ -89,8 +89,7 @@ class _LetterIcon extends StatelessWidget {
               textScaler: TextScaler.noScaling,
               style: context.text.titleLarge?.copyWith(
                 height: 1,
-                fontWeight: FontWeight.w800,
-                color: Tone.info.foreground(context),
+                color: context.colors.textSecondary,
               ),
             ),
           ),
