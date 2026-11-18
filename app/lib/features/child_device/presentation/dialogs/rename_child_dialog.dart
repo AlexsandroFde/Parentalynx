@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/services/child_name_policy.dart';
 
 /// Pede o novo nome da crianca. Devolve o nome aceito pela regra, ou nulo se a pessoa
@@ -41,23 +42,49 @@ class _RenameDialogState extends State<_RenameDialog> {
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('Nome da criança'),
-      content: TextField(
-        controller: _name,
-        autofocus: true,
-        textCapitalization: TextCapitalization.words,
-        onSubmitted: (_) => _submit(),
-        decoration: InputDecoration(labelText: 'Nome', errorText: _error),
-      ),
-      actions: <Widget>[
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cancelar')),
-        FilledButton(
-          style: FilledButton.styleFrom(minimumSize: const Size(64, 44)),
-          onPressed: _submit,
-          child: const Text('Salvar'),
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: AppSpacing.maxFormWidth),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(AppSpacing.xl),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Semantics(
+                header: true,
+                child: Text('Nome da criança', style: context.text.headlineSmall),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'O nome aparece no painel, nas regras e nos relatórios.',
+                style: context.text.bodyLarge?.copyWith(color: context.colors.textSecondary),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              AppTextField(
+                label: 'Nome',
+                controller: _name,
+                isRequired: true,
+                autofocus: true,
+                helper: 'Até ${ChildNamePolicy.maxLength} caracteres.',
+                errorText: _error,
+                prefixIcon: AppIcons.child,
+                textCapitalization: TextCapitalization.words,
+                textInputAction: TextInputAction.done,
+                onSubmitted: (_) => _submit(),
+              ),
+              const SizedBox(height: AppSpacing.xl),
+              AppButton.primary(label: 'Salvar', expand: true, onPressed: _submit),
+              const SizedBox(height: AppSpacing.sm),
+              AppButton.tertiary(
+                label: 'Cancelar',
+                expand: true,
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            ],
+          ),
         ),
-      ],
+      ),
     );
   }
 }

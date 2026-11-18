@@ -20,6 +20,7 @@ import '../../../../child_device/domain/usecases/watch_child_devices.dart';
 import '../../../../device_policy/domain/entities/policy.dart';
 import '../../../../device_policy/domain/entities/versioned_policy.dart';
 import '../../../../device_policy/domain/usecases/get_device_policy.dart';
+import '../../../../device_sync/domain/entities/policy_sync_status.dart';
 import '../../../../notifications/domain/entities/guardian_alert.dart';
 import '../../../../notifications/domain/usecases/get_recent_alerts.dart';
 import '../../../../notifications/domain/usecases/watch_incoming_alerts.dart';
@@ -144,7 +145,7 @@ class GuardianDashboardBloc extends Bloc<GuardianDashboardEvent, GuardianDashboa
     Emitter<GuardianDashboardState> emit,
   ) async {
     try {
-      await Future.wait(<Future<void>>[_loadApps(emit), _loadAlerts(emit)]);
+      await Future.wait(<Future<void>>[_loadApps(emit), _loadAlerts(emit), _loadPolicy(emit)]);
     } finally {
       event.completer?.complete();
     }
@@ -211,34 +212,38 @@ class GuardianDashboardBloc extends Bloc<GuardianDashboardEvent, GuardianDashboa
   ) {
     return _runCommand(
       emit,
+      DashboardCommand(DashboardCommandKind.extraTime, minutes: event.minutes),
       (String deviceId) => _grantAdditionalTime(deviceId, minutes: event.minutes),
       (ChildDevice device) =>
-          '${formatMinutes(event.minutes)} a mais enviados para '
-          '${device.displayName}.',
+          '${formatMinutes(event.minutes)} a mais para hoje. ${_delivery(device)}',
     );
   }
 
   Future<void> _onPause(DashboardPauseRequested event, Emitter<GuardianDashboardState> emit) {
     return _runCommand(
       emit,
+      const DashboardCommand(DashboardCommandKind.pause),
       (String deviceId) => _lockDeviceNow(deviceId, duration: event.duration),
-      (ChildDevice device) => 'Pausa enviada para ${device.displayName}.',
+      (ChildDevice device) => 'Pausa salva. ${_delivery(device)}',
     );
   }
 
   Future<void> _onResume(DashboardResumeRequested event, Emitter<GuardianDashboardState> emit) {
     return _runCommand(
       emit,
+      const DashboardCommand(DashboardCommandKind.resume),
       _unlockDevice.call,
-      (ChildDevice device) => 'Retomada enviada para ${device.displayName}.',
+      (ChildDevice device) => 'Pausa encerrada. ${_delivery(device)}',
     );
   }
 
   Future<void> _onSuspend(DashboardSuspendRequested event, Emitter<GuardianDashboardState> emit) {
     return _runCommand(
       emit,
+      DashboardCommand(DashboardCommandKind.suspend, minutes: event.minutes),
       (String deviceId) => _suspendRules(deviceId, minutes: event.minutes, scopes: event.scopes),
-      (ChildDevice device) => 'Regras suspensas por ${formatMinutes(event.minutes)}.',
+      (ChildDevice device) =>
+          'Regras suspensas por ${formatMinutes(event.minutes)}. ${_delivery(device)}',
     );
   }
 
@@ -248,15 +253,25 @@ class GuardianDashboardBloc extends Bloc<GuardianDashboardEvent, GuardianDashboa
   ) {
     return _runCommand(
       emit,
+      const DashboardCommand(DashboardCommandKind.endSuspension),
       _resumeRules.call,
-      (ChildDevice device) => 'As regras voltam a valer para ${device.displayName}.',
+      (ChildDevice device) => 'Suspensão encerrada. ${_delivery(device)}',
     );
+  }
+
+  /// O comando fica salvo no servidor e so vale quando o aparelho receber. A mensagem diz
+  /// isso, e avisa quando o aparelho esta sem conexao.
+  static String _delivery(ChildDevice device) {
+    return device.online
+        ? 'O aparelho de ${device.displayName} recebe em instantes.'
+        : 'O aparelho de ${device.displayName} está sem conexão e recebe quando voltar.';
   }
 
   /// Envia um comando ao aparelho em foco e adota a politica devolvida. Desistir do pedido de
   /// senha volta ao estado anterior sem aviso.
   Future<void> _runCommand(
     Emitter<GuardianDashboardState> emit,
+    DashboardCommand which,
     Future<Result<VersionedPolicy>> Function(String deviceId) command,
     String Function(ChildDevice device) successMessage,
   ) async {
@@ -265,7 +280,7 @@ class GuardianDashboardBloc extends Bloc<GuardianDashboardEvent, GuardianDashboa
     if (deviceId == null || device == null) {
       return;
     }
-    emit(state.copyWith(command: const ActionRunning()));
+    emit(state.copyWith(command: const ActionRunning(), lastCommand: which));
     final Result<VersionedPolicy> result = await command(deviceId);
     switch (result) {
       case Ok<VersionedPolicy>(:final VersionedPolicy value):

@@ -173,7 +173,11 @@ void main() {
       },
       skip: 1,
       expect: () => <ChildDeviceState>[
-        ChildDeviceLoaded(device: joao, action: const ActionRunning()),
+        ChildDeviceLoaded(
+          device: joao,
+          action: const ActionRunning(),
+          task: ChildDeviceTask.rename,
+        ),
         ChildDeviceLoaded(
           device: joao,
           action: const ActionSucceeded(message: 'Nome alterado.'),
@@ -194,7 +198,11 @@ void main() {
       },
       skip: 1,
       expect: () => <ChildDeviceState>[
-        ChildDeviceLoaded(device: joao, action: const ActionRunning()),
+        ChildDeviceLoaded(
+          device: joao,
+          action: const ActionRunning(),
+          task: ChildDeviceTask.revoke,
+        ),
         ChildDeviceLoaded(device: joao),
       ],
     );
@@ -211,7 +219,11 @@ void main() {
       },
       skip: 1,
       expect: () => <ChildDeviceState>[
-        ChildDeviceLoaded(device: joao, action: const ActionRunning()),
+        ChildDeviceLoaded(
+          device: joao,
+          action: const ActionRunning(),
+          task: ChildDeviceTask.deleteData,
+        ),
         ChildDeviceLoaded(device: joao, action: const ActionFailed(NetworkFailure())),
       ],
     );

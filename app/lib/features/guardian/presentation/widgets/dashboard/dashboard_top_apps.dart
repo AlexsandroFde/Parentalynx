@@ -3,86 +3,74 @@ import 'package:material_ui/material_ui.dart';
 
 import '../../../../../core/constants/route_paths.dart';
 import '../../../../../core/time/formatters.dart';
-import '../../../../../shared/theme/app_theme.dart';
-import '../../../../../shared/widgets/form_widgets.dart';
+import '../../../../../shared/design_system/design_system.dart';
 import '../../../../app_management/domain/entities/app_entry.dart';
 import '../../../../app_management/presentation/widgets/app_icon_view.dart';
 import '../../bloc/dashboard/panel_state.dart';
 
-/// Apps mais usados hoje, com uma barra proporcional ao mais usado.
+/// Apps mais usados hoje em uma lista agrupada, com o tempo a direita e uma barra
+/// proporcional ao mais usado.
 class DashboardTopApps extends StatelessWidget {
-  const DashboardTopApps({required this.apps, super.key});
+  const DashboardTopApps({
+    required this.apps,
+    required this.childName,
+    required this.onRetry,
+    super.key,
+  });
 
   final PanelState<DeviceApps> apps;
+  final String childName;
+  final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final List<AppEntry> top = apps.valueOrNull?.topToday() ?? const <AppEntry>[];
     final int maxMs = top.isEmpty ? 1 : top.first.todayMs;
-    final Widget content = switch (apps) {
-      PanelLoading<DeviceApps>() => const Padding(
-        padding: EdgeInsets.all(AppSpacing.md),
-        child: Center(child: CircularProgressIndicator()),
-      ),
-      PanelFailed<DeviceApps>() => Text(
-        'Não foi possível carregar os apps. Puxe para atualizar.',
-        style: theme.textTheme.bodyMedium,
-      ),
-      PanelLoaded<DeviceApps>() when top.isEmpty => Text(
-        'Nenhum uso registrado hoje.',
-        style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-      ),
-      PanelLoaded<DeviceApps>() => Column(
-        children: <Widget>[
-          for (final AppEntry app in top)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 6),
-              child: Row(
-                children: <Widget>[
-                  AppIconView.forApp(app, size: 36),
-                  const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Row(
-                          children: <Widget>[
-                            Expanded(
-                              child: Text(
-                                app.label,
-                                style: theme.textTheme.bodyLarge,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            Text(formatDurationMs(app.todayMs), style: theme.textTheme.labelLarge),
-                          ],
-                        ),
-                        const SizedBox(height: 4),
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(3),
-                          child: LinearProgressIndicator(
-                            value: (app.todayMs / maxMs).clamp(0.0, 1.0),
-                            minHeight: 6,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-        ],
-      ),
-    };
-    return SectionCard(
+    return AppSection(
       title: 'Mais usados hoje',
-      trailing: TextButton(
-        onPressed: () => context.go(GuardianPaths.reports),
-        child: const Text('Relatórios'),
+      actionLabel: 'Relatórios',
+      onAction: () => context.go(GuardianPaths.reports),
+      child: StateSwitcher(
+        child: switch (apps) {
+          PanelLoading<DeviceApps>() => const SkeletonListGroup(
+            key: ValueKey<String>('apps-carregando'),
+          ),
+          PanelFailed<DeviceApps>(:final failure) => AppPanel(
+            key: const ValueKey<String>('apps-erro'),
+            child: ErrorState(
+              compact: true,
+              title: 'Não foi possível carregar os apps',
+              message: failure.message,
+              onRetry: onRetry,
+            ),
+          ),
+          PanelLoaded<DeviceApps>() when top.isEmpty => AppPanel(
+            key: const ValueKey<String>('apps-vazio'),
+            child: EmptyState(
+              compact: true,
+              icon: AppIcons.apps,
+              title: 'Nenhum uso registrado hoje',
+              message: 'Os apps que $childName usar hoje aparecem aqui, do mais usado ao menos.',
+            ),
+          ),
+          PanelLoaded<DeviceApps>() => AppListGroup(
+            key: const ValueKey<String>('apps-lista'),
+            children: <Widget>[
+              for (final AppEntry app in top)
+                AppListRow(
+                  leading: AppIconView.forApp(app, size: AppSizes.iconTile),
+                  title: app.label,
+                  titleStyle: context.text.bodyLarge,
+                  trailing: Text(
+                    formatDurationMs(app.todayMs),
+                    style: context.textStyles.metricSmall,
+                  ),
+                  below: UsageBar(fraction: app.todayMs / maxMs),
+                ),
+            ],
+          ),
+        },
       ),
-      child: content,
     );
   }
 }

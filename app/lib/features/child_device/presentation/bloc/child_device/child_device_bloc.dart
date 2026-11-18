@@ -84,18 +84,25 @@ class ChildDeviceBloc extends Bloc<ChildDeviceEvent, ChildDeviceState> {
   Future<void> _onRename(ChildDeviceRenameRequested event, Emitter<ChildDeviceState> emit) {
     return _run(
       emit,
+      ChildDeviceTask.rename,
       (ChildDevice device) => _rename(device.id, childName: event.childName),
       success: 'Nome alterado.',
     );
   }
 
   Future<void> _onRevoke(ChildDeviceRevokeRequested event, Emitter<ChildDeviceState> emit) {
-    return _run(emit, (ChildDevice device) => _revoke(device.id), success: 'Vínculo revogado.');
+    return _run(
+      emit,
+      ChildDeviceTask.revoke,
+      (ChildDevice device) => _revoke(device.id),
+      success: 'Vínculo revogado. O aparelho deixa de ser controlado ao sincronizar.',
+    );
   }
 
   Future<void> _onDeleteData(ChildDeviceDataDeleteRequested event, Emitter<ChildDeviceState> emit) {
     return _run(
       emit,
+      ChildDeviceTask.deleteData,
       (ChildDevice device) => _deleteData(device.id),
       success: 'Histórico apagado.',
     );
@@ -106,7 +113,7 @@ class ChildDeviceBloc extends Bloc<ChildDeviceEvent, ChildDeviceState> {
     if (current is! ChildDeviceLoaded || current.busy) {
       return;
     }
-    emit(current.copyWith(action: const ActionRunning()));
+    emit(current.copyWith(action: const ActionRunning(), task: ChildDeviceTask.delete));
     final Result<void> result = await _delete(current.device.id);
     switch (result) {
       case Ok<void>():
@@ -119,6 +126,7 @@ class ChildDeviceBloc extends Bloc<ChildDeviceEvent, ChildDeviceState> {
   Future<void> _onExport(ChildDeviceExportRequested event, Emitter<ChildDeviceState> emit) {
     return _run<String>(
       emit,
+      ChildDeviceTask.export,
       (ChildDevice device) => _export(device.id),
       outcome: ChildDeviceExportReady.new,
     );
@@ -130,6 +138,7 @@ class ChildDeviceBloc extends Bloc<ChildDeviceEvent, ChildDeviceState> {
   ) {
     return _run<String>(
       emit,
+      ChildDeviceTask.offlineCode,
       (ChildDevice device) => _offlineSecret(device.id),
       outcome: ChildDeviceOfflineSecretReady.new,
     );
@@ -139,6 +148,7 @@ class ChildDeviceBloc extends Bloc<ChildDeviceEvent, ChildDeviceState> {
   /// volta ao estado anterior sem aviso.
   Future<void> _run<T>(
     Emitter<ChildDeviceState> emit,
+    ChildDeviceTask task,
     Future<Result<T>> Function(ChildDevice device) action, {
     String? success,
     ChildDeviceOutcome Function(T value)? outcome,
@@ -147,14 +157,15 @@ class ChildDeviceBloc extends Bloc<ChildDeviceEvent, ChildDeviceState> {
     if (current is! ChildDeviceLoaded || current.busy) {
       return;
     }
-    emit(current.copyWith(action: const ActionRunning()));
+    emit(current.copyWith(action: const ActionRunning(), task: task));
     final Result<T> result = await action(current.device);
     switch (result) {
       case Ok<T>(:final T value):
         final ChildDeviceState latest = state;
         if (latest is ChildDeviceLoaded) {
           emit(
-            latest.copyWith(
+            ChildDeviceLoaded(
+              device: latest.device,
               action: ActionSucceeded(message: success),
               outcome: outcome?.call(value),
             ),
@@ -168,7 +179,7 @@ class ChildDeviceBloc extends Bloc<ChildDeviceEvent, ChildDeviceState> {
   void _emitFailure(Emitter<ChildDeviceState> emit, AppFailure failure) {
     final ChildDeviceState latest = state;
     if (latest is ChildDeviceLoaded) {
-      emit(latest.copyWith(action: actionStatusForFailure(failure)));
+      emit(ChildDeviceLoaded(device: latest.device, action: actionStatusForFailure(failure)));
     }
   }
 }

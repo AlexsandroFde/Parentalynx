@@ -134,6 +134,7 @@ void main() {
       expect(commands.suspended, isTrue);
       expect(commands.suspension!.scopes, <SuspensionScope>[SuspensionScope.dailyLimit]);
       expect(commands.extraMinutesToday, 45);
+      expect(commands.pausedUntil, dashboardNowMs + 60000);
     });
 
     test('comandos vencidos nao valem mais', () {
@@ -164,6 +165,7 @@ void main() {
 
       expect(commands.paused, isTrue);
       expect(commands.suspended, isFalse);
+      expect(commands.pausedUntil, isNull);
     });
   });
 

@@ -12,6 +12,7 @@ final class DeviceLinkingState extends Equatable {
     this.approved,
     this.loaded = false,
     this.offline = false,
+    this.codeExpired = false,
     this.command,
     this.actingOn,
     this.action = const ActionIdle(),
@@ -35,6 +36,9 @@ final class DeviceLinkingState extends Equatable {
 
   /// Verdadeiro depois da primeira consulta ao servidor.
   final bool loaded;
+
+  /// O codigo mostrado venceu sem ser usado. A tela explica e oferece gerar outro.
+  final bool codeExpired;
 
   /// A ultima consulta falhou por falta de conexao.
   final bool offline;
@@ -71,6 +75,7 @@ final class DeviceLinkingState extends Equatable {
     LinkRequest? Function()? approved,
     bool? loaded,
     bool? offline,
+    bool? codeExpired,
     LinkingCommand? command,
     String? Function()? actingOn,
     ActionStatus? action,
@@ -85,6 +90,7 @@ final class DeviceLinkingState extends Equatable {
       approved: approved == null ? this.approved : approved(),
       loaded: loaded ?? this.loaded,
       offline: offline ?? this.offline,
+      codeExpired: codeExpired ?? this.codeExpired,
       command: command ?? this.command,
       actingOn: actingOn == null ? this.actingOn : actingOn(),
       action: action ?? this.action,
@@ -100,6 +106,7 @@ final class DeviceLinkingState extends Equatable {
     approved,
     loaded,
     offline,
+    codeExpired,
     command,
     actingOn,
     action,

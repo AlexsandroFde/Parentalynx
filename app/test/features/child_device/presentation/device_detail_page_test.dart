@@ -27,6 +27,8 @@ void main() {
     final Map<String, Object?> devices = <String, Object?>{
       'devices': <Object?>[
         deviceJson(pendingTimeRequests: 1, issues: <String>['accessibility_disabled']),
+        deviceJson(id: 'd2', childName: 'Bia', online: false),
+        deviceJson(id: 'd3', childName: 'Leo', status: 'revoked'),
       ],
     };
     // Os exemplos usam o relogio real ("ha 1 min"): o relogio do teste parte de depois deles.
@@ -44,12 +46,34 @@ void main() {
     );
   }
 
-  Future<GoRouter> pumpDetail(WidgetTester tester) {
+  Future<GoRouter> pumpDetail(
+    WidgetTester tester, {
+    Size size = phoneSize,
+    Brightness brightness = Brightness.light,
+  }) {
     return pumpGuardianRoutes(
       tester,
       routes: childDeviceRoutes(deps.di),
       location: GuardianPaths.device('d1'),
       deps: deps,
+      size: size,
+      brightness: brightness,
+      wrap: devicesScope,
+    );
+  }
+
+  Future<GoRouter> pumpList(
+    WidgetTester tester, {
+    Size size = phoneSize,
+    Brightness brightness = Brightness.light,
+  }) {
+    return pumpGuardianRoutes(
+      tester,
+      routes: childDeviceRoutes(deps.di),
+      location: GuardianPaths.devices,
+      deps: deps,
+      size: size,
+      brightness: brightness,
       wrap: devicesScope,
     );
   }
@@ -61,46 +85,45 @@ void main() {
     await settle(tester);
   }
 
-  testWidgets(
-    'detalhe do aparelho mostra o nivel de protecao e as permissoes',
-    tags: 'screenshot',
-    (WidgetTester tester) async {
-      await pumpWidgetInApp(
-        tester,
-        devicesScope(
-          BlocProvider<ChildDeviceBloc>(
-            create: (BuildContext context) {
-              return deps.di<ChildDeviceBloc>()..add(const ChildDeviceStarted('d1'));
-            },
-            child: DeviceDetailPage(
-              offlineCodeBloc: (String secret) => deps.di<OfflineCodeBloc>(param1: secret),
-            ),
+  testWidgets('detalhe do aparelho mostra o nivel de protecao e as permissoes com o que fazer', (
+    WidgetTester tester,
+  ) async {
+    await pumpWidgetInApp(
+      tester,
+      devicesScope(
+        BlocProvider<ChildDeviceBloc>(
+          create: (BuildContext context) {
+            return deps.di<ChildDeviceBloc>()..add(const ChildDeviceStarted('d1'));
+          },
+          child: DeviceDetailPage(
+            offlineCodeBloc: (String secret) => deps.di<OfflineCodeBloc>(param1: secret),
           ),
         ),
-        di: deps.di,
-      );
-      await settle(tester);
-
-      expect(find.text('Nível de proteção'), findsOneWidget);
-      expect(find.text('Padrão'), findsOneWidget);
-      expect(find.text('O que não é garantido'), findsOneWidget);
-      await expectScreenshot(tester, 'guardian_device_detail');
-
-      await tester.scrollUntilVisible(find.text('Acessibilidade: desativada'), 300);
-      expect(find.textContaining('serviço de acessibilidade está desativado'), findsOneWidget);
-    },
-  );
-
-  testWidgets('a lista de aparelhos abre o detalhe', (WidgetTester tester) async {
-    await pumpGuardianRoutes(
-      tester,
-      routes: childDeviceRoutes(deps.di),
-      location: GuardianPaths.devices,
-      deps: deps,
-      wrap: devicesScope,
+      ),
+      di: deps.di,
     );
+    await settle(tester);
+
+    expect(find.text('Regras aplicadas no aparelho'), findsOneWidget);
+    expect(find.text('Nível de proteção'), findsOneWidget);
+    expect(find.text('Padrão'), findsOneWidget);
+    expect(find.text('O que não é garantido'), findsOneWidget);
+
+    await tester.scrollUntilVisible(find.text('Acessibilidade'), 300);
+    expect(find.text('Serviço de acessibilidade desativado'), findsOneWidget);
+    expect(find.textContaining('reative a acessibilidade'), findsOneWidget);
+    expect(find.text('Desativada'), findsWidgets);
+  });
+
+  testWidgets('a lista de aparelhos separa ativos e desvinculados e abre o detalhe', (
+    WidgetTester tester,
+  ) async {
+    await pumpList(tester);
 
     expect(find.text('Aparelhos'), findsOneWidget);
+    expect(find.text('Ativos'), findsOneWidget);
+    expect(find.text('Proteção incompleta'), findsOneWidget);
+    expect(find.text('Desvinculados'), findsOneWidget);
     await tester.tap(find.text('João'));
     await settle(tester);
 
@@ -143,7 +166,6 @@ void main() {
     await pumpDetail(tester);
 
     await reveal(tester, find.text('Exportar dados'));
-    await settle(tester);
     await tester.tap(find.text('Exportar dados'));
     await settle(tester);
 
@@ -164,6 +186,7 @@ void main() {
     await tester.tap(find.text('Mostrar código'));
     await settle(tester);
 
+    expect(find.text('Código de acesso offline'), findsWidgets);
     expect(find.text('${code.substring(0, 4)} ${code.substring(4)}'), findsOneWidget);
     expect(find.text('Muda em 50 s'), findsOneWidget);
 
@@ -172,9 +195,25 @@ void main() {
     expect(find.text('Muda em 49 s'), findsOneWidget);
 
     // Fecha a folha, o que encerra a contagem.
-    await tester.tapAt(const Offset(20, 20));
+    await tester.tap(find.byTooltip('Fechar'));
     await settle(tester);
     expect(find.text('Muda em 49 s'), findsNothing);
+  });
+
+  testWidgets('desvincular pede confirmacao com a consequencia antes de enviar', (
+    WidgetTester tester,
+  ) async {
+    await pumpDetail(tester);
+
+    await reveal(tester, find.text('Desvincular aparelho'));
+    await tester.tap(find.text('Desvincular aparelho'));
+    await settle(tester);
+
+    expect(find.text('Desvincular o aparelho de João?'), findsOneWidget);
+    expect(find.textContaining('O histórico fica guardado'), findsWidgets);
+    await tester.tap(find.text('Cancelar'));
+    await settle(tester);
+    expect(deps.backend.calls('POST', '$devicePath/revoke'), isEmpty);
   });
 
   testWidgets('apagar o aparelho pede confirmacao, apaga e volta para a lista', (
@@ -184,15 +223,72 @@ void main() {
     await pumpDetail(tester);
 
     await reveal(tester, find.text('Apagar aparelho e histórico'));
-    await settle(tester);
     await tester.tap(find.text('Apagar aparelho e histórico'));
     await settle(tester);
     expect(find.text('Apagar João?'), findsOneWidget);
+    expect(find.text('Esta ação não pode ser desfeita.'), findsOneWidget);
     await tester.tap(find.text('Apagar tudo'));
     await settle(tester);
 
     expect(deps.backend.calls('DELETE', devicePath), hasLength(1));
     expect(find.text('Aparelho apagado.'), findsOneWidget);
     expect(find.text('Aparelhos'), findsOneWidget);
+  });
+
+  testWidgets('detalhe e lista funcionam com a fonte no maior tamanho', (
+    WidgetTester tester,
+  ) async {
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    await pumpDetail(tester, size: const Size(392, 2400));
+    expect(tester.takeException(), isNull);
+    await tester.scrollUntilVisible(find.text('Apagar aparelho e histórico'), 400);
+    expect(tester.takeException(), isNull);
+
+    await pumpList(tester);
+    expect(find.text('Ativos'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('detalhe e lista seguem as diretrizes de acessibilidade', (
+    WidgetTester tester,
+  ) async {
+    await pumpDetail(tester, size: const Size(392, 2600));
+    await expectAccessible(tester);
+
+    await pumpList(tester);
+    await expectAccessible(tester);
+  });
+
+  group('capturas', () {
+    for (final Brightness brightness in Brightness.values) {
+      final String theme = brightness == Brightness.light ? '' : '_escuro';
+
+      testWidgets('detalhe do aparelho$theme', tags: 'screenshot', (WidgetTester tester) async {
+        await pumpDetail(tester, size: const Size(392, 2600), brightness: brightness);
+        await expectScreenshot(tester, 'guardian_device_detail$theme');
+      });
+
+      testWidgets('lista de aparelhos$theme', tags: 'screenshot', (WidgetTester tester) async {
+        await pumpList(tester, brightness: brightness);
+        await expectScreenshot(tester, 'guardian_devices$theme');
+      });
+
+      testWidgets('codigo de acesso offline$theme', tags: 'screenshot', (
+        WidgetTester tester,
+      ) async {
+        deps.backend.onJson('GET', '$devicePath/offline-secret', <String, Object?>{
+          'secret': 'JBSWY3DPEHPK3PXP',
+        });
+        await pumpDetail(tester, brightness: brightness);
+        deps.clock.current = DateTime(2026, 11, 17, 15, 30, 10);
+        await reveal(tester, find.text('Mostrar código'));
+        await tester.tap(find.text('Mostrar código'));
+        await settle(tester);
+        await expectScreenshot(tester, 'guardian_offline_code$theme');
+        await tester.tap(find.byTooltip('Fechar'));
+        await settle(tester);
+      });
+    }
   });
 }

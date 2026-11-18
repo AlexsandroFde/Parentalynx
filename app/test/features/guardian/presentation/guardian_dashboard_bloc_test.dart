@@ -121,6 +121,7 @@ void main() {
     VersionedPolicy? withPolicy,
     ActiveCommands commands = ActiveCommands.none,
     ActionStatus command = const ActionIdle(),
+    DashboardCommand? lastCommand,
   }) {
     return GuardianDashboardState(
       deviceId: 'dev-1',
@@ -131,6 +132,7 @@ void main() {
       recentAlerts: PanelLoaded<List<GuardianAlert>>(alerts),
       commands: commands,
       command: command,
+      lastCommand: lastCommand,
     );
   }
 
@@ -186,6 +188,7 @@ void main() {
         expect(bloc.state, loaded());
         verify(() => getApps('dev-1')).called(2);
         verify(() => getRecentAlerts()).called(2);
+        verify(() => getPolicy('dev-1')).called(2);
       },
     );
 
@@ -267,6 +270,10 @@ void main() {
   });
 
   group('acoes rapidas', () {
+    const DashboardCommand extra30 = DashboardCommand(DashboardCommandKind.extraTime, minutes: 30);
+    const DashboardCommand extra15 = DashboardCommand(DashboardCommandKind.extraTime, minutes: 15);
+    const DashboardCommand resume = DashboardCommand(DashboardCommandKind.resume);
+
     final VersionedPolicy withExtra = versionedPolicyOf(
       version: 13,
       overrides: const PolicyOverrides(
@@ -291,11 +298,14 @@ void main() {
       },
       skip: 5,
       expect: () => <GuardianDashboardState>[
-        loaded(command: const ActionRunning()),
+        loaded(command: const ActionRunning(), lastCommand: extra30),
         loaded(
           withPolicy: withExtra,
           commands: const ActiveCommands(extraMinutesToday: 30),
-          command: const ActionSucceeded(message: '30min a mais enviados para João.'),
+          command: const ActionSucceeded(
+            message: '30min a mais para hoje. O aparelho de João recebe em instantes.',
+          ),
+          lastCommand: extra30,
         ),
       ],
       verify: (_) => verify(() => grantAdditionalTime('dev-1', minutes: 30)).called(1),
@@ -322,12 +332,23 @@ void main() {
         bloc.add(const DashboardPauseRequested());
         await pumpEventQueue();
         expect(bloc.state.commands.paused, isTrue);
-        expect(bloc.state.command, const ActionSucceeded(message: 'Pausa enviada para João.'));
+        expect(
+          bloc.state.command,
+          const ActionSucceeded(message: 'Pausa salva. O aparelho de João recebe em instantes.'),
+        );
+        // Salva no servidor, mas so vale quando o aparelho confirmar a versao nova.
+        expect(bloc.state.policySync!.isPending, isTrue);
+        expect(bloc.state.policySync!.serverVersion, 13);
         bloc.add(const DashboardResumeRequested());
       },
       verify: (GuardianDashboardBloc bloc) {
         expect(bloc.state.commands.paused, isFalse);
-        expect(bloc.state.command, const ActionSucceeded(message: 'Retomada enviada para João.'));
+        expect(
+          bloc.state.command,
+          const ActionSucceeded(
+            message: 'Pausa encerrada. O aparelho de João recebe em instantes.',
+          ),
+        );
         verify(() => lockDeviceNow('dev-1')).called(1);
         verify(() => unlockDevice('dev-1')).called(1);
       },
@@ -370,14 +391,21 @@ void main() {
         );
         await pumpEventQueue();
         expect(bloc.state.commands.suspended, isTrue);
-        expect(bloc.state.command, const ActionSucceeded(message: 'Regras suspensas por 1h.'));
+        expect(
+          bloc.state.command,
+          const ActionSucceeded(
+            message: 'Regras suspensas por 1h. O aparelho de João recebe em instantes.',
+          ),
+        );
         bloc.add(const DashboardSuspensionEndRequested());
       },
       verify: (GuardianDashboardBloc bloc) {
         expect(bloc.state.commands.suspended, isFalse);
         expect(
           bloc.state.command,
-          const ActionSucceeded(message: 'As regras voltam a valer para João.'),
+          const ActionSucceeded(
+            message: 'Suspensão encerrada. O aparelho de João recebe em instantes.',
+          ),
         );
         verify(
           () => suspendRules(
@@ -404,7 +432,10 @@ void main() {
         bloc.add(const DashboardExtraTimeRequested(15));
       },
       skip: 5,
-      expect: () => <GuardianDashboardState>[loaded(command: const ActionRunning()), loaded()],
+      expect: () => <GuardianDashboardState>[
+        loaded(command: const ActionRunning(), lastCommand: extra15),
+        loaded(lastCommand: extra15),
+      ],
     );
 
     blocTest<GuardianDashboardBloc, GuardianDashboardState>(
@@ -421,8 +452,8 @@ void main() {
       },
       skip: 5,
       expect: () => <GuardianDashboardState>[
-        loaded(command: const ActionRunning()),
-        loaded(command: const ActionFailed(NetworkFailure())),
+        loaded(command: const ActionRunning(), lastCommand: resume),
+        loaded(command: const ActionFailed(NetworkFailure()), lastCommand: resume),
       ],
     );
 

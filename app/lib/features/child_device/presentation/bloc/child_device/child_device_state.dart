@@ -52,9 +52,17 @@ final class ChildDeviceRemoved extends ChildDeviceState {
   const ChildDeviceRemoved();
 }
 
+/// Acao administrativa sobre o aparelho, para a tela mostrar o andamento no controle tocado.
+enum ChildDeviceTask { rename, revoke, deleteData, delete, export, offlineCode }
+
 /// Aparelho carregado.
 final class ChildDeviceLoaded extends ChildDeviceState {
-  const ChildDeviceLoaded({required this.device, this.action = const ActionIdle(), this.outcome});
+  const ChildDeviceLoaded({
+    required this.device,
+    this.action = const ActionIdle(),
+    this.outcome,
+    this.task,
+  });
 
   final ChildDevice device;
 
@@ -64,20 +72,28 @@ final class ChildDeviceLoaded extends ChildDeviceState {
   /// O que a acao concluida entregou para a tela tratar.
   final ChildDeviceOutcome? outcome;
 
+  /// Acao em andamento (nula quando nada esta rodando).
+  final ChildDeviceTask? task;
+
   bool get busy => action.isRunning;
+
+  /// Acao em andamento agora, ou nulo.
+  ChildDeviceTask? get runningTask => busy ? task : null;
 
   ChildDeviceLoaded copyWith({
     ChildDevice? device,
     ActionStatus? action,
     ChildDeviceOutcome? outcome,
+    ChildDeviceTask? task,
   }) {
     return ChildDeviceLoaded(
       device: device ?? this.device,
       action: action ?? this.action,
       outcome: outcome,
+      task: task ?? this.task,
     );
   }
 
   @override
-  List<Object?> get props => <Object?>[device, action, outcome];
+  List<Object?> get props => <Object?>[device, action, outcome, task];
 }

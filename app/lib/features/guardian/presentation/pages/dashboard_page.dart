@@ -7,27 +7,26 @@ import 'package:material_ui/material_ui.dart';
 import '../../../../core/bloc/action_status.dart';
 import '../../../../core/constants/route_paths.dart';
 import '../../../../core/time/clock.dart';
-import '../../../../core/time/formatters.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../../child_device/domain/entities/child_device.dart';
 import '../../../child_device/presentation/bloc/devices/devices_bloc.dart';
 import '../../../child_device/presentation/widgets/device_selector.dart';
-import '../../../device_policy/domain/entities/policy.dart';
-import '../../domain/entities/active_commands.dart';
 import '../../domain/entities/device_connection.dart';
 import '../bloc/dashboard/guardian_dashboard_bloc.dart';
+import '../bloc/dashboard/panel_state.dart';
+import '../dialogs/dashboard_command_dialogs.dart';
 import '../texts/dashboard_texts.dart';
 import '../widgets/dashboard/dashboard_device_header.dart';
-import '../widgets/dashboard/dashboard_lock_banner.dart';
-import '../widgets/dashboard/dashboard_protection_card.dart';
+import '../widgets/dashboard/dashboard_notices.dart';
+import '../widgets/dashboard/dashboard_placeholders.dart';
+import '../widgets/dashboard/dashboard_protection_section.dart';
 import '../widgets/dashboard/dashboard_quick_actions.dart';
 import '../widgets/dashboard/dashboard_recent_alerts.dart';
-import '../widgets/dashboard/dashboard_time_card.dart';
+import '../widgets/dashboard/dashboard_time_section.dart';
 import '../widgets/dashboard/dashboard_top_apps.dart';
 
-/// Painel do responsavel: estado do aparelho em foco, tempo de hoje e acoes rapidas.
+/// Inicio do painel: como esta a crianca agora e quanto tempo falta, o que pede atencao, as
+/// acoes rapidas e um resumo do dia.
 ///
 /// Usa o [DevicesBloc] do painel (lista e aparelho em foco) e um [GuardianDashboardBloc]
 /// acima na arvore, a quem avisa qual aparelho esta em foco.
@@ -39,6 +38,8 @@ class DashboardPage extends StatefulWidget {
 }
 
 class _DashboardPageState extends State<DashboardPage> {
+  GuardianDashboardBloc get _bloc => context.read<GuardianDashboardBloc>();
+
   @override
   void initState() {
     super.initState();
@@ -47,7 +48,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   void _focus(ChildDevice? device) {
     if (device != null) {
-      context.read<GuardianDashboardBloc>().add(DashboardDeviceSelected(device.id));
+      _bloc.add(DashboardDeviceSelected(device.id));
     }
   }
 
@@ -55,8 +56,75 @@ class _DashboardPageState extends State<DashboardPage> {
     final Completer<void> devices = Completer<void>();
     final Completer<void> dashboard = Completer<void>();
     context.read<DevicesBloc>().add(DevicesRefreshRequested(completer: devices));
-    context.read<GuardianDashboardBloc>().add(DashboardRefreshRequested(completer: dashboard));
+    _bloc.add(DashboardRefreshRequested(completer: dashboard));
     await Future.wait(<Future<void>>[devices.future, dashboard.future]);
+  }
+
+  Future<void> _pause(ChildDevice device) async {
+    final PauseChoice? choice = await showPauseSheet(
+      context,
+      device: device,
+      now: context.read<Clock>().now(),
+    );
+    if (choice != null && mounted) {
+      _bloc.add(DashboardPauseRequested(duration: choice.duration));
+    }
+  }
+
+  Future<void> _suspend(ChildDevice device) async {
+    final SuspensionChoice? choice = await showSuspendRulesSheet(
+      context,
+      device: device,
+      now: context.read<Clock>().now(),
+    );
+    if (choice != null && mounted) {
+      _bloc.add(DashboardSuspendRequested(minutes: choice.minutes, scopes: choice.scopes));
+    }
+  }
+
+  Future<void> _customExtraTime() async {
+    final int? minutes = await showCustomExtraTimePicker(context);
+    if (minutes != null && mounted) {
+      _bloc.add(DashboardExtraTimeRequested(minutes));
+    }
+  }
+
+  /// Repete o comando que falhou. Pausa e suspensao voltam para a confirmacao, que tem o
+  /// prazo escolhido.
+  void _retry(DashboardCommand command, ChildDevice device) {
+    switch (command.kind) {
+      case DashboardCommandKind.extraTime:
+        _bloc.add(DashboardExtraTimeRequested(command.minutes ?? 0));
+      case DashboardCommandKind.pause:
+        unawaited(_pause(device));
+      case DashboardCommandKind.resume:
+        _bloc.add(const DashboardResumeRequested());
+      case DashboardCommandKind.suspend:
+        unawaited(_suspend(device));
+      case DashboardCommandKind.endSuspension:
+        _bloc.add(const DashboardSuspensionEndRequested());
+    }
+  }
+
+  void _onCommand(BuildContext context, GuardianDashboardState state) {
+    switch (state.command) {
+      case ActionSucceeded(:final String? message) when message != null:
+        showAppSnackBar(context, message, tone: Tone.success);
+      case ActionFailed(:final failure):
+        final DashboardCommand? command = state.lastCommand;
+        final ChildDevice? device = state.device;
+        showAppSnackBar(
+          context,
+          command == null
+              ? failure.message
+              : '${commandFailureLead(command.kind)} ${failure.message}',
+          tone: Tone.danger,
+          actionLabel: command == null || device == null ? null : 'Tentar de novo',
+          onAction: command == null || device == null ? null : () => _retry(command, device),
+        );
+      default:
+        break;
+    }
   }
 
   @override
@@ -73,21 +141,21 @@ class _DashboardPageState extends State<DashboardPage> {
           listenWhen: (GuardianDashboardState previous, GuardianDashboardState current) {
             return previous.command != current.command;
           },
-          listener: (BuildContext context, GuardianDashboardState state) {
-            switch (state.command) {
-              case ActionSucceeded(:final String? message) when message != null:
-                showAppSnackBar(context, message, tone: Tone.success);
-              case ActionFailed(:final failure):
-                showFailure(context, failure);
-              default:
-                break;
-            }
-          },
+          listener: _onCommand,
         ),
       ],
       child: Scaffold(
-        appBar: AppBar(title: const Text('Início')),
-        body: _body(context),
+        appBar: AppBar(
+          title: const Text('Início'),
+          actions: const <Widget>[
+            HelpButton(
+              title: 'Como usar o painel',
+              subtitle: 'O que cada parte do Início mostra e quando as mudanças valem.',
+              topics: dashboardHelpTopics,
+            ),
+          ],
+        ),
+        body: StateSwitcher(child: _body(context)),
       ),
     );
   }
@@ -97,148 +165,117 @@ class _DashboardPageState extends State<DashboardPage> {
     final ChildDevice? selected = devices.selected;
     switch (devices) {
       case DevicesInitial() || DevicesLoading():
-        return const LoadingView(message: 'Carregando os aparelhos');
+        return const DashboardSkeleton(key: ValueKey<String>('carregando'));
       case DevicesError(:final failure):
-        return FailureView(
-          error: failure,
+        return ErrorState.fromError(
+          failure,
+          key: const ValueKey<String>('erro'),
+          subject: 'os aparelhos',
           onRetry: () => context.read<DevicesBloc>().add(const DevicesRefreshRequested()),
         );
       case DevicesEmpty() || DevicesLoaded():
         if (selected == null) {
-          return _NoDevice(pending: devices.pending.length);
+          return DashboardNoDevice(
+            key: const ValueKey<String>('sem-aparelho'),
+            pending: devices.pending.length,
+            hasInactive:
+                devices is DevicesLoaded &&
+                devices.devices.any((ChildDevice d) => d.status == DeviceLinkStatus.revoked),
+          );
         }
     }
-    return BlocBuilder<GuardianDashboardBloc, GuardianDashboardState>(
-      builder: (BuildContext context, GuardianDashboardState dashboard) {
-        if (!dashboard.isShowing(selected.id)) {
-          return const LoadingView(message: 'Carregando os aparelhos');
-        }
-        return RefreshIndicator(
-          onRefresh: _refresh,
-          child: _DeviceDashboard(state: dashboard),
-        );
-      },
-    );
-  }
-}
-
-class _NoDevice extends StatelessWidget {
-  const _NoDevice({required this.pending});
-
-  final int pending;
-
-  @override
-  Widget build(BuildContext context) {
-    if (pending > 0) {
-      return EmptyState(
-        icon: Icons.phonelink_ring_outlined,
-        title: 'Um aparelho aguarda a sua aprovação',
-        message: 'Confira o número de confirmação mostrado nos dois aparelhos e aprove o vínculo.',
-        actionLabel: 'Ver pedido de vínculo',
-        onAction: () => context.push(GuardianPaths.pairing),
-      );
+    final GuardianDashboardState dashboard = context.watch<GuardianDashboardBloc>().state;
+    if (!dashboard.isShowing(selected.id)) {
+      return const DashboardSkeleton(key: ValueKey<String>('carregando'));
     }
-    return EmptyState(
-      icon: Icons.phonelink_setup_outlined,
-      title: 'Nenhum aparelho vinculado',
-      message:
-          'Instale o ParentaLynx no aparelho da criança, escolha "Este é o aparelho da '
-          'criança" e use o código de vinculação gerado aqui.',
-      actionLabel: 'Vincular aparelho',
-      onAction: () => context.push(GuardianPaths.pairing),
+    return _DeviceDashboard(
+      key: ValueKey<String>('painel-${selected.id}'),
+      state: dashboard,
+      pendingLinks: devices.pending.length,
+      onRefresh: _refresh,
+      onPause: _pause,
+      onSuspend: _suspend,
+      onCustomExtraTime: _customExtraTime,
     );
   }
 }
 
 class _DeviceDashboard extends StatelessWidget {
-  const _DeviceDashboard({required this.state});
+  const _DeviceDashboard({
+    required this.state,
+    required this.pendingLinks,
+    required this.onRefresh,
+    required this.onPause,
+    required this.onSuspend,
+    required this.onCustomExtraTime,
+    super.key,
+  });
 
   final GuardianDashboardState state;
+  final int pendingLinks;
+  final RefreshCallback onRefresh;
+  final ValueChanged<ChildDevice> onPause;
+  final ValueChanged<ChildDevice> onSuspend;
+  final VoidCallback onCustomExtraTime;
 
   @override
   Widget build(BuildContext context) {
     final ChildDevice device = state.device!;
-    final DeviceSnapshot? snapshot = device.snapshot;
-    final ActiveCommands commands = state.commands;
-    final Suspension? suspension = commands.suspension;
     final DateTime now = context.read<Clock>().now();
     final GuardianDashboardBloc bloc = context.read<GuardianDashboardBloc>();
+    final DashboardCommand? running = state.runningCommand;
+    void resume() => bloc.add(const DashboardResumeRequested());
+    void endSuspension() => bloc.add(const DashboardSuspensionEndRequested());
+    void retryPanels() => bloc.add(const DashboardRefreshRequested());
 
-    return PageBody(
+    return AppPageBody(
+      onRefresh: onRefresh,
       children: <Widget>[
         const DeviceSelector(),
         DashboardDeviceHeader(
           device: device,
           connection: state.connection ?? DeviceConnection.online,
+          sync: state.policySync ?? device.policySync,
           now: now,
         ),
-        const SizedBox(height: AppSpacing.md),
-        DashboardTimeCard(usage: state.usage, now: now),
-        if (snapshot != null && (snapshot.lockState.isLocked || commands.paused)) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          DashboardLockBanner(
-            snapshot: snapshot,
-            paused: commands.paused,
-            now: now,
-            onResume: () => bloc.add(const DashboardResumeRequested()),
-          ),
-        ],
-        if (suspension != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          NoticeBanner(
-            icon: Icons.pause_circle_outline,
-            title: 'Regras suspensas até ${formatClockMs(suspension.until)}',
-            message:
-                'Suspenso: ${suspension.scopes.map((SuspensionScope s) => s.label.toLowerCase()).join(', ')}.',
-            actionLabel: 'Encerrar suspensão',
-            onAction: () => bloc.add(const DashboardSuspensionEndRequested()),
-          ),
-        ],
-        if (device.pendingTimeRequests > 0) ...<Widget>[
-          const SizedBox(height: AppSpacing.md),
-          NoticeBanner(
-            tone: Tone.warning,
-            icon: Icons.more_time,
-            title: device.pendingTimeRequests == 1
-                ? '${device.displayName} pediu mais tempo'
-                : '${device.displayName} fez ${device.pendingTimeRequests} pedidos de tempo',
-            message: 'Responda para a criança saber se pode continuar.',
-            actionLabel: 'Ver pedidos',
-            onAction: () => context.go(GuardianPaths.alerts),
-          ),
-        ],
-        const SizedBox(height: AppSpacing.md),
-        DashboardQuickActions(device: device, commands: commands),
-        if (snapshot != null) ..._issueBanners(snapshot),
-        const SizedBox(height: AppSpacing.md),
-        DashboardTopApps(apps: state.apps),
-        const SizedBox(height: AppSpacing.md),
-        DashboardRecentAlerts(alerts: state.recentAlerts, now: now),
-        const SizedBox(height: AppSpacing.md),
-        DashboardProtectionCard(device: device),
-        const SizedBox(height: AppSpacing.xl),
+        DashboardNotices(
+          device: device,
+          commands: state.commands,
+          sync: state.policySync ?? device.policySync,
+          pendingLinks: pendingLinks,
+          policyLoaded: state.policy is PanelLoaded,
+          busy: running != null,
+          now: now,
+          onResume: resume,
+          onEndSuspension: endSuspension,
+        ),
+        const SectionGap(),
+        DashboardTimeSection(
+          device: device,
+          extraMinutesToday: state.commands.extraMinutesToday,
+          running: running,
+          now: now,
+          onExtraTime: (int minutes) => bloc.add(DashboardExtraTimeRequested(minutes)),
+          onCustomExtraTime: onCustomExtraTime,
+          onAdjustLimit: () => context.go(RulesPaths.limit),
+        ),
+        const SectionGap(),
+        DashboardQuickActions(
+          device: device,
+          commands: state.commands,
+          running: running,
+          onPause: () => onPause(device),
+          onResume: resume,
+          onSuspend: () => onSuspend(device),
+          onEndSuspension: endSuspension,
+        ),
+        const SectionGap(),
+        DashboardTopApps(apps: state.apps, childName: device.displayName, onRetry: retryPanels),
+        const SectionGap(),
+        DashboardRecentAlerts(alerts: state.recentAlerts, now: now, onRetry: retryPanels),
+        const SectionGap(),
+        DashboardProtectionSection(device: device),
       ],
     );
-  }
-
-  List<Widget> _issueBanners(DeviceSnapshot snapshot) {
-    return <Widget>[
-      if (!snapshot.enforcementActive) ...<Widget>[
-        const SizedBox(height: AppSpacing.md),
-        const NoticeBanner(
-          tone: Tone.danger,
-          title: 'Controle inativo no aparelho',
-          message: 'O aparelho informou que as regras não estão sendo aplicadas.',
-        ),
-      ],
-      for (final String issue in snapshot.issues) ...<Widget>[
-        const SizedBox(height: AppSpacing.md),
-        NoticeBanner(
-          tone: Tone.warning,
-          title: describeIssue(issue).title,
-          message: describeIssue(issue).message,
-        ),
-      ],
-    ];
   }
 }

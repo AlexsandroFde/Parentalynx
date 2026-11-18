@@ -17,8 +17,8 @@ final class DashboardDeviceSelected extends GuardianDashboardEvent {
   List<Object?> get props => <Object?>[deviceId];
 }
 
-/// Puxar para atualizar: recarrega os apps mais usados e os alertas recentes. [completer] e
-/// concluido ao terminar. Nao entra na comparacao do evento.
+/// Puxar para atualizar: recarrega a politica, os apps mais usados e os alertas recentes.
+/// [completer] e concluido ao terminar. Nao entra na comparacao do evento.
 final class DashboardRefreshRequested extends GuardianDashboardEvent {
   const DashboardRefreshRequested({this.completer});
 

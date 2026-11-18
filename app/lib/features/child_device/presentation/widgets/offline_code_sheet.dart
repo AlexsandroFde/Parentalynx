@@ -1,13 +1,13 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/entities/child_device.dart';
 import '../../domain/entities/offline_access_code.dart';
 import '../bloc/offline_code/offline_code_bloc.dart';
 
-/// Mostra o codigo de acesso offline do momento, com a contagem ate ele mudar.
+/// Conteudo da folha do codigo de acesso offline: o codigo do momento, em digitos grandes, e a
+/// contagem ate ele mudar. O titulo e as instrucoes ficam na moldura da folha.
 ///
 /// Espera um [OfflineCodeBloc] acima na arvore.
 class OfflineCodeSheet extends StatelessWidget {
@@ -20,70 +20,71 @@ class OfflineCodeSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final OfflineAccessCode current = context.watch<OfflineCodeBloc>().state.code;
     final String code = current.code;
     final int remaining = current.secondsRemaining;
     final String spaced = code.length == 8 ? '${code.substring(0, 4)} ${code.substring(4)}' : code;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text('Código de acesso offline', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            'No aparelho de ${device.displayName}, abra o ParentaLynx, toque em "Área '
-            'do responsável" e escolha "Usar código de acesso".',
-            style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-          ),
-          const SizedBox(height: AppSpacing.xl),
-          if (!current.isValid)
-            const NoticeBanner(
-              tone: Tone.danger,
-              message: 'Não foi possível calcular o código para este aparelho.',
-            )
-          else ...<Widget>[
-            Semantics(
-              label: 'Código ${code.split('').join(' ')}',
-              excludeSemantics: true,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Text(
-                  spaced,
-                  style: theme.textTheme.displayMedium?.copyWith(
-                    fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 3,
-                    color: theme.colorScheme.primary,
+    final bool ending = remaining <= 10;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        if (!current.isValid)
+          const AppBanner(
+            tone: Tone.danger,
+            title: 'Não foi possível calcular o código',
+            message:
+                'O segredo deste aparelho não pôde ser lido. Feche e abra de novo; se continuar, '
+                'desvincule e vincule o aparelho outra vez.',
+          )
+        else
+          AppPanel(
+            tone: Tone.info,
+            padding: const EdgeInsets.all(AppSpacing.xl),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Semantics(
+                  label: 'Código ${code.split('').join(' ')}',
+                  excludeSemantics: true,
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    child: Text(
+                      spaced,
+                      maxLines: 1,
+                      style: context.text.displayMedium?.copyWith(
+                        fontFeatures: AppTypography.tabularFigures,
+                        letterSpacing: AppSpacing.xs,
+                        color: context.colors.onPrimaryContainer,
+                      ),
+                    ),
                   ),
                 ),
-              ),
+                const SizedBox(height: AppSpacing.lg),
+                UsageBar(
+                  fraction: remaining / stepSeconds,
+                  color: (ending ? Tone.warning : Tone.info).foreground(context),
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'Muda em $remaining s',
+                  textAlign: TextAlign.center,
+                  style: context.text.labelLarge?.copyWith(
+                    color: context.colors.onPrimaryContainer,
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: AppSpacing.lg),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(value: remaining / stepSeconds, minHeight: 6),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'Muda em $remaining s',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelLarge?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          const NoticeBanner(
-            tone: Tone.warning,
-            message:
-                'Não mostre este código para a criança. Ele vale por poucos minutos e depende '
-                'de os dois aparelhos estarem com a hora certa.',
           ),
-        ],
-      ),
+        const SizedBox(height: AppSpacing.lg),
+        AppBanner(
+          tone: Tone.warning,
+          icon: AppIcons.lock,
+          message:
+              'Não mostre este código para ${device.displayName}. Ele vale só por alguns minutos '
+              'e depende de os dois aparelhos estarem com a hora certa.',
+        ),
+      ],
     );
   }
 }

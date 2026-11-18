@@ -219,11 +219,16 @@ void main() {
     deps.clock.advance(const Duration(minutes: 14, seconds: 30));
     await run(bloc, const LinkCodeTicked());
     expect(bloc.state.remaining, const Duration(seconds: 30));
+    expect(bloc.state.codeExpired, isFalse);
 
     deps.clock.advance(const Duration(seconds: 30));
     await run(bloc, const LinkCodeTicked());
     expect(bloc.state.code, isNull);
     expect(deps.di<GetShownLinkCode>()(), isNull);
+    // A tela explica que o codigo venceu; gerar outro limpa o aviso.
+    expect(bloc.state.codeExpired, isTrue);
+    await run(bloc, const LinkCodeRequested());
+    expect(bloc.state.codeExpired, isFalse);
   });
 
   test('aviso em tempo real de pedido novo dispara a consulta', () async {

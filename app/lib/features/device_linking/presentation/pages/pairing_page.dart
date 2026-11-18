@@ -9,10 +9,8 @@ import '../../../../core/constants/route_paths.dart';
 import '../../../../core/security/pairing_code.dart';
 import '../../../../core/time/clock.dart';
 import '../../../../core/time/formatters.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../../../shared/services/share_service.dart';
-import '../../../../shared/theme/app_theme.dart';
-import '../../../../shared/widgets/feedback_views.dart';
-import '../../../../shared/widgets/form_widgets.dart';
 import '../../../authentication/presentation/widgets/auth_widgets.dart';
 import '../../../child_device/presentation/bloc/devices/devices_bloc.dart';
 import '../../domain/entities/link_code.dart';
@@ -20,6 +18,44 @@ import '../../domain/entities/link_request.dart';
 import '../../domain/services/link_request_rules.dart';
 import '../bloc/device_linking/device_linking_bloc.dart';
 import '../dialogs/approve_link_dialog.dart';
+
+/// Passos da vinculacao, mostrados inteiros desde o comeco.
+const List<String> _steps = <String>[
+  'Gere aqui um código de vinculação.',
+  'No aparelho da criança, abra o ParentaLynx, escolha "Este é o aparelho da criança" e '
+      'digite o código.',
+  'Confira se o número de confirmação é o mesmo nos dois aparelhos e aprove.',
+  'No aparelho da criança, conceda as permissões que o app pedir.',
+];
+
+/// Ajuda da vinculacao, em perguntas e respostas.
+const List<HelpTopic> _help = <HelpTopic>[
+  HelpTopic(
+    title: 'Como funciona a vinculação?',
+    body:
+        'Você gera um código aqui e digita no aparelho da criança. O aparelho dela pede para '
+        'entrar na sua conta e você aprova aqui, conferindo o número de confirmação.',
+  ),
+  HelpTopic(
+    title: 'Por que conferir o número de confirmação?',
+    body:
+        'Ele garante que o pedido veio do aparelho que está com você. Se o número for '
+        'diferente, outra pessoa pode ter usado o código: rejeite e gere outro.',
+  ),
+  HelpTopic(
+    title: 'O código venceu ou sumiu',
+    body:
+        'Cada código vale 15 minutos e só pode ser usado uma vez. Por segurança, o servidor não '
+        'guarda o texto do código: se ele sumiu da tela, gere outro. O anterior deixa de valer.',
+  ),
+  HelpTopic(
+    title: 'O que acontece depois de aprovar?',
+    body:
+        'O aparelho da criança pede as permissões do controle: acesso ao uso, acessibilidade e '
+        'notificações. Sem elas o tempo não é contado e os apps não são bloqueados. As regras '
+        'começam sem limite até você definir.',
+  ),
+];
 
 /// Vinculacao de um aparelho da crianca: gera o codigo, acompanha o pedido e confirma.
 ///
@@ -57,10 +93,11 @@ class _PairingPageState extends State<PairingPage> {
   }
 
   Future<void> _cancelCode() async {
-    final bool confirmed = await confirmAction(
+    final bool confirmed = await showConfirmDialog(
       context,
       title: 'Cancelar o código?',
-      message: 'O código deixa de valer. Para vincular um aparelho será preciso gerar outro.',
+      message: 'O código deixa de valer na hora e não pode mais ser digitado no aparelho.',
+      consequence: 'Para vincular depois, basta gerar outro código.',
       confirmLabel: 'Cancelar código',
       cancelLabel: 'Manter',
     );
@@ -103,13 +140,13 @@ class _PairingPageState extends State<PairingPage> {
   }
 
   Future<void> _reject(LinkRequest request) async {
-    final bool confirmed = await confirmAction(
+    final String name = request.deviceName.isEmpty ? 'este aparelho' : '"${request.deviceName}"';
+    final bool confirmed = await showConfirmDialog(
       context,
       title: 'Rejeitar o pedido?',
-      message:
-          'O aparelho "${request.deviceName}" não será vinculado. Para tentar de novo será '
-          'preciso gerar outro código.',
-      confirmLabel: 'Rejeitar',
+      message: 'O aparelho $name não será vinculado à sua conta.',
+      consequence: 'Para tentar de novo, será preciso gerar outro código.',
+      confirmLabel: 'Rejeitar pedido',
       destructive: true,
     );
     if (!confirmed || !mounted) {
@@ -118,12 +155,13 @@ class _PairingPageState extends State<PairingPage> {
     context.read<DeviceLinkingBloc>().add(LinkRejectionSubmitted(request.id));
   }
 
-  void _finish() {
+  /// Sai da tela de sucesso para [location] (o painel, por padrao).
+  void _finish({String location = GuardianPaths.home}) {
     context.read<DeviceLinkingBloc>().add(const ApprovedLinkDismissed());
-    if (context.canPop()) {
+    if (location == GuardianPaths.home && context.canPop()) {
       context.pop();
     } else {
-      context.go(GuardianPaths.home);
+      context.go(location);
     }
   }
 
@@ -136,10 +174,17 @@ class _PairingPageState extends State<PairingPage> {
           context.read<DevicesBloc>().add(DeviceSelected(approved.id));
         }
         if (message != null) {
-          showAppSnackBar(context, message);
+          showAppSnackBar(context, message, tone: Tone.success);
         }
       case ActionFailed(:final failure):
-        showFailure(context, failure);
+        final String lead = switch (state.command) {
+          LinkingCommand.generate => 'O código não foi gerado.',
+          LinkingCommand.cancel => 'O código não foi cancelado e continua valendo.',
+          LinkingCommand.approve => 'O vínculo não foi aprovado.',
+          LinkingCommand.reject => 'O pedido não foi rejeitado.',
+          null => '',
+        };
+        showAppSnackBar(context, '$lead ${failure.message}'.trim(), tone: Tone.danger);
       case ActionIdle() || ActionRunning():
         break;
     }
@@ -154,16 +199,35 @@ class _PairingPageState extends State<PairingPage> {
       listener: _onAction,
       builder: (BuildContext context, DeviceLinkingState state) {
         final LinkRequest? approved = state.approved;
+        final bool firstCheck = !state.loaded && !state.offline && state.code == null;
         return Scaffold(
-          appBar: AppBar(title: const Text('Vincular aparelho')),
-          body: approved != null
-              ? _SuccessView(
-                  device: approved,
-                  onDone: _finish,
-                  onAnother: () =>
-                      context.read<DeviceLinkingBloc>().add(const ApprovedLinkDismissed()),
-                )
-              : PageBody(children: _content(context, state)),
+          appBar: AppBar(
+            title: const Text('Vincular aparelho'),
+            actions: const <Widget>[
+              HelpButton(
+                title: 'Vinculação',
+                subtitle: 'Como ligar o aparelho da criança à sua conta com segurança.',
+                topics: _help,
+              ),
+            ],
+          ),
+          body: StateSwitcher(
+            child: approved != null
+                ? _SuccessView(
+                    key: const ValueKey<String>('vinculado'),
+                    device: approved,
+                    onDone: _finish,
+                    onRules: () => _finish(location: GuardianPaths.rules),
+                    onAnother: () =>
+                        context.read<DeviceLinkingBloc>().add(const ApprovedLinkDismissed()),
+                  )
+                : firstCheck
+                ? const _CheckingView(key: ValueKey<String>('conferindo'))
+                : AppPageBody(
+                    key: const ValueKey<String>('vinculacao'),
+                    children: _content(context, state),
+                  ),
+          ),
         );
       },
     );
@@ -173,19 +237,62 @@ class _PairingPageState extends State<PairingPage> {
     final LinkCode? code = state.code;
     final int? otherCodeExpiresAt = state.otherCodeStillValidUntil;
     final String? busyRequestId = state.busyRequestId;
+    final int step = state.requests.isNotEmpty
+        ? 2
+        : code != null
+        ? 1
+        : 0;
+    final ({String title, String subtitle}) header = switch (step) {
+      2 => (
+        title: 'Confira o número de confirmação',
+        subtitle: 'Ele precisa ser o mesmo que aparece na tela do aparelho da criança.',
+      ),
+      1 => (
+        title: 'Digite o código no aparelho da criança',
+        subtitle:
+            'No ParentaLynx do aparelho dela, escolha "Este é o aparelho da criança". A tela '
+            'muda sozinha quando o código for usado.',
+      ),
+      _ => (
+        title: 'Gere um código de vinculação',
+        subtitle:
+            'O código vale por 15 minutos e só pode ser usado uma vez. Depois de digitado no '
+            'aparelho da criança, você confirma o vínculo aqui.',
+      ),
+    };
     return <Widget>[
+      AppPageHeader(
+        eyebrow: 'Passo ${step + 1} de ${_steps.length}',
+        title: header.title,
+        subtitle: header.subtitle,
+      ),
       if (state.offline) ...<Widget>[
-        const NoticeBanner(
+        const AppBanner(
           tone: Tone.warning,
-          icon: Icons.cloud_off_outlined,
-          message: 'Sem conexão com o servidor. Tentando de novo a cada poucos segundos.',
+          icon: AppIcons.offline,
+          title: 'Sem conexão com o servidor',
+          message:
+              'Os pedidos de vínculo não chegam enquanto isso. O app tenta de novo a cada '
+              'poucos segundos.',
+          liveRegion: true,
+        ),
+        const SizedBox(height: AppSpacing.lg),
+      ],
+      if (state.codeExpired && code == null && state.requests.isEmpty) ...<Widget>[
+        const AppBanner(
+          tone: Tone.warning,
+          icon: AppIcons.timeRunningOut,
+          title: 'O código venceu',
+          message: 'Ele não foi usado a tempo e não vale mais. Gere outro para continuar.',
+          liveRegion: true,
         ),
         const SizedBox(height: AppSpacing.lg),
       ],
       for (final LinkRequest request in state.requests) ...<Widget>[
-        _PendingLinkCard(
+        _RequestPanel(
           request: request,
-          busy: busyRequestId == request.id,
+          approving: busyRequestId == request.id && state.command == LinkingCommand.approve,
+          rejecting: busyRequestId == request.id && state.command == LinkingCommand.reject,
           enabled: busyRequestId == null,
           onApprove: () => _approve(request),
           onReject: () => _reject(request),
@@ -193,7 +300,7 @@ class _PairingPageState extends State<PairingPage> {
         const SizedBox(height: AppSpacing.lg),
       ],
       if (code != null)
-        _CodeCard(
+        _CodePanel(
           code: code,
           remaining: state.remaining,
           lifetime: LinkRequestRules.codeLifetime,
@@ -203,81 +310,64 @@ class _PairingPageState extends State<PairingPage> {
           onCancel: _cancelCode,
         )
       else ...<Widget>[
-        _GenerateCard(
-          hasPending: state.requests.isNotEmpty,
-          busy: state.generating,
-          onGenerate: () => context.read<DeviceLinkingBloc>().add(const LinkCodeRequested()),
-        ),
         if (otherCodeExpiresAt != null) ...<Widget>[
-          const SizedBox(height: AppSpacing.lg),
-          NoticeBanner(
+          AppBanner(
+            title: 'Já existe um código válido até as ${formatClockMs(otherCodeExpiresAt)}',
             message:
-                'Já existe um código válido até as ${formatClockMs(otherCodeExpiresAt)}, '
-                'gerado antes. Por segurança o servidor não guarda o texto do código, então '
-                'ele não pode ser mostrado de novo. Gerar um novo cancela o anterior.',
+                'Ele foi gerado antes e, por segurança, não pode ser mostrado de novo. Gerar um '
+                'novo cancela o anterior.',
           ),
+          const SizedBox(height: AppSpacing.lg),
         ],
+        AppButton(
+          label: state.requests.isEmpty ? 'Gerar código' : 'Gerar código para outro aparelho',
+          variant: state.requests.isEmpty ? AppButtonVariant.primary : AppButtonVariant.tertiary,
+          icon: AppIcons.pinCode,
+          expand: true,
+          busy: state.generating,
+          onPressed: () => context.read<DeviceLinkingBloc>().add(const LinkCodeRequested()),
+        ),
       ],
-      const SizedBox(height: AppSpacing.lg),
-      const _HowItWorks(),
+      const SectionGap(),
+      AppSection(
+        title: 'Como vincular',
+        child: AppPanel(
+          child: StepList(steps: _steps, current: step),
+        ),
+      ),
     ];
   }
 }
 
-class _GenerateCard extends StatelessWidget {
-  const _GenerateCard({required this.hasPending, required this.busy, required this.onGenerate});
-
-  final bool hasPending;
-  final bool busy;
-  final VoidCallback onGenerate;
+/// Primeira consulta ao servidor: pode haver um pedido esperando.
+class _CheckingView extends StatelessWidget {
+  const _CheckingView({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
-              child: Icon(Icons.link, size: 28, color: theme.colorScheme.onPrimaryContainer),
-            ),
-            const SizedBox(height: AppSpacing.lg),
-            Text(
-              hasPending ? 'Vincular outro aparelho' : 'Gerar código de vinculação',
-              style: theme.textTheme.titleLarge,
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Text(
-              'O código vale por 15 minutos e só pode ser usado uma vez. Depois de digitado '
-              'no aparelho da criança, você ainda confirma o vínculo aqui.',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            BusyButton(
-              label: 'Gerar código',
-              icon: Icons.qr_code_2,
-              busy: busy,
-              onPressed: onGenerate,
-            ),
-          ],
+    return const AppPageBody(
+      children: <Widget>[
+        Skeleton(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              SkeletonBox(width: 80, height: 10),
+              SizedBox(height: AppSpacing.sm),
+              SkeletonBox(width: 260, height: 26),
+              SizedBox(height: AppSpacing.md),
+              SkeletonBox(width: 300),
+            ],
+          ),
         ),
-      ),
+        SizedBox(height: AppSpacing.xl),
+        SkeletonPanel(height: 120),
+      ],
     );
   }
 }
 
-class _CodeCard extends StatelessWidget {
-  const _CodeCard({
+class _CodePanel extends StatelessWidget {
+  const _CodePanel({
     required this.code,
     required this.remaining,
     required this.lifetime,
@@ -297,191 +387,184 @@ class _CodeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final String formatted = PairingCode.format(code.code);
     final bool ending = remaining.inSeconds <= 60;
     final Tone tone = ending ? Tone.warning : Tone.info;
     final double fraction = (remaining.inMilliseconds / lifetime.inMilliseconds).clamp(0.0, 1.0);
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.xl),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              'Código de vinculação',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Semantics(
-              label: 'Código ${formatted.split('').join(' ')}',
-              excludeSemantics: true,
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: SelectableText(
-                  formatted,
-                  maxLines: 1,
-                  style: theme.textTheme.displayMedium?.copyWith(
-                    fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 4,
-                    color: theme.colorScheme.primary,
-                  ),
+    return AppPanel(
+      padding: const EdgeInsets.all(AppSpacing.xl),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Text(
+            'CÓDIGO DE VINCULAÇÃO',
+            textAlign: TextAlign.center,
+            style: context.textStyles.eyebrow,
+          ),
+          const SizedBox(height: AppSpacing.md),
+          Semantics(
+            label: 'Código ${formatted.split('').join(' ')}',
+            excludeSemantics: true,
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(
+                formatted,
+                maxLines: 1,
+                style: context.text.displayMedium?.copyWith(
+                  fontFeatures: AppTypography.tabularFigures,
+                  letterSpacing: AppSpacing.xs,
+                  color: context.colors.primary,
                 ),
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            ClipRRect(
-              borderRadius: BorderRadius.circular(4),
-              child: LinearProgressIndicator(
-                value: fraction,
-                minHeight: 6,
-                color: tone.foreground(context),
-              ),
-            ),
-            const SizedBox(height: AppSpacing.sm),
-            Row(
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          UsageBar(fraction: fraction, color: tone.foreground(context)),
+          const SizedBox(height: AppSpacing.sm),
+          Semantics(
+            liveRegion: ending,
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
-                Icon(Icons.timer_outlined, size: 18, color: tone.foreground(context)),
-                const SizedBox(width: 6),
-                Text(
-                  'Expira em ${formatCountdown(remaining.inMilliseconds)}',
-                  style: theme.textTheme.labelLarge?.copyWith(color: tone.foreground(context)),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.xl),
-            CopyShareButtons(onCopy: onCopy, onShare: onShare),
-            const SizedBox(height: AppSpacing.lg),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                SizedBox.square(
-                  dimension: 16,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
+                Icon(AppIcons.dailyLimit, size: AppSizes.iconSm, color: tone.foreground(context)),
+                const SizedBox(width: AppSpacing.xs),
                 Flexible(
                   child: Text(
-                    'Aguardando o aparelho da criança',
-                    style: theme.textTheme.bodyMedium?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    'Expira em ${formatCountdown(remaining.inMilliseconds)}',
+                    style: context.text.labelLarge?.copyWith(color: tone.onBackground(context)),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.sm),
-            Center(
-              child: TextButton(
-                onPressed: cancelling ? null : onCancel,
-                child: const Text('Cancelar código'),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            'Vale até as ${formatClockMs(code.expiresAt)}, uma única vez.',
+            textAlign: TextAlign.center,
+            style: context.text.bodySmall,
+          ),
+          const SizedBox(height: AppSpacing.xl),
+          CopyShareButtons(onCopy: onCopy, onShare: onShare),
+          const SizedBox(height: AppSpacing.lg),
+          const Divider(height: AppSizes.hairline),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: <Widget>[
+              SizedBox.square(
+                dimension: AppSizes.iconSm,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: context.colors.textSecondary,
+                ),
               ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Text(
+                  'Aguardando o aparelho da criança usar o código',
+                  style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Align(
+            alignment: AlignmentDirectional.centerStart,
+            child: AppButton.tertiary(
+              label: 'Cancelar código',
+              size: AppButtonSize.compact,
+              busy: cancelling,
+              onPressed: onCancel,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _PendingLinkCard extends StatelessWidget {
-  const _PendingLinkCard({
+class _RequestPanel extends StatelessWidget {
+  const _RequestPanel({
     required this.request,
-    required this.busy,
+    required this.approving,
+    required this.rejecting,
     required this.enabled,
     required this.onApprove,
     required this.onReject,
   });
 
   final LinkRequest request;
-  final bool busy;
+  final bool approving;
+  final bool rejecting;
   final bool enabled;
   final VoidCallback onApprove;
   final VoidCallback onReject;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
     final DateTime now = context.read<Clock>().now();
     final String confirmCode = request.confirmCode ?? '';
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppRadius.md),
-        side: BorderSide(color: theme.colorScheme.primary, width: 2),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Icon(Icons.phonelink_ring_outlined, color: theme.colorScheme.primary),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(child: Text('Pedido de vínculo', style: theme.textTheme.titleMedium)),
-                Text(
-                  formatRelativeMs(request.createdAt, now: now),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              request.deviceName.isEmpty ? 'Aparelho sem nome' : request.deviceName,
-              style: theme.textTheme.titleLarge,
-            ),
-            if (request.hardwareLabel.isNotEmpty)
-              Text(
-                request.hardwareLabel,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
+    return AppPanel(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              const AppIconTile(icon: AppIcons.deviceRinging),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text('Pedido de vínculo', style: context.text.bodySmall),
+                    Text(
+                      request.deviceName.isEmpty ? 'Aparelho sem nome' : request.deviceName,
+                      style: context.text.titleMedium,
+                    ),
+                    if (request.hardwareLabel.isNotEmpty)
+                      Text(
+                        request.hardwareLabel,
+                        style: context.text.bodyMedium?.copyWith(
+                          color: context.colors.textSecondary,
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            if (request.relink) ...<Widget>[
-              const SizedBox(height: AppSpacing.md),
-              NoticeBanner(
-                icon: Icons.history,
-                message: request.childName.isEmpty
-                    ? 'Este aparelho já foi vinculado a esta conta. Ao aprovar, as regras e o '
-                          'histórico anteriores são mantidos.'
-                    : 'Este aparelho já foi vinculado a esta conta como "${request.childName}". '
-                          'Ao aprovar, as regras e o histórico anteriores são mantidos.',
-              ),
+              const SizedBox(width: AppSpacing.sm),
+              Text(formatRelativeMs(request.createdAt, now: now), style: context.text.bodySmall),
             ],
+          ),
+          if (request.relink) ...<Widget>[
             const SizedBox(height: AppSpacing.lg),
-            Container(
-              padding: const EdgeInsets.all(AppSpacing.lg),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(AppRadius.md),
-              ),
+            AppBanner(
+              icon: AppIcons.history,
+              message: request.childName.isEmpty
+                  ? 'Este aparelho já foi vinculado a esta conta. Ao aprovar, as regras e o '
+                        'histórico anteriores são mantidos.'
+                  : 'Este aparelho já foi vinculado a esta conta como "${request.childName}". '
+                        'Ao aprovar, as regras e o histórico anteriores são mantidos.',
+            ),
+          ],
+          const SizedBox(height: AppSpacing.lg),
+          DecoratedBox(
+            decoration: BoxDecoration(
+              color: context.colors.surfaceMuted,
+              borderRadius: context.shapes.controlRadius,
+            ),
+            child: Padding(
+              padding: AppSpacing.panel,
               child: Column(
                 children: <Widget>[
-                  Text(
-                    'Número de confirmação',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
+                  Text('Número de confirmação', style: context.text.labelLarge),
                   const SizedBox(height: AppSpacing.xs),
                   Semantics(
                     label: 'Número de confirmação ${confirmCode.split('').join(' ')}',
                     excludeSemantics: true,
                     child: Text(
                       confirmCode.split('').join(' '),
-                      style: theme.textTheme.displaySmall?.copyWith(
-                        fontFeatures: const <FontFeature>[FontFeature.tabularFigures()],
-                        fontWeight: FontWeight.w700,
+                      style: context.text.displaySmall?.copyWith(
+                        fontFeatures: AppTypography.tabularFigures,
                       ),
                     ),
                   ),
@@ -490,97 +573,31 @@ class _PendingLinkCard extends StatelessWidget {
                     'Confira se o mesmo número aparece na tela do aparelho da criança. Se for '
                     'diferente ou se você não reconhece o aparelho, rejeite.',
                     textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
+                    style: context.text.bodySmall?.copyWith(color: context.colors.textPrimary),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: AppSpacing.lg),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: enabled ? onReject : null,
-                    child: const Text('Rejeitar'),
-                  ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: AppButton.secondary(
+                  label: 'Rejeitar',
+                  busy: rejecting,
+                  onPressed: enabled ? onReject : null,
                 ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: BusyButton(
-                    label: 'Aprovar',
-                    busy: busy,
-                    onPressed: enabled ? onApprove : null,
-                  ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: AppButton.primary(
+                  label: 'Aprovar',
+                  busy: approving,
+                  onPressed: enabled ? onApprove : null,
                 ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _HowItWorks extends StatelessWidget {
-  const _HowItWorks();
-
-  @override
-  Widget build(BuildContext context) {
-    return const SectionCard(
-      title: 'Como vincular',
-      child: Column(
-        children: <Widget>[
-          _HowStep(number: 1, text: 'No aparelho da criança, instale e abra o ParentaLynx.'),
-          _HowStep(number: 2, text: 'Escolha "Este é o aparelho da criança".'),
-          _HowStep(number: 3, text: 'Digite o código mostrado aqui.'),
-          _HowStep(
-            number: 4,
-            text: 'Confira o número de confirmação nos dois aparelhos e aprove o pedido.',
-          ),
-          _HowStep(
-            number: 5,
-            text: 'No aparelho da criança, conceda as permissões pedidas.',
-            last: true,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _HowStep extends StatelessWidget {
-  const _HowStep({required this.number, required this.text, this.last = false});
-
-  final int number;
-  final String text;
-  final bool last;
-
-  @override
-  Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    return Padding(
-      padding: EdgeInsets.only(bottom: last ? 0 : AppSpacing.md),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Container(
-            width: 26,
-            height: 26,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surfaceContainerHighest,
-              shape: BoxShape.circle,
-            ),
-            child: Text('$number', style: theme.textTheme.labelLarge),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 3),
-              child: Text(text, style: theme.textTheme.bodyMedium),
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -589,59 +606,84 @@ class _HowStep extends StatelessWidget {
 }
 
 class _SuccessView extends StatelessWidget {
-  const _SuccessView({required this.device, required this.onDone, required this.onAnother});
+  const _SuccessView({
+    required this.device,
+    required this.onDone,
+    required this.onRules,
+    required this.onAnother,
+    super.key,
+  });
 
   final LinkRequest device;
   final VoidCallback onDone;
+  final VoidCallback onRules;
   final VoidCallback onAnother;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final StatusColors status = StatusColors.of(context);
-    return PageBody(
+    const double blob = AppSizes.illustration + AppSpacing.xl;
+    return AppPageBody(
       children: <Widget>[
-        const SizedBox(height: AppSpacing.xl),
+        const SizedBox(height: AppSpacing.lg),
         Center(
-          child: Container(
-            width: 88,
-            height: 88,
-            decoration: BoxDecoration(color: status.successContainer, shape: BoxShape.circle),
-            child: Icon(Icons.check_rounded, size: 52, color: status.success),
+          child: ExcludeSemantics(
+            child: Container(
+              width: blob,
+              height: blob,
+              decoration: BoxDecoration(
+                color: Tone.success.background(context),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                AppIcons.check,
+                size: blob * 0.5,
+                color: Tone.success.foreground(context),
+              ),
+            ),
           ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        Text(
-          'Aparelho de ${device.displayName} vinculado',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineSmall,
+        Semantics(
+          header: true,
+          liveRegion: true,
+          child: Text(
+            'Aparelho de ${device.displayName} vinculado',
+            textAlign: TextAlign.center,
+            style: context.text.headlineSmall,
+          ),
         ),
         const SizedBox(height: AppSpacing.sm),
         Text(
           device.hardwareLabel,
           textAlign: TextAlign.center,
-          style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          style: context.text.bodyMedium?.copyWith(color: context.colors.textSecondary),
+        ),
+        const SectionGap(),
+        AppSection(
+          title: 'Falta pouco',
+          child: AppPanel(
+            child: StepList(
+              steps: <String>[
+                'No aparelho de ${device.displayName}, conceda as permissões pedidas: acesso ao '
+                    'uso, acessibilidade e notificações. Sem elas o tempo não é contado.',
+                'Defina o limite diário, os horários e os aplicativos. Até lá, o aparelho fica '
+                    'sem limite.',
+              ],
+              current: 0,
+            ),
+          ),
         ),
         const SizedBox(height: AppSpacing.xl),
-        const NoticeBanner(
-          title: 'Falta um passo no aparelho da criança',
-          message:
-              'O app da criança vai pedir as permissões de acesso ao uso, acessibilidade e '
-              'notificações. Sem elas o controle não consegue contar o tempo nem bloquear '
-              'aplicativos. O painel avisa se alguma estiver faltando.',
+        AppButton.primary(label: 'Concluir', expand: true, onPressed: onDone),
+        const SizedBox(height: AppSpacing.sm),
+        AppButton.secondary(
+          label: 'Definir as regras agora',
+          icon: AppIcons.rules,
+          expand: true,
+          onPressed: onRules,
         ),
-        const SizedBox(height: AppSpacing.lg),
-        const NoticeBanner(
-          tone: Tone.neutral,
-          icon: Icons.tune,
-          message:
-              'As regras começam sem limite de tempo. Defina o limite diário, os horários e '
-              'os aplicativos na aba Regras.',
-        ),
-        const SizedBox(height: AppSpacing.xl),
-        FilledButton(onPressed: onDone, child: const Text('Concluir')),
-        const SizedBox(height: AppSpacing.md),
-        OutlinedButton(onPressed: onAnother, child: const Text('Vincular outro aparelho')),
+        const SizedBox(height: AppSpacing.sm),
+        AppButton.tertiary(label: 'Vincular outro aparelho', expand: true, onPressed: onAnother),
       ],
     );
   }

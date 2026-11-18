@@ -101,7 +101,7 @@ class DeviceLinkingBloc extends Bloc<DeviceLinkingEvent, DeviceLinkingState> {
     final int now = _clock.nowMs();
     final LinkCode? code = state.code;
     if (code != null && _expireCode(code, nowMs: now)) {
-      emit(state.copyWith(nowMs: now, code: () => null));
+      emit(state.copyWith(nowMs: now, code: () => null, codeExpired: true));
     } else if (code != null || state.otherCodeExpiresAt != null) {
       emit(state.copyWith(nowMs: now));
     }
@@ -118,6 +118,7 @@ class DeviceLinkingBloc extends Bloc<DeviceLinkingEvent, DeviceLinkingState> {
             code: () => value,
             otherCodeExpiresAt: () => null,
             approved: () => null,
+            codeExpired: false,
             action: const ActionSucceeded(),
           ),
         );
@@ -138,7 +139,7 @@ class DeviceLinkingBloc extends Bloc<DeviceLinkingEvent, DeviceLinkingState> {
     final Result<void> result = await _cancelCode(code.id);
     switch (result) {
       case Ok<void>():
-        emit(state.copyWith(code: () => null, action: const ActionSucceeded()));
+        emit(state.copyWith(code: () => null, codeExpired: false, action: const ActionSucceeded()));
       case Err<void>(:final AppFailure failure):
         emit(state.copyWith(action: actionStatusForFailure(failure)));
     }

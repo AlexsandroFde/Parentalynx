@@ -1,103 +1,116 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../../core/time/formatters.dart';
-import '../../../../../shared/theme/app_theme.dart';
-import '../../../../../shared/widgets/form_widgets.dart';
+import '../../../../../shared/design_system/design_system.dart';
 import '../../../../child_device/domain/entities/child_device.dart';
 import '../../../domain/entities/active_commands.dart';
 import '../../bloc/dashboard/guardian_dashboard_bloc.dart';
-import '../../dialogs/dashboard_command_dialogs.dart';
 
-/// Acoes rapidas enviadas na hora ao aparelho: tempo extra, pausa e suspensao de regras.
+/// Pausar o aparelho e suspender regras, cada acao com a consequencia escrita logo abaixo.
 ///
-/// Despacha os comandos ao [GuardianDashboardBloc] da arvore.
+/// Pausar e suspender passam por uma confirmacao (com o prazo) antes de serem enviados;
+/// retomar e encerrar a suspensao devolvem as regras e sao enviados na hora. O botao tocado
+/// mostra o andamento ate o servidor responder.
 class DashboardQuickActions extends StatelessWidget {
-  const DashboardQuickActions({required this.device, required this.commands, super.key});
+  const DashboardQuickActions({
+    required this.device,
+    required this.commands,
+    required this.running,
+    required this.onPause,
+    required this.onResume,
+    required this.onSuspend,
+    required this.onEndSuspension,
+    super.key,
+  });
 
   final ChildDevice device;
   final ActiveCommands commands;
+  final DashboardCommand? running;
+  final VoidCallback onPause;
+  final VoidCallback onResume;
+  final VoidCallback onSuspend;
+  final VoidCallback onEndSuspension;
+
+  bool _is(DashboardCommandKind kind) => running?.kind == kind;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
-    final int extraToday = commands.extraMinutesToday;
-    final GuardianDashboardBloc bloc = context.read<GuardianDashboardBloc>();
-    return SectionCard(
+    final bool idle = running == null;
+    final String name = device.displayName;
+    return AppSection(
       title: 'Ações rápidas',
-      subtitle: 'Enviadas na hora ao aparelho de ${device.displayName}.',
+      subtitle: 'Valem no aparelho de $name assim que ele receber.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
-          Text('Tempo extra para hoje', style: theme.textTheme.labelLarge),
-          const SizedBox(height: AppSpacing.sm),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.xs,
-            children: <Widget>[
-              for (final int minutes in const <int>[15, 30, 60])
-                ActionChip(
-                  avatar: const Icon(Icons.add, size: 18),
-                  label: Text(formatMinutes(minutes)),
-                  onPressed: () => bloc.add(DashboardExtraTimeRequested(minutes)),
-                ),
-              ActionChip(
-                label: const Text('Outro valor'),
-                onPressed: () async {
-                  final int? minutes = await showCustomExtraTimePicker(context);
-                  if (minutes != null) {
-                    bloc.add(DashboardExtraTimeRequested(minutes));
-                  }
-                },
-              ),
-            ],
-          ),
-          if (extraToday > 0)
-            Padding(
-              padding: const EdgeInsets.only(top: AppSpacing.xs),
-              child: Text(
-                'Hoje já foram concedidos ${formatMinutes(extraToday)} extras.',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
-          const SizedBox(height: AppSpacing.md),
-          // Um botao por linha: os rotulos cabem inteiros mesmo com fonte grande.
           if (commands.paused)
-            FilledButton.icon(
-              onPressed: () => bloc.add(const DashboardResumeRequested()),
-              icon: const Icon(Icons.play_arrow),
-              label: const Text('Retomar'),
+            _QuickAction(
+              button: AppButton.secondary(
+                label: 'Retomar agora',
+                icon: AppIcons.resume,
+                expand: true,
+                busy: _is(DashboardCommandKind.resume),
+                onPressed: idle ? onResume : null,
+              ),
+              consequence: 'Encerra a pausa e libera o aparelho de $name.',
             )
           else
-            FilledButton.tonalIcon(
-              onPressed: () async {
-                final PauseChoice? choice = await showPauseChoiceDialog(context, device);
-                if (choice != null) {
-                  bloc.add(DashboardPauseRequested(duration: choice.duration));
-                }
-              },
-              icon: const Icon(Icons.pause),
-              label: const Text('Pausar agora'),
+            _QuickAction(
+              button: AppButton.secondary(
+                label: 'Pausar agora',
+                icon: AppIcons.pause,
+                expand: true,
+                busy: _is(DashboardCommandKind.pause),
+                onPressed: idle ? onPause : null,
+              ),
+              consequence: 'Bloqueia tudo, menos as exceções e as chamadas de emergência.',
             ),
-          const SizedBox(height: AppSpacing.sm),
-          OutlinedButton.icon(
-            onPressed: commands.suspended
-                ? () => bloc.add(const DashboardSuspensionEndRequested())
-                : () async {
-                    final SuspensionChoice? choice = await showSuspendRulesSheet(context);
-                    if (choice != null) {
-                      bloc.add(
-                        DashboardSuspendRequested(minutes: choice.minutes, scopes: choice.scopes),
-                      );
-                    }
-                  },
-            icon: Icon(commands.suspended ? Icons.play_circle_outline : Icons.pause_circle_outline),
-            label: Text(commands.suspended ? 'Encerrar suspensão' : 'Suspender regras'),
-          ),
+          const SizedBox(height: AppSpacing.lg),
+          if (commands.suspended)
+            _QuickAction(
+              button: AppButton.secondary(
+                label: 'Encerrar suspensão',
+                icon: AppIcons.lock,
+                expand: true,
+                busy: _is(DashboardCommandKind.endSuspension),
+                onPressed: idle ? onEndSuspension : null,
+              ),
+              consequence: 'O limite, os horários e os bloqueios voltam a valer.',
+            )
+          else
+            _QuickAction(
+              button: AppButton.secondary(
+                label: 'Suspender regras',
+                icon: AppIcons.unlock,
+                expand: true,
+                busy: _is(DashboardCommandKind.suspend),
+                onPressed: idle ? onSuspend : null,
+              ),
+              consequence: 'Limite, horários ou bloqueios deixam de valer por um tempo.',
+            ),
         ],
       ),
+    );
+  }
+}
+
+class _QuickAction extends StatelessWidget {
+  const _QuickAction({required this.button, required this.consequence});
+
+  final Widget button;
+  final String consequence;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        button,
+        const SizedBox(height: AppSpacing.xs),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs),
+          child: Text(consequence, style: context.text.bodySmall),
+        ),
+      ],
     );
   }
 }

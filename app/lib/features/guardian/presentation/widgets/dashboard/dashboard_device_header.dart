@@ -1,111 +1,67 @@
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../../core/time/formatters.dart';
-import '../../../../../shared/theme/app_theme.dart';
-import '../../../../../shared/widgets/feedback_views.dart';
+import '../../../../../shared/design_system/design_system.dart';
 import '../../../../child_device/domain/entities/child_device.dart';
+import '../../../../child_device/presentation/texts/device_texts.dart';
+import '../../../../device_sync/domain/entities/policy_sync_status.dart';
+import '../../../../device_sync/presentation/widgets/policy_sync_status_view.dart';
 import '../../../domain/entities/device_connection.dart';
 
-/// Cabecalho do painel: crianca, aparelho, bateria, conexao e confirmacao das regras.
+/// Cabecalho do painel: de quem e o aparelho, se ele esta conectado, a bateria e se as regras
+/// atuais ja valem nele.
 class DashboardDeviceHeader extends StatelessWidget {
   const DashboardDeviceHeader({
     required this.device,
     required this.connection,
+    required this.sync,
     required this.now,
     super.key,
   });
 
   final ChildDevice device;
   final DeviceConnection connection;
+
+  /// Confirmacao das regras, contando um comando que o aparelho ainda nao recebeu.
+  final PolicySyncStatus sync;
   final DateTime now;
 
-  StatusPill _connectionPill() {
-    final int? lastSync = device.lastSyncAt;
-    return switch (connection) {
-      DeviceConnection.online => const StatusPill(
-        label: 'Online',
-        tone: Tone.success,
-        icon: Icons.wifi,
-      ),
-      DeviceConnection.neverSynced => const StatusPill(
-        label: 'Nunca sincronizou',
-        tone: Tone.warning,
-        icon: Icons.cloud_off_outlined,
-      ),
-      DeviceConnection.recent || DeviceConnection.stale => StatusPill(
-        label: 'Visto ${formatRelativeMs(lastSync ?? 0, now: now)}',
-        tone: connection == DeviceConnection.stale ? Tone.warning : Tone.neutral,
-        icon: Icons.cloud_off_outlined,
-      ),
-    };
-  }
+  /// Abaixo deste nivel a bateria merece atencao: o aparelho pode desligar e sair do ar.
+  static const int lowBattery = 15;
 
   @override
   Widget build(BuildContext context) {
-    final ThemeData theme = Theme.of(context);
+    final ({String label, Tone tone, IconData icon}) status = connectionStatus(
+      device,
+      now: now,
+      stale: connection == DeviceConnection.stale,
+    );
     final int? battery = device.snapshot?.batteryPercent;
-    final String name = device.displayName;
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(AppSpacing.lg),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        AppPageHeader(
+          eyebrow: 'Hoje',
+          title: device.displayName,
+          subtitle: device.hardwareLabel,
+          trailing: InitialAvatar(name: device.displayName, size: AppSizes.avatarLg),
+          bottomSpacing: AppSpacing.md,
+        ),
+        Wrap(
+          spacing: AppSpacing.sm,
+          runSpacing: AppSpacing.sm,
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: theme.colorScheme.primaryContainer,
-                  foregroundColor: theme.colorScheme.onPrimaryContainer,
-                  child: Text(
-                    name.isEmpty ? '?' : name.substring(0, 1).toUpperCase(),
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      color: theme.colorScheme.onPrimaryContainer,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(name, style: theme.textTheme.titleLarge),
-                      Text(
-                        battery == null
-                            ? device.hardwareLabel
-                            : '${device.hardwareLabel}. Bateria $battery%',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: AppSpacing.md),
-            Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.xs,
-              children: <Widget>[
-                _connectionPill(),
-                if (device.policyPending)
-                  const StatusPill(
-                    label: 'Aguardando o aparelho confirmar',
-                    tone: Tone.info,
-                    icon: Icons.sync,
-                  )
-                else
-                  const StatusPill(
-                    label: 'Regras aplicadas no aparelho',
-                    tone: Tone.success,
-                    icon: Icons.check_circle_outline,
-                  ),
-              ],
-            ),
+            StatusBadge(label: status.label, tone: status.tone, icon: status.icon),
+            if (battery != null)
+              StatusBadge(
+                label: battery <= lowBattery ? 'Bateria fraca: $battery%' : 'Bateria $battery%',
+                tone: battery <= lowBattery ? Tone.warning : Tone.neutral,
+                icon: AppIcons.battery,
+              ),
           ],
         ),
-      ),
+        const SizedBox(height: AppSpacing.lg),
+        PolicySyncStatusView(status: sync, now: now),
+      ],
     );
   }
 }

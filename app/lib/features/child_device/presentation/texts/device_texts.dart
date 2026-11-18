@@ -1,7 +1,7 @@
 import 'package:material_ui/material_ui.dart';
 
 import '../../../../core/time/formatters.dart';
-import '../../../../shared/widgets/feedback_views.dart';
+import '../../../../shared/design_system/design_system.dart';
 import '../../domain/entities/child_device.dart';
 
 /// Textos e rotulos sobre aparelhos, usados na lista e no detalhe.
@@ -134,38 +134,120 @@ class PermissionLine {
   }
 }
 
-/// Texto de um problema de aplicacao das regras (`enforcement.issues` do protocolo).
-String issueLabel(String code) {
+/// Problema de aplicacao das regras informado pelo aparelho (`enforcement.issues` do
+/// protocolo), em linguagem de quem usa: o que aconteceu, o efeito e o que fazer.
+({String title, String message}) describeIssue(String code) {
   return switch (code) {
-    'accessibility_disabled' =>
-      'O serviço de acessibilidade está desativado: o bloqueio de apps ficou mais lento ou '
-          'indisponível.',
-    'usage_access_missing' => 'Sem acesso ao uso: a contagem de tempo está menos precisa.',
-    'overlay_missing' => 'Sem permissão de sobreposição: não há reforço para a tela de bloqueio.',
-    'notifications_disabled' => 'Notificações desativadas: a criança não vê os avisos de tempo.',
-    'battery_optimized' => 'A economia de bateria pode encerrar o controle em segundo plano.',
-    'suspend_failed' => 'O sistema recusou suspender algum aplicativo.',
-    'policy_invalid' => 'O aparelho não conseguiu ler as regras recebidas.',
-    'clock_untrusted' => 'O relógio do aparelho não pôde ser conferido com o servidor.',
-    _ => 'Problema informado pelo aparelho: $code',
+    'accessibility_disabled' => (
+      title: 'Serviço de acessibilidade desativado',
+      message:
+          'O bloqueio de apps pode não funcionar. No aparelho da criança, abra o ParentaLynx e '
+          'reative a acessibilidade.',
+    ),
+    'usage_access_missing' => (
+      title: 'Acesso ao uso desativado',
+      message:
+          'A contagem de tempo ficou imprecisa ou parou. No aparelho da criança, reative o '
+          '"Acesso ao uso" do ParentaLynx.',
+    ),
+    'overlay_missing' => (
+      title: 'Sobreposição desativada',
+      message:
+          'A tela de bloqueio fica sem reforço se a acessibilidade cair. Reative "Sobrepor a '
+          'outros apps" no aparelho da criança.',
+    ),
+    'notifications_disabled' => (
+      title: 'Notificações desligadas no aparelho',
+      message:
+          'A criança não vê os avisos de tempo acabando. Reative as notificações do ParentaLynx '
+          'no aparelho dela.',
+    ),
+    'battery_optimized' => (
+      title: 'Economia de bateria ativa para o app',
+      message:
+          'O sistema pode encerrar o controle com a tela apagada. Libere o ParentaLynx da '
+          'economia de bateria no aparelho da criança.',
+    ),
+    'suspend_failed' => (
+      title: 'O sistema recusou suspender um app',
+      message: 'O app continua bloqueado pela tela de bloqueio do ParentaLynx.',
+    ),
+    'policy_invalid' => (
+      title: 'Regras novas não aplicadas',
+      message:
+          'O aparelho não conseguiu ler a versão atual das regras e continua com a anterior. '
+          'Atualize o ParentaLynx no aparelho da criança.',
+    ),
+    'clock_untrusted' => (
+      title: 'Relógio do aparelho não confirmado',
+      message:
+          'Sem a hora do servidor, o dia da cota pode ficar errado. Conecte o aparelho da '
+          'criança à internet.',
+    ),
+    _ => (
+      title: 'Problema na proteção',
+      message:
+          'O aparelho informou um problema que esta versão do app não reconhece. Atualize o '
+          'ParentaLynx nos dois aparelhos.',
+    ),
   };
 }
 
-/// Situacao de conexao de um aparelho ativo, para a etiqueta da lista e do detalhe.
+/// Tempo sem sincronizar a partir do qual a conexao merece atencao (o mesmo do painel).
+const Duration connectionStaleAfter = Duration(hours: 3);
+
+/// Situacao de conexao de um aparelho ativo, para a etiqueta do painel, da lista e do detalhe.
+///
+/// [stale] diz se a falta de conexao merece atencao; sem ele, conta [connectionStaleAfter].
 ({String label, Tone tone, IconData icon}) connectionStatus(
   ChildDevice device, {
   required DateTime now,
+  bool? stale,
 }) {
   if (device.online) {
-    return (label: 'Online', tone: Tone.success, icon: Icons.wifi);
+    return (label: 'Online', tone: Tone.success, icon: AppIcons.online);
   }
   final int? lastSync = device.lastSyncAt;
   if (lastSync == null) {
-    return (label: 'Nunca sincronizou', tone: Tone.warning, icon: Icons.sync_problem);
+    return (label: 'Ainda não sincronizou', tone: Tone.warning, icon: AppIcons.syncProblem);
   }
+  final String seen = formatRelativeMs(lastSync, now: now);
+  final bool attention =
+      stale ?? now.millisecondsSinceEpoch - lastSync > connectionStaleAfter.inMilliseconds;
   return (
-    label: 'Visto ${formatRelativeMs(lastSync, now: now)}',
-    tone: Tone.neutral,
-    icon: Icons.cloud_off_outlined,
+    label: seen == 'agora' ? 'Visto agora há pouco' : 'Visto por último $seen',
+    tone: attention ? Tone.warning : Tone.neutral,
+    icon: AppIcons.offline,
   );
 }
+
+/// Ajuda do detalhe do aparelho, em perguntas e respostas.
+const List<HelpTopic> deviceHelpTopics = <HelpTopic>[
+  HelpTopic(
+    title: 'O que é o nível de proteção?',
+    body:
+        'Depende de como o ParentaLynx foi instalado. Na instalação padrão, o controle funciona '
+        'enquanto as permissões estiverem ativas e avisa você se alguma for desativada. Como '
+        'dispositivo gerenciado, o próprio Android impõe o bloqueio.',
+  ),
+  HelpTopic(
+    title: 'Como reativar uma permissão?',
+    body:
+        'No aparelho da criança, abra o ParentaLynx e toque em "Permissões do controle": o app '
+        'leva até cada configuração do Android. O aparelho informa a mudança aqui na próxima '
+        'sincronização.',
+  ),
+  HelpTopic(
+    title: 'Para que serve o código de acesso offline?',
+    body:
+        'Para você se identificar no aparelho da criança quando ele estiver sem internet, por '
+        'exemplo para liberar o uso por alguns minutos. O código muda a cada minuto.',
+  ),
+  HelpTopic(
+    title: 'Desvincular ou apagar?',
+    body:
+        'Desvincular faz o aparelho deixar de ser controlado e mantém o histórico; dá para '
+        'vincular de novo com um novo código. Apagar remove o aparelho, as regras e o histórico '
+        'do servidor e não pode ser desfeito.',
+  ),
+];
