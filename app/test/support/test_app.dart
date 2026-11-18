@@ -8,9 +8,9 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:parentalynx/core/time/clock.dart';
 import 'package:parentalynx/features/app_management/presentation/services/app_icon_images.dart';
+import 'package:parentalynx/shared/design_system/design_system.dart';
 import 'package:parentalynx/shared/services/share_service.dart';
 import 'package:parentalynx/shared/theme/app_frame.dart';
-import 'package:parentalynx/shared/theme/app_theme.dart';
 
 import 'fakes.dart';
 
@@ -21,18 +21,26 @@ const Size phoneSize = Size(392, 850);
 ///
 /// Os servicos de interface ([ShareService] e [Clock]) vem de [di], como no app. Os BLoCs de
 /// que a tela precisa sao montados pelo proprio teste em volta de [child].
+///
+/// [textScale] simula o tamanho de fonte escolhido nas configuracoes do aparelho (2 e o maior
+/// do Android).
 Future<void> pumpWidgetInApp(
   WidgetTester tester,
   Widget child, {
   required GetIt di,
   Brightness brightness = Brightness.light,
   Size size = phoneSize,
+  double textScale = 1,
   GlobalKey<NavigatorState>? navigatorKey,
 }) async {
   await initializeDateFormatting('pt_BR');
   tester.view.devicePixelRatio = 2.0;
   tester.view.physicalSize = size * 2.0;
   addTearDown(tester.view.reset);
+  if (textScale != 1) {
+    tester.platformDispatcher.textScaleFactorTestValue = textScale;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+  }
   await tester.pumpWidget(
     MultiRepositoryProvider(
       providers: <RepositoryProvider<Object>>[
@@ -59,8 +67,9 @@ Future<void> pumpWidgetInApp(
 
 bool _fontsLoaded = false;
 
-/// Carrega as fontes reais (Roboto e icones) do SDK do Flutter, para que o layout e as capturas
-/// de tela dos testes correspondam a um aparelho, em vez dos blocos da fonte de teste.
+/// Carrega as fontes reais (Manrope, a fonte do Design System, embutida no app; Roboto e os
+/// icones do SDK do Flutter), para que o layout e as capturas de tela dos testes correspondam
+/// a um aparelho, em vez dos blocos da fonte de teste.
 ///
 /// E chamada por `test/flutter_test_config.dart` antes de cada arquivo de teste. Nao chame de
 /// dentro de um `testWidgets`: a carga depende de E/S real, que nao avanca no tempo simulado.
@@ -69,8 +78,13 @@ Future<void> loadAppFonts() async {
     return;
   }
   TestWidgetsFlutterBinding.ensureInitialized();
+  await _loadFamily('Manrope', <String>[
+    for (final String weight in <String>['Regular', 'Medium', 'SemiBold', 'Bold', 'ExtraBold'])
+      'assets/fonts/manrope/Manrope-$weight.ttf',
+  ]);
   final String? flutterRoot = Platform.environment['FLUTTER_ROOT'];
   if (flutterRoot == null) {
+    _fontsLoaded = true;
     return;
   }
   final String fontsDir = '$flutterRoot/bin/cache/artifacts/material_fonts';
@@ -84,21 +98,28 @@ Future<void> loadAppFonts() async {
     'MaterialIcons': <String>['materialicons-regular.otf'],
   };
   for (final MapEntry<String, List<String>> family in families.entries) {
-    final FontLoader loader = FontLoader(family.key);
-    bool any = false;
-    for (final String file in family.value) {
-      final File font = File('$fontsDir/$file');
-      if (font.existsSync()) {
-        final Uint8List bytes = font.readAsBytesSync();
-        loader.addFont(Future<ByteData>.value(ByteData.view(bytes.buffer)));
-        any = true;
-      }
-    }
-    if (any) {
-      await loader.load();
-    }
+    await _loadFamily(family.key, <String>[
+      for (final String file in family.value) '$fontsDir/$file',
+    ]);
   }
   _fontsLoaded = true;
+}
+
+/// Registra os arquivos de fonte que existirem com o nome de familia [family].
+Future<void> _loadFamily(String family, List<String> paths) async {
+  final FontLoader loader = FontLoader(family);
+  bool any = false;
+  for (final String path in paths) {
+    final File font = File(path);
+    if (font.existsSync()) {
+      final Uint8List bytes = font.readAsBytesSync();
+      loader.addFont(Future<ByteData>.value(ByteData.view(bytes.buffer)));
+      any = true;
+    }
+  }
+  if (any) {
+    await loader.load();
+  }
 }
 
 /// Compara a tela atual com a captura de referencia `screenshots/<name>.png`, na pasta do
@@ -108,4 +129,18 @@ Future<void> loadAppFonts() async {
 /// As capturas servem para revisar o visual das telas sem um aparelho.
 Future<void> expectScreenshot(WidgetTester tester, String name) async {
   await expectLater(find.byType(MaterialApp).first, matchesGoldenFile('screenshots/$name.png'));
+}
+
+/// Confere as diretrizes de acessibilidade do Flutter na tela montada: area de toque de pelo
+/// menos 48x48, rotulo em tudo que e tocavel e, com [checkContrast], contraste minimo do texto
+/// (4,5:1, ou 3:1 para texto grande).
+Future<void> expectAccessible(WidgetTester tester, {bool checkContrast = true}) async {
+  final SemanticsHandle handle = tester.ensureSemantics();
+  await tester.pump();
+  await expectLater(tester, meetsGuideline(androidTapTargetGuideline));
+  await expectLater(tester, meetsGuideline(labeledTapTargetGuideline));
+  if (checkContrast) {
+    await expectLater(tester, meetsGuideline(textContrastGuideline));
+  }
+  handle.dispose();
 }

@@ -2,17 +2,23 @@ import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
 
-/// Anel de progresso do tempo de uso, com conteudo no centro.
+import '../../foundations/ds_context.dart';
+import '../../tokens/motion.dart';
+
+/// Anel do tempo de uso, com o valor no centro.
 ///
-/// [progress] vai de 0 a 1 e representa a fracao ja usada. O anel muda de cor conforme se
-/// aproxima do limite, e nunca depende so da cor: quem usa o componente coloca o valor em
-/// texto no centro.
+/// [progress] vai de 0 a 1 e representa a fracao ja usada. A cor nunca e o unico sinal: quem
+/// usa o componente coloca o valor em texto no centro e um [semanticLabel] completo
+/// ("1 hora e 20 minutos restantes de 2 horas e 30 minutos").
+///
+/// O conteudo do centro diminui para caber no anel (o valor nunca quebra em duas linhas); com
+/// fonte ampliada, o mesmo valor deve aparecer tambem em texto fora do anel.
 class TimeRing extends StatelessWidget {
   const TimeRing({
     required this.progress,
     required this.child,
     this.size = 200,
-    this.strokeWidth = 16,
+    this.strokeWidth = 14,
     this.color,
     this.semanticLabel,
     super.key,
@@ -23,35 +29,40 @@ class TimeRing extends StatelessWidget {
   final double size;
   final double strokeWidth;
 
-  /// Cor do arco. Por padrao usa a cor primaria do tema.
+  /// Cor do arco. Por padrao, a cor primaria.
   final Color? color;
   final String? semanticLabel;
 
   @override
   Widget build(BuildContext context) {
-    final ColorScheme scheme = Theme.of(context).colorScheme;
+    final Color track = context.colors.surfaceMuted;
+    final Color arc = color ?? context.colors.primary;
     return Semantics(
       label: semanticLabel,
       container: semanticLabel != null,
+      excludeSemantics: semanticLabel != null,
       child: SizedBox.square(
         dimension: size,
         child: TweenAnimationBuilder<double>(
           tween: Tween<double>(end: progress.clamp(0.0, 1.0)),
-          duration: const Duration(milliseconds: 450),
-          curve: Curves.easeOutCubic,
+          duration: AppMotion.resolve(context, AppMotion.emphasis),
+          curve: AppMotion.emphasized,
           builder: (BuildContext context, double value, Widget? center) {
             return CustomPaint(
               painter: _RingPainter(
                 progress: value,
                 strokeWidth: strokeWidth,
-                trackColor: scheme.surfaceContainerHighest,
-                arcColor: color ?? scheme.primary,
+                trackColor: track,
+                arcColor: arc,
               ),
               child: center,
             );
           },
           child: Center(
-            child: Padding(padding: EdgeInsets.all(strokeWidth + 8), child: child),
+            child: Padding(
+              padding: EdgeInsets.all(strokeWidth + 10),
+              child: FittedBox(fit: BoxFit.scaleDown, child: child),
+            ),
           ),
         ),
       ),
@@ -60,7 +71,7 @@ class TimeRing extends StatelessWidget {
 }
 
 class _RingPainter extends CustomPainter {
-  const _RingPainter({
+  _RingPainter({
     required this.progress,
     required this.strokeWidth,
     required this.trackColor,
@@ -75,34 +86,29 @@ class _RingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final Offset center = size.center(Offset.zero);
-    final double radius = (math.min(size.width, size.height) - strokeWidth) / 2;
+    final double radius = (size.shortestSide - strokeWidth) / 2;
+    final Rect rect = Rect.fromCircle(center: center, radius: radius);
     final Paint track = Paint()
+      ..color = trackColor
       ..style = PaintingStyle.stroke
-      ..strokeWidth = strokeWidth
-      ..color = trackColor;
+      ..strokeWidth = strokeWidth;
     canvas.drawCircle(center, radius, track);
     if (progress <= 0) {
       return;
     }
     final Paint arc = Paint()
+      ..color = arcColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = strokeWidth
-      ..strokeCap = StrokeCap.round
-      ..color = arcColor;
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      2 * math.pi * progress,
-      false,
-      arc,
-    );
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(rect, -math.pi / 2, 2 * math.pi * progress, false, arc);
   }
 
   @override
-  bool shouldRepaint(_RingPainter oldDelegate) {
+  bool shouldRepaint(covariant _RingPainter oldDelegate) {
     return oldDelegate.progress != progress ||
-        oldDelegate.strokeWidth != strokeWidth ||
+        oldDelegate.arcColor != arcColor ||
         oldDelegate.trackColor != trackColor ||
-        oldDelegate.arcColor != arcColor;
+        oldDelegate.strokeWidth != strokeWidth;
   }
 }
