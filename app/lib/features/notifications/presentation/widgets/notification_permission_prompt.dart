@@ -1,21 +1,17 @@
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../core/platform/native_api.g.dart' show DeviceApi;
-import '../../../../core/platform/native_providers.dart';
 import '../../../../shared/widgets/feedback_views.dart';
-import 'alerts_controller.dart';
-
-/// Texto unico sobre a entrega dos alertas, usado em mais de uma tela para nao prometer mais
-/// do que o app entrega.
-const String alertDeliveryNote =
-    'Com o app aberto, os alertas chegam na hora. Com o app fechado, o aparelho busca novos '
-    'alertas em segundo plano e eles podem levar até cerca de 15 minutos para aparecer.';
+import '../bloc/notification_permission/notification_permission_bloc.dart';
+import '../texts/notification_texts.dart';
 
 /// Explica para que servem as notificacoes e, se a pessoa aceitar, pede a permissao ao
-/// sistema. Devolve verdadeiro se a permissao foi concedida.
-Future<bool> requestNotificationsWithExplanation(BuildContext context, WidgetRef ref) async {
+/// sistema pelo [NotificationPermissionBloc] da arvore. Devolve verdadeiro se a permissao foi
+/// concedida.
+Future<bool> requestNotificationsWithExplanation(BuildContext context) async {
+  final NotificationPermissionBloc bloc = context.read<NotificationPermissionBloc>();
   final bool? proceed = await showDialog<bool>(
     context: context,
     builder: (BuildContext context) {
@@ -44,15 +40,13 @@ Future<bool> requestNotificationsWithExplanation(BuildContext context, WidgetRef
   if (proceed != true) {
     return false;
   }
-  final DeviceApi api = ref.read(deviceApiProvider);
-  bool granted = false;
-  try {
-    granted = await api.requestNotificationPermission();
-  } on PlatformException {
-    granted = false;
+  final Completer<bool> completer = Completer<bool>();
+  bloc.add(NotificationPermissionRequested(completer: completer));
+  final bool granted = await completer.future;
+  if (!context.mounted) {
+    return granted;
   }
-  ref.invalidate(notificationsAllowedProvider);
-  if (!granted && context.mounted) {
+  if (!granted) {
     final ScaffoldMessengerState? messenger = ScaffoldMessenger.maybeOf(context);
     messenger
       ?..hideCurrentSnackBar()
@@ -61,17 +55,11 @@ Future<bool> requestNotificationsWithExplanation(BuildContext context, WidgetRef
           content: const Text('As notificações continuam desativadas para o ParentaLynx.'),
           action: SnackBarAction(
             label: 'Configurações',
-            onPressed: () async {
-              try {
-                await api.openNotificationSettings();
-              } on PlatformException {
-                // Sem tela de configuracoes disponivel. Nada a fazer.
-              }
-            },
+            onPressed: () => bloc.add(const NotificationSettingsOpened()),
           ),
         ),
       );
-  } else if (granted && context.mounted) {
+  } else {
     showAppSnackBar(context, 'Notificações ativadas.', tone: Tone.success);
   }
   return granted;
