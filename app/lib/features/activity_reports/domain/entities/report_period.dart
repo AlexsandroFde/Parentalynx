@@ -1,3 +1,5 @@
+import 'package:equatable/equatable.dart';
+
 import '../../../../core/time/formatters.dart';
 
 /// Atalhos de periodo dos relatorios.
@@ -14,7 +16,7 @@ enum ReportPreset {
 }
 
 /// Intervalo de dias da cota de um relatorio, inclusivo nas duas pontas.
-class ReportPeriod {
+final class ReportPeriod extends Equatable {
   const ReportPeriod._(this.preset, this.from, this.to);
 
   /// Periodo de um atalho, calculado a partir do dia da cota corrente do aparelho.
@@ -56,42 +58,36 @@ class ReportPeriod {
 
   bool get isSingleDay => from == to;
 
-  /// Descricao do intervalo: `ter 17/11` ou `11/11 a 17/11`.
-  String get rangeLabel {
-    if (isSingleDay) {
-      return formatDayLabel(from);
+  @override
+  List<Object?> get props => <Object?>[preset, from, to];
+}
+
+/// Escolha de periodo feita na tela: um atalho, ou um intervalo personalizado.
+final class ReportSelection extends Equatable {
+  const ReportSelection({this.preset = ReportPreset.last7, this.customFrom, this.customTo});
+
+  /// Escolha padrao ao abrir os relatorios: os ultimos 7 dias.
+  static const ReportSelection initial = ReportSelection();
+
+  final ReportPreset preset;
+  final String? customFrom;
+  final String? customTo;
+
+  /// Periodo da escolha no dia da cota informado.
+  ReportPeriod periodFor(String today) {
+    final String? from = customFrom;
+    final String? to = customTo;
+    if (preset == ReportPreset.custom && from != null && to != null) {
+      return ReportPeriod.custom(from, to, today: today);
     }
-    return '${formatShortDate(parseDay(from))} a ${formatShortDate(parseDay(to))}';
+    return ReportPeriod.preset(preset, today: today);
   }
 
   @override
-  bool operator ==(Object other) {
-    return other is ReportPeriod && other.preset == preset && other.from == from && other.to == to;
-  }
-
-  @override
-  int get hashCode => Object.hash(preset, from, to);
+  List<Object?> get props => <Object?>[preset, customFrom, customTo];
 }
 
-/// Escala do eixo de duracoes de um grafico: intervalo entre marcas e topo, em minutos.
-///
-/// As marcas caem em valores redondos (15min, 30min, 1h, 2h, 4h), com no maximo cerca de
-/// cinco linhas.
-({double interval, double max}) durationAxis(double maxMinutes) {
-  const List<double> steps = <double>[5, 10, 15, 30, 60, 120, 240, 480];
-  double interval = steps.last;
-  for (final double step in steps) {
-    if (maxMinutes / step <= 4) {
-      interval = step;
-      break;
-    }
-  }
-  final double top = maxMinutes <= 0 ? interval : (maxMinutes / interval).ceil() * interval;
-  return (interval: interval, max: top);
-}
-
-/// Rotulo de uma marca do eixo de duracoes: `0`, `30min`, `1h`, `1h 30min`.
-String durationTick(double minutes) {
-  final int value = minutes.round();
-  return value == 0 ? '0' : formatMinutes(value);
+/// Dia da cota corrente do aparelho. Quando o servidor ainda nao informou, usa a data local.
+String quotaDayOf(String deviceToday, DateTime now) {
+  return deviceToday.isEmpty ? formatDay(now) : deviceToday;
 }

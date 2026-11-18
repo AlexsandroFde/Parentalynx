@@ -1,55 +1,114 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
+
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
+import '../../../../core/constants/route_paths.dart';
+import '../../../../core/errors/app_failure.dart';
 import '../../../../core/time/formatters.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/feedback_views.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../../apps/presentation/app_category_ui.dart';
-import '../../apps/presentation/app_icon.dart';
-import '../../dashboard/presentation/widgets/device_selector.dart';
-import '../../devices/domain/device.dart';
-import '../../devices/presentation/devices_providers.dart';
-import '../../guardian_paths.dart';
-import '../data/reports_repository.dart';
-import '../domain/report_models.dart';
-import '../domain/report_period.dart';
-import '../reports_paths.dart';
-import 'charts.dart';
+import '../../../app_management/presentation/widgets/app_category_ui.dart';
+import '../../../app_management/presentation/widgets/app_icon_view.dart';
+import '../../../child_device/domain/entities/child_device.dart';
+import '../../../child_device/presentation/bloc/devices/devices_bloc.dart';
+import '../../../child_device/presentation/widgets/device_selector.dart';
+import '../../domain/entities/report_period.dart';
+import '../../domain/entities/report_summary.dart';
+import '../bloc/activity_reports/activity_reports_bloc.dart';
+import '../texts/report_texts.dart';
+import '../widgets/charts.dart';
 
 /// Relatorios de uso do aparelho em foco, com filtro de periodo.
-class ReportsPage extends ConsumerStatefulWidget {
+///
+/// Espera o [DevicesBloc] (aparelho em foco) e o [ActivityReportsBloc] acima na arvore. A tela
+/// avisa o BLoC do relatorio quando o aparelho em foco muda.
+class ReportsPage extends StatefulWidget {
   const ReportsPage({super.key});
 
   @override
-  ConsumerState<ReportsPage> createState() => _ReportsPageState();
+  State<ReportsPage> createState() => _ReportsPageState();
 }
 
-class _ReportsPageState extends ConsumerState<ReportsPage> {
-  ReportPreset _preset = ReportPreset.last7;
-  String? _customFrom;
-  String? _customTo;
-
-  /// Ultimo relatorio carregado, mantido na tela enquanto o proximo periodo carrega.
-  ReportSummary? _last;
-
-  ReportPeriod _period(String today) {
-    final String? from = _customFrom;
-    final String? to = _customTo;
-    if (_preset == ReportPreset.custom && from != null && to != null) {
-      return ReportPeriod.custom(from, to, today: today);
-    }
-    return ReportPeriod.preset(_preset, today: today);
+class _ReportsPageState extends State<ReportsPage> {
+  @override
+  void initState() {
+    super.initState();
+    _followDevice(context.read<DevicesBloc>().state.selected);
   }
 
-  Future<void> _select(ReportPreset preset, String today) async {
+  void _followDevice(ChildDevice? device) {
+    if (device != null) {
+      context.read<ActivityReportsBloc>().add(
+        ReportsDeviceChanged(deviceId: device.id, deviceToday: device.today),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final DevicesState devices = context.watch<DevicesBloc>().state;
+    final ChildDevice? device = devices.selected;
+    return BlocListener<DevicesBloc, DevicesState>(
+      listenWhen: (DevicesState previous, DevicesState current) {
+        final ChildDevice? before = previous.selected;
+        final ChildDevice? after = current.selected;
+        return before?.id != after?.id || before?.today != after?.today;
+      },
+      listener: (BuildContext context, DevicesState state) => _followDevice(state.selected),
+      child: Scaffold(
+        appBar: AppBar(title: const Text('Relatórios')),
+        body: device == null ? _NoDevice(devices: devices) : _ReportsContent(device: device),
+      ),
+    );
+  }
+}
+
+class _NoDevice extends StatelessWidget {
+  const _NoDevice({required this.devices});
+
+  final DevicesState devices;
+
+  @override
+  Widget build(BuildContext context) {
+    return switch (devices) {
+      DevicesInitial() || DevicesLoading() => const LoadingView(),
+      DevicesError(:final failure) => FailureView(
+        error: failure,
+        onRetry: () => context.read<DevicesBloc>().add(const DevicesRefreshRequested()),
+      ),
+      DevicesEmpty() || DevicesLoaded() => EmptyState(
+        icon: Icons.insights_outlined,
+        title: 'Nenhum aparelho vinculado',
+        message: 'Os relatórios aparecem depois que o aparelho da criança for vinculado.',
+        actionLabel: 'Vincular aparelho',
+        onAction: () => context.push(GuardianPaths.pairing),
+      ),
+    };
+  }
+}
+
+class _ReportsContent extends StatelessWidget {
+  const _ReportsContent({required this.device});
+
+  final ChildDevice device;
+
+  Future<void> _refresh(BuildContext context) {
+    final Completer<void> done = Completer<void>();
+    context.read<ActivityReportsBloc>().add(ReportsRefreshRequested(completer: done));
+    return done.future;
+  }
+
+  Future<void> _select(BuildContext context, ReportPreset preset, ReportQuery query) async {
+    final ActivityReportsBloc bloc = context.read<ActivityReportsBloc>();
     if (preset != ReportPreset.custom) {
-      setState(() => _preset = preset);
+      bloc.add(ReportsPresetSelected(preset));
       return;
     }
-    final ReportPeriod current = _period(today);
-    final DateTime last = parseDay(today);
+    final ReportPeriod current = query.period;
+    final DateTime last = parseDay(query.today);
     final DateTimeRange? range = await showDateRangePicker(
       context: context,
       firstDate: last.subtract(const Duration(days: 400)),
@@ -59,56 +118,24 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
       saveText: 'Aplicar',
     );
     if (range != null) {
-      setState(() {
-        _preset = ReportPreset.custom;
-        _customFrom = formatDay(range.start);
-        _customTo = formatDay(range.end);
-      });
+      bloc.add(ReportsCustomRangeSelected(from: formatDay(range.start), to: formatDay(range.end)));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final Device? device = ref.watch(selectedDeviceProvider);
-    return Scaffold(
-      appBar: AppBar(title: const Text('Relatórios')),
-      body: device == null ? _noDevice() : _content(device),
-    );
-  }
-
-  Widget _noDevice() {
-    final AsyncValue<List<Device>> devices = ref.watch(devicesProvider);
-    if (!devices.hasValue) {
-      return devices.hasError
-          ? FailureView(
-              error: devices.error!,
-              onRetry: () => ref.read(devicesProvider.notifier).refresh(),
-            )
-          : const LoadingView();
-    }
-    return EmptyState(
-      icon: Icons.insights_outlined,
-      title: 'Nenhum aparelho vinculado',
-      message: 'Os relatórios aparecem depois que o aparelho da criança for vinculado.',
-      actionLabel: 'Vincular aparelho',
-      onAction: () => context.push(GuardianPaths.pairing),
-    );
-  }
-
-  Widget _content(Device device) {
     final ThemeData theme = Theme.of(context);
-    final String today = device.today.isEmpty ? formatDay(DateTime.now()) : device.today;
-    final ReportPeriod period = _period(today);
-    final ReportQuery query = (deviceId: device.id, from: period.from, to: period.to);
-    final AsyncValue<ReportSummary> value = ref.watch(reportSummaryProvider(query));
-    final ReportSummary? fresh = value.value;
-    if (fresh != null) {
-      _last = fresh;
+    final ActivityReportsState state = context.watch<ActivityReportsBloc>().state;
+    final ReportQuery? query = state.query;
+    if (query == null) {
+      return const LoadingView();
     }
-    final ReportSummary? summary = fresh ?? _last;
+    final ReportPeriod period = query.period;
+    final ReportSummary? summary = state.summary;
+    final AppFailure? failure = state.failure;
 
     return RefreshIndicator(
-      onRefresh: () async => ref.invalidate(reportSummaryProvider(query)),
+      onRefresh: () => _refresh(context),
       child: PageBody(
         children: <Widget>[
           const DeviceSelector(),
@@ -121,8 +148,8 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                     padding: const EdgeInsets.only(right: AppSpacing.sm),
                     child: ChoiceChip(
                       label: Text(preset.label),
-                      selected: _preset == preset,
-                      onSelected: (_) => _select(preset, today),
+                      selected: query.selection.preset == preset,
+                      onSelected: (_) => _select(context, preset, query),
                     ),
                   ),
               ],
@@ -139,7 +166,7 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
                   ),
                 ),
               ),
-              if (value.isLoading && summary != null)
+              if (state.isLoading && summary != null)
                 const SizedBox.square(
                   dimension: 16,
                   child: CircularProgressIndicator(strokeWidth: 2),
@@ -150,28 +177,25 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
           if (summary == null)
             SizedBox(
               height: 320,
-              child: value.hasError
-                  ? FailureView(
-                      error: value.error!,
-                      onRetry: () => ref.invalidate(reportSummaryProvider(query)),
-                    )
+              child: failure != null
+                  ? FailureView(error: failure, onRetry: () => _refresh(context))
                   : const LoadingView(message: 'Montando o relatório'),
             )
           else ...<Widget>[
-            if (value.hasError && fresh == null) ...<Widget>[
+            if (failure != null && !state.isFresh) ...<Widget>[
               NoticeBanner(
                 tone: Tone.warning,
                 message: 'Não foi possível atualizar. Mostrando o último relatório carregado.',
                 actionLabel: 'Tentar de novo',
-                onAction: () => ref.invalidate(reportSummaryProvider(query)),
+                onAction: () => _refresh(context),
               ),
               const SizedBox(height: AppSpacing.md),
             ],
             // Enquanto o novo periodo carrega, o relatorio anterior fica esmaecido na tela.
             AnimatedOpacity(
               duration: const Duration(milliseconds: 150),
-              opacity: fresh == null ? 0.5 : 1,
-              child: _ReportBody(summary: summary, device: device, period: period),
+              opacity: state.isFresh ? 1 : 0.5,
+              child: _ReportBody(summary: summary, period: period),
             ),
           ],
         ],
@@ -181,10 +205,9 @@ class _ReportsPageState extends ConsumerState<ReportsPage> {
 }
 
 class _ReportBody extends StatelessWidget {
-  const _ReportBody({required this.summary, required this.device, required this.period});
+  const _ReportBody({required this.summary, required this.period});
 
   final ReportSummary summary;
-  final Device device;
   final ReportPeriod period;
 
   @override
@@ -192,19 +215,20 @@ class _ReportBody extends StatelessWidget {
     final ThemeData theme = Theme.of(context);
     final ChartPalette palette = ChartPalette.of(context);
     final ReportTotals totals = summary.totals;
-    final bool multiDay = summary.daily.length > 1;
+    final bool multiDay = summary.isMultiDay;
     final int totalMs = totals.totalMs;
 
-    final List<AppUsage> topApps = summary.apps.take(8).toList();
+    final List<AppUsage> topApps = summary.topApps();
     final int maxAppMs = topApps.isEmpty ? 1 : topApps.first.totalMs;
-    final List<CategoryUsage> categories = summary.categories
-        .where((CategoryUsage c) => c.totalMs > 0)
-        .toList();
+    final List<CategoryUsage> categories = summary.usedCategories;
     final int maxCategoryMs = categories.isEmpty ? 1 : categories.first.totalMs;
     final int maxBlocked = summary.blockedByApp.isEmpty ? 1 : summary.blockedByApp.first.count;
     final int? peak = summary.peakHour;
 
-    String share(int ms) => totalMs <= 0 ? '' : '${(ms * 100 / totalMs).round()}% do total';
+    String share(int ms) {
+      final int? percent = summary.percentOfTotal(ms);
+      return percent == null ? '' : '$percent% do total';
+    }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -3,11 +3,11 @@ import 'dart:math' as math;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:material_ui/material_ui.dart';
 
-import '../../../../app/theme/app_theme.dart';
 import '../../../../core/time/formatters.dart';
+import '../../../../shared/theme/app_theme.dart';
 import '../../../../shared/widgets/form_widgets.dart';
-import '../domain/report_models.dart';
-import '../domain/report_period.dart';
+import '../../domain/entities/report_summary.dart';
+import 'chart_scale.dart';
 
 /// Cores dos graficos nos dois temas.
 ///
