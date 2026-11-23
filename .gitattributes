@@ -1,0 +1,7 @@
+# Arquivos executados no Linux (servidor e conteiner) precisam de fim de linha LF, mesmo quando
+# o repositorio e clonado no Windows.
+*.sh text eol=lf
+backend/Dockerfile text eol=lf
+backend/Caddyfile text eol=lf
+backend/*.yml text eol=lf
+backend/.env.example text eol=lf
