@@ -85,9 +85,9 @@ Saída: `app/build/app/outputs/flutter-apk/app-debug.apk`.
 
 O endereço do servidor é fixo no código, em `AppConfig.serverUrl`
 (`app/lib/app/config/app_config.dart`). O app não oferece a troca, então nada é digitado nos
-aparelhos. Enquanto o servidor não está no VPS, o valor é `http://10.0.2.2:8080`, que é o
-computador visto de dentro do emulador Android. Com o servidor no ar, troque pelo domínio
-(`https://api.exemplo.com.br`) e compile de novo.
+aparelhos. O valor é o domínio do servidor no VPS (seção 2.2). Para testar contra o servidor
+local no emulador Android, troque temporariamente por `http://10.0.2.2:8080`, que é o computador
+visto de dentro do emulador.
 
 O APK de depuração aceita HTTP sem TLS, para testes em rede local. Para testar um aparelho
 físico contra o computador, troque o valor temporariamente pelo IP do computador

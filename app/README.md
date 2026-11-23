@@ -45,8 +45,8 @@ flutter build apk --release
 
 O endereço do servidor é fixo no código, em `AppConfig.serverUrl`
 ([lib/app/config/app_config.dart](lib/app/config/app_config.dart)), e o app não oferece a troca.
-Enquanto o servidor não está no VPS, ele aponta para `http://10.0.2.2:8080` (o computador visto
-do emulador). O build de produção só fala HTTPS. O servidor no VPS está em
+Ele aponta para o servidor na VM. Para testar contra o servidor local no emulador, troque
+temporariamente por `http://10.0.2.2:8080`. O build de produção só fala HTTPS. O servidor no VPS está em
 [../docs/08-servidor-vps.md](../docs/08-servidor-vps.md).
 
 Testes do agente nativo (JVM), a partir de `android/`:

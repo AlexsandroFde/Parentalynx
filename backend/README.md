@@ -32,9 +32,9 @@ Conferir que está no ar:
 curl http://localhost:8080/health
 ```
 
-O app usa o endereço fixo em `AppConfig.serverUrl` (`app/lib/app/config/app_config.dart`).
-Enquanto ele vale `http://10.0.2.2:8080`, o app no emulador Android fala com este servidor
-local. Builds de produção do app só aceitam HTTPS.
+O app usa o endereço fixo em `AppConfig.serverUrl` (`app/lib/app/config/app_config.dart`), que
+aponta para o servidor no VPS. Para o app no emulador Android falar com este servidor local,
+troque temporariamente por `http://10.0.2.2:8080`. Builds de produção do app só aceitam HTTPS.
 
 ## Variáveis de ambiente
 
