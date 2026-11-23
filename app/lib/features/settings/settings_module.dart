@@ -1,12 +1,12 @@
 import 'package:get_it/get_it.dart';
 
 import '../../core/network/api_client.dart';
+import '../../core/network/server_endpoint.dart';
 import '../../core/platform/native_api.g.dart';
 import '../authentication/domain/repositories/i_current_account_repository.dart';
 import '../authentication/domain/usecases/app_lock_preference.dart';
 import '../authentication/domain/usecases/end_session.dart';
 import '../authentication/domain/usecases/run_elevated.dart';
-import '../server_config/domain/usecases/watch_server_address.dart';
 import 'data/datasources/remote/account_remote_data_source.dart';
 import 'data/repositories/api_account_management_repository.dart';
 import 'data/services/native_app_info_service.dart';
@@ -89,10 +89,7 @@ void registerSettingsModule(GetIt di) {
   // Apresentacao: uma instancia por tela, fechada quando a tela sai.
   di
     ..registerFactory<MoreBloc>(
-      () => MoreBloc(
-        watchServerAddress: di<WatchServerAddress>(),
-        getAppVersion: di<GetAppVersion>(),
-      ),
+      () => MoreBloc(serverAddress: di<ServerEndpoint>().url, getAppVersion: di<GetAppVersion>()),
     )
     ..registerFactory<AccountBloc>(
       () => AccountBloc(

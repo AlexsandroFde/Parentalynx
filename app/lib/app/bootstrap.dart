@@ -27,30 +27,26 @@ final class AppComposition {
 }
 
 /// Prepara o que precisa existir antes do primeiro quadro: localizacao de datas, observador
-/// dos BLoCs, perfil, endereco do servidor e token de sessao gravados, e o conteiner de
-/// dependencias.
+/// dos BLoCs, perfil e token de sessao gravados, e o conteiner de dependencias.
 Future<AppComposition> bootstrap() async {
   await _prepareEngine();
 
   final UserRole role = await NativeUserRoleRepository.readInitial(AppModeApi());
   final SecureStore store = NativeSecureStore(SecureStorageApi());
-  String serverUrl = AppConfig.defaultServerUrl;
   String? sessionToken;
   try {
-    serverUrl = await store.read(StorageKeys.serverUrl) ?? AppConfig.defaultServerUrl;
     if (role == UserRole.guardian) {
       sessionToken = await store.read(StorageKeys.guardianSessionToken);
     }
   } on PlatformException {
-    // A ponte nativa nao respondeu. O app sobe com os valores padrao e a tela de boas-vindas
-    // deixa a pessoa tentar de novo.
+    // A ponte nativa nao respondeu. O app sobe sem sessao e a pessoa entra de novo.
   }
 
   final GetIt di = GetIt.instance;
   final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
   configureDependencies(
     di,
-    values: AppBootValues(role: role, serverUrl: serverUrl, sessionToken: sessionToken),
+    values: AppBootValues(role: role, sessionToken: sessionToken),
     navigatorKey: navigatorKey,
   );
 

@@ -18,7 +18,6 @@ import 'package:parentalynx/features/authentication/presentation/pages/recovery_
 import 'package:parentalynx/features/authentication/presentation/pages/register_page.dart';
 import 'package:parentalynx/features/authentication/presentation/pages/sign_in_page.dart';
 import 'package:parentalynx/features/authentication/presentation/pages/unlock_page.dart';
-import 'package:parentalynx/features/server_config/presentation/bloc/server_config_bloc.dart';
 
 import '../../../support/fake_backend.dart';
 import '../../../support/fakes.dart';
@@ -99,11 +98,7 @@ void main() {
         providers: <BlocProvider<Object?>>[
           BlocProvider<AuthBloc>.value(value: deps.di<AuthBloc>()),
           BlocProvider<GuardianEntryBloc>(
-            create: (BuildContext context) =>
-                deps.di<GuardianEntryBloc>()..add(const GuardianEntryStarted()),
-          ),
-          BlocProvider<ServerConfigBloc>(
-            create: (BuildContext context) => deps.di<ServerConfigBloc>(),
+            create: (BuildContext context) => deps.di<GuardianEntryBloc>(),
           ),
         ],
         child: const SignInPage(),
@@ -115,7 +110,7 @@ void main() {
     );
   }
 
-  testWidgets('porta de entrada mostra os caminhos, o servidor e a troca de papel', (
+  testWidgets('porta de entrada mostra os caminhos e a troca de papel, sem servidor', (
     WidgetTester tester,
   ) async {
     await pumpSignIn(tester, build());
@@ -124,14 +119,10 @@ void main() {
     expect(find.text('Criar conta'), findsOneWidget);
     expect(find.text('Já tenho conta'), findsOneWidget);
     expect(find.text('Como começar'), findsOneWidget);
-    expect(find.text('https://servidor.teste'), findsOneWidget);
     expect(find.text('Trocar o papel deste aparelho'), findsOneWidget);
-
-    // O servidor pode ser corrigido daqui, sem voltar para a escolha do papel.
-    await tester.ensureVisible(find.text('https://servidor.teste'));
-    await tester.tap(find.text('https://servidor.teste'));
-    await settle(tester);
-    expect(find.text('Salvar'), findsOneWidget);
+    // O endereco do servidor e fixo no codigo: nao ha o que trocar aqui.
+    expect(find.text('Servidor'), findsNothing);
+    expect(find.text('https://servidor.teste'), findsNothing);
   });
 
   screenChecks('porta de entrada', 'guardian_sign_in', pumpSignIn);

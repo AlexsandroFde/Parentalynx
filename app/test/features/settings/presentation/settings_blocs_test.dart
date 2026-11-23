@@ -12,7 +12,6 @@ import 'package:parentalynx/features/authentication/domain/entities/app_lock_tim
 import 'package:parentalynx/features/authentication/domain/entities/guardian_account.dart';
 import 'package:parentalynx/features/authentication/domain/entities/guardian_session.dart';
 import 'package:parentalynx/features/authentication/domain/usecases/app_lock_preference.dart';
-import 'package:parentalynx/features/server_config/domain/usecases/watch_server_address.dart';
 import 'package:parentalynx/features/settings/domain/entities/audit_entry.dart';
 import 'package:parentalynx/features/settings/domain/entities/password_change_errors.dart';
 import 'package:parentalynx/features/settings/domain/usecases/change_password.dart';
@@ -53,8 +52,6 @@ class _MockLoadAuditLog extends Mock implements LoadAuditLog {}
 class _MockAppLockPreference extends Mock implements AppLockPreference {}
 
 class _MockUpdateAccountSettings extends Mock implements UpdateAccountSettings {}
-
-class _MockWatchServerAddress extends Mock implements WatchServerAddress {}
 
 class _MockGetAppVersion extends Mock implements GetAppVersion {}
 
@@ -668,39 +665,25 @@ void main() {
 
   group('MoreBloc', () {
     blocTest<MoreBloc, MoreState>(
-      'mostra a versao do app e acompanha o endereco do servidor',
+      'mostra o servidor fixo e a versao do app',
       build: () {
-        final _MockWatchServerAddress watchServerAddress = _MockWatchServerAddress();
         final _MockGetAppVersion getAppVersion = _MockGetAppVersion();
-        when(() => watchServerAddress.current).thenReturn('https://servidor.teste');
-        when(watchServerAddress.call).thenAnswer(
-          (_) => Stream<String>.fromIterable(<String>[
-            'https://servidor.teste',
-            'https://outro.teste',
-          ]),
-        );
         when(getAppVersion.call).thenAnswer((_) async => '1.0.0');
-        return MoreBloc(watchServerAddress: watchServerAddress, getAppVersion: getAppVersion);
+        return MoreBloc(serverAddress: 'https://servidor.teste', getAppVersion: getAppVersion);
       },
       act: (MoreBloc bloc) => bloc.add(const MoreStarted()),
-      wait: const Duration(milliseconds: 10),
-      verify: (MoreBloc bloc) {
-        expect(
-          bloc.state,
-          const MoreState(serverAddress: 'https://outro.teste', appVersion: '1.0.0'),
-        );
-      },
+      expect: () => const <MoreState>[
+        MoreState(serverAddress: 'https://servidor.teste', appVersion: '1.0.0'),
+      ],
     );
 
-    test('comeca com o endereco atual, antes de qualquer aviso', () {
-      final _MockWatchServerAddress watchServerAddress = _MockWatchServerAddress();
-      when(() => watchServerAddress.current).thenReturn('');
+    test('comeca com o endereco do servidor, antes da versao', () {
       final MoreBloc bloc = MoreBloc(
-        watchServerAddress: watchServerAddress,
+        serverAddress: 'https://servidor.teste',
         getAppVersion: _MockGetAppVersion(),
       );
       addTearDown(bloc.close);
-      expect(bloc.state, const MoreState(serverAddress: ''));
+      expect(bloc.state, const MoreState(serverAddress: 'https://servidor.teste'));
     });
   });
 }

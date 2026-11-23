@@ -5,17 +5,16 @@ import 'package:material_ui/material_ui.dart';
 import '../../../../core/bloc/action_status.dart';
 import '../../../../core/constants/route_paths.dart';
 import '../../../../shared/design_system/design_system.dart';
-import '../../../server_config/presentation/widgets/server_sheet.dart';
 import '../../domain/entities/guardian_session.dart';
 import '../bloc/auth/auth_bloc.dart';
 import '../bloc/guardian_entry/guardian_entry_bloc.dart';
 import '../widgets/auth_widgets.dart';
 
-/// Porta de entrada do modo responsavel: criar conta, entrar, o servidor em uso e a volta
-/// para a escolha do papel do aparelho.
+/// Porta de entrada do modo responsavel: criar conta, entrar e voltar para a escolha do papel
+/// do aparelho.
 ///
-/// Le o aviso de sessao encerrada do [AuthBloc], o servidor do [GuardianEntryBloc] e troca o
-/// servidor pelo `ServerConfigBloc`, que precisa estar acima na arvore.
+/// Le o aviso de sessao encerrada do [AuthBloc] e a volta para a escolha do papel do
+/// [GuardianEntryBloc].
 class SignInPage extends StatelessWidget {
   const SignInPage({super.key});
 
@@ -90,14 +89,6 @@ class SignInPage extends StatelessWidget {
                   title: 'Este aparelho',
                   child: AppListGroup(
                     children: <Widget>[
-                      AppListRow(
-                        leading: const AppIconTile(icon: AppIcons.server, tone: Tone.neutral),
-                        title: 'Servidor',
-                        subtitle: state.serverAddress.isEmpty
-                            ? 'Não configurado'
-                            : state.serverAddress,
-                        onTap: changingRole ? null : () => showServerSheet(context),
-                      ),
                       AppListRow(
                         leading: const AppIconTile(icon: AppIcons.swap, tone: Tone.neutral),
                         title: 'Trocar o papel deste aparelho',

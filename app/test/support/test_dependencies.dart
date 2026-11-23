@@ -14,7 +14,6 @@ import 'package:parentalynx/features/child_device/child_device_module.dart';
 import 'package:parentalynx/features/device_policy/device_policy_module.dart';
 import 'package:parentalynx/features/device_sync/device_sync_module.dart';
 import 'package:parentalynx/features/device_sync/domain/repositories/i_realtime_repository.dart';
-import 'package:parentalynx/features/server_config/server_config_module.dart';
 import 'package:parentalynx/features/user_role/domain/entities/user_role.dart';
 import 'package:parentalynx/features/user_role/user_role_module.dart';
 import 'package:parentalynx/shared/services/share_service.dart';
@@ -27,7 +26,7 @@ import 'native_doubles.dart';
 ///
 /// Usa os modulos reais (casos de uso, repositorios, BLoCs) com o nucleo trocado por dubles:
 /// servidor falso, ponte nativa simulada, armazenamento em memoria, relogio controlado e canal
-/// em tempo real controlado. Ja registra os modulos de base (perfil, servidor, autenticacao,
+/// em tempo real controlado. Ja registra os modulos de base (perfil, autenticacao,
 /// sincronizacao, aparelhos e politica); cada teste registra os modulos da funcionalidade
 /// testada em [di].
 class TestDependencies {
@@ -94,7 +93,6 @@ class TestDependencies {
     );
 
     registerUserRoleModule(di, initialRole: role);
-    registerServerConfigModule(di, allowInsecureHttp: true);
     registerAuthenticationModule(di, navigatorKey: navigatorKey);
     registerDeviceSyncModule(di);
     registerChildDeviceModule(di);

@@ -18,7 +18,7 @@ import '../../shared/services/share_service.dart';
 final class CoreBootValues {
   const CoreBootValues({required this.serverUrl, this.sessionToken});
 
-  /// Endereco do servidor gravado, ou o padrao do build.
+  /// Endereco do servidor: `AppConfig.serverUrl` no app, o servidor falso nos testes.
   final String serverUrl;
 
   /// Token da sessao do responsavel gravado, quando ha.
@@ -80,9 +80,7 @@ void registerNetworkModule(GetIt di, CoreBootValues values, {http.Client? httpCl
       () => httpClient ?? http.Client(),
       dispose: (http.Client client) => client.close(),
     )
-    ..registerLazySingleton<ServerEndpoint>(
-      () => ServerEndpoint(store: di<SecureStore>(), initialUrl: values.serverUrl),
-    )
+    ..registerLazySingleton<ServerEndpoint>(() => ServerEndpoint(values.serverUrl))
     ..registerLazySingleton<SessionCredentials>(
       () => SessionCredentials(store: di<SecureStore>(), initialToken: values.sessionToken),
       dispose: (SessionCredentials credentials) => credentials.dispose(),

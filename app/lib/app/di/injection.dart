@@ -20,7 +20,6 @@ import '../../features/onboarding/onboarding_module.dart';
 import '../../features/schedules/schedules_module.dart';
 import '../../features/screen_time/screen_time_child_module.dart';
 import '../../features/screen_time/screen_time_module.dart';
-import '../../features/server_config/server_config_module.dart';
 import '../../features/settings/settings_module.dart';
 import '../../features/user_role/domain/entities/user_role.dart';
 import '../../features/user_role/user_role_module.dart';
@@ -29,13 +28,10 @@ import 'core_module.dart';
 
 /// Valores lidos antes do primeiro quadro e necessarios para montar as dependencias.
 final class AppBootValues {
-  const AppBootValues({required this.role, required this.serverUrl, this.sessionToken});
+  const AppBootValues({required this.role, this.sessionToken});
 
   /// Perfil gravado pelo lado nativo.
   final UserRole role;
-
-  /// Endereco do servidor gravado, ou o padrao do build.
-  final String serverUrl;
 
   /// Token da sessao do responsavel gravado, quando ha.
   final String? sessionToken;
@@ -53,14 +49,9 @@ void configureDependencies(
 }) {
   registerCoreModule(
     di,
-    CoreBootValues(serverUrl: values.serverUrl, sessionToken: values.sessionToken),
+    CoreBootValues(serverUrl: AppConfig.serverUrl, sessionToken: values.sessionToken),
   );
-  registerFeatureModules(
-    di,
-    initialRole: values.role,
-    allowInsecureHttp: AppConfig.allowInsecureHttp,
-    navigatorKey: navigatorKey,
-  );
+  registerFeatureModules(di, initialRole: values.role, navigatorKey: navigatorKey);
 }
 
 /// Raiz de composicao do motor do navegador gerenciado (`browserMain`): o nucleo e so o modulo
@@ -70,7 +61,7 @@ void configureDependencies(
 /// app principal. Os registros do nucleo sao preguicosos, entao so a ponte nativa usada pelo
 /// navegador chega a ser criada.
 void configureBrowserDependencies(GetIt di) {
-  registerCoreModule(di, CoreBootValues(serverUrl: AppConfig.defaultServerUrl));
+  registerCoreModule(di, const CoreBootValues(serverUrl: AppConfig.serverUrl));
   registerManagedBrowserModule(di);
 }
 
@@ -79,12 +70,10 @@ void configureBrowserDependencies(GetIt di) {
 void registerFeatureModules(
   GetIt di, {
   required UserRole initialRole,
-  required bool allowInsecureHttp,
   required GlobalKey<NavigatorState> navigatorKey,
 }) {
   // Base.
   registerUserRoleModule(di, initialRole: initialRole);
-  registerServerConfigModule(di, allowInsecureHttp: allowInsecureHttp);
   registerAuthenticationModule(di, navigatorKey: navigatorKey);
   registerDeviceSyncModule(di);
   registerChildDeviceModule(di);

@@ -30,12 +30,7 @@ TestDependencies buildAppTestDependencies({
     sessionToken: sessionToken,
     secureStore: secureStore,
   );
-  registerFeatureModules(
-    deps.di,
-    initialRole: role,
-    allowInsecureHttp: true,
-    navigatorKey: deps.navigatorKey,
-  );
+  registerFeatureModules(deps.di, initialRole: role, navigatorKey: deps.navigatorKey);
   // A raiz de composicao registra as implementacoes reais: os dubles voltam por cima.
   deps.di
     ..registerSingleton<IRealtimeRepository>(deps.realtime)

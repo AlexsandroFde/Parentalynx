@@ -1,23 +1,14 @@
-/// Configuracao definida no momento do build.
+/// Configuracao do app definida no codigo.
 ///
 /// So a camada de composicao (`app/`) le esta classe: as funcionalidades recebem os valores
-/// de que precisam pela injecao de dependencias (por exemplo a regra de enderecos aceitos).
-///
-/// O endereco do servidor vem de `--dart-define=API_BASE_URL=https://...`. Em build de
-/// depuracao, se nada for informado, usa o servidor local visto de dentro do emulador.
+/// de que precisam pela injecao de dependencias.
 abstract final class AppConfig {
-  static const String _definedBaseUrl = String.fromEnvironment('API_BASE_URL');
+  /// Endereco do servidor ParentaLynx. E fixo: o app nao oferece a troca.
+  ///
+  /// Enquanto o dominio nao existe, aponta para o servidor local visto de dentro do emulador
+  /// Android. Com o servidor no VPS, troque por `https://api.SEU_DOMINIO`: o build de
+  /// producao so fala HTTPS (ver docs/08-servidor-vps.md).
+  static const String serverUrl = 'http://10.0.2.2:8080';
 
   static const bool isReleaseBuild = bool.fromEnvironment('dart.vm.product');
-
-  /// Endereco padrao do servidor, ou vazio quando o build de producao nao trouxe um.
-  static String get defaultServerUrl {
-    if (_definedBaseUrl.isNotEmpty) {
-      return _definedBaseUrl;
-    }
-    return isReleaseBuild ? '' : 'http://10.0.2.2:8080';
-  }
-
-  /// So builds de depuracao aceitam servidor sem TLS (testes em rede local).
-  static bool get allowInsecureHttp => !isReleaseBuild;
 }

@@ -7,7 +7,7 @@ sealed class MoreEvent extends Equatable {
   List<Object?> get props => const <Object?>[];
 }
 
-/// A aba abriu: busca a versao do app e acompanha o endereco do servidor.
+/// A aba abriu: busca a versao do app.
 final class MoreStarted extends MoreEvent {
   const MoreStarted();
 }

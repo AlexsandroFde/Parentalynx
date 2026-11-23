@@ -26,7 +26,7 @@ android/                   agente nativo, manifesto e recursos
 test/                      testes por camada, capturas de tela de referência e regras de arquitetura
 ```
 
-Funcionalidades: `onboarding`, `user_role`, `server_config`, `authentication`, `device_sync`,
+Funcionalidades: `onboarding`, `user_role`, `authentication`, `device_sync`,
 `child_device`, `device_policy`, `device_linking`, `screen_time`, `schedules`,
 `app_management`, `blocking`, `activity_reports`, `notifications`, `settings`,
 `managed_browser`, `guardian` (casca e início do painel) e `child_mode` (casca e telas do modo
@@ -40,8 +40,14 @@ flutter analyze
 flutter test                                  # todos os testes
 flutter test --update-goldens --tags screenshot   # regenerar as capturas de referência
 flutter build apk --debug
-flutter build apk --release --dart-define=API_BASE_URL=https://seu-servidor
+flutter build apk --release
 ```
+
+O endereço do servidor é fixo no código, em `AppConfig.serverUrl`
+([lib/app/config/app_config.dart](lib/app/config/app_config.dart)), e o app não oferece a troca.
+Enquanto o servidor não está no VPS, ele aponta para `http://10.0.2.2:8080` (o computador visto
+do emulador). O build de produção só fala HTTPS. O servidor no VPS está em
+[../docs/08-servidor-vps.md](../docs/08-servidor-vps.md).
 
 Testes do agente nativo (JVM), a partir de `android/`:
 

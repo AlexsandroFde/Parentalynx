@@ -7,7 +7,6 @@ import '../../core/platform/native_api.g.dart';
 import '../../core/storage/local_preferences.dart';
 import '../../core/storage/secure_store.dart';
 import '../../core/time/clock.dart';
-import '../server_config/domain/usecases/watch_server_address.dart';
 import '../user_role/domain/usecases/change_user_role.dart';
 import 'data/datasources/local/session_local_data_source.dart';
 import 'data/datasources/remote/auth_remote_data_source.dart';
@@ -152,9 +151,6 @@ void registerAuthenticationModule(GetIt di, {required GlobalKey<NavigatorState> 
     )
     ..registerFactory<ElevationBloc>(() => ElevationBloc(elevateSession: di<ElevateSession>()))
     ..registerFactory<GuardianEntryBloc>(
-      () => GuardianEntryBloc(
-        watchServerAddress: di<WatchServerAddress>(),
-        changeUserRole: di<ChangeUserRole>(),
-      ),
+      () => GuardianEntryBloc(changeUserRole: di<ChangeUserRole>()),
     );
 }

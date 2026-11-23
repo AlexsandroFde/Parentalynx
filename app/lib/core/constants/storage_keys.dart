@@ -2,8 +2,6 @@
 ///
 /// O prefixo `agent.` e reservado ao agente nativo e nao pode ser lido daqui.
 abstract final class StorageKeys {
-  static const String serverUrl = 'config.server_url';
-
   /// Lida tambem pelo worker nativo de alertas. Nao renomear sem alterar o Kotlin.
   static const String guardianSessionToken = 'guardian.session_token';
   static const String guardianSessionId = 'guardian.session_id';
