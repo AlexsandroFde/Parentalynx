@@ -139,7 +139,7 @@ pode aparecer num log. Depois dela, configure uma vez:
    | --- | --- |
    | `VPS_HOST` | IP público da VM |
    | `VPS_USER` | usuário do SSH (`ubuntu` na Oracle, `root` na maioria dos provedores) |
-   | `VPS_SSH_KEY` | conteúdo inteiro de `~/.ssh/parentalynx-deploy` (a chave privada, sem `.pub`) |
+   | `VPS_SSH_KEY` | a chave privada em base64, numa linha só: rode `base64 -w0 ~/.ssh/parentalynx-deploy \| clip` no Git Bash e cole |
    | `VPS_KNOWN_HOSTS` | a linha do passo 2 |
 
 Para revogar o acesso do GitHub, apague a linha `github-actions-deploy` do
