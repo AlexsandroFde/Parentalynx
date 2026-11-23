@@ -58,7 +58,6 @@ imports de todo o `lib/` a cada execução da suíte.
 | Funcionalidade | Responsabilidade | BLoCs |
 | --- | --- | --- |
 | `user_role` | Perfil do aparelho (responsável ou criança) | `UserRoleBloc` |
-| `server_config` | Endereço do servidor e regra de HTTPS | `ServerConfigBloc` |
 | `onboarding` | Boas-vindas e escolha do perfil | `OnboardingBloc` |
 | `authentication` | Conta, sessão, bloqueio do painel, elevação | `AuthBloc`, `LoginBloc`, `RegisterBloc`, `RecoverAccessBloc`, `UnlockBloc`, `ElevationBloc`, `GuardianEntryBloc` |
 | `device_sync` | Avisos em tempo real, confirmação da política aplicada, sincronização pedida ao agente | `DeviceSyncBloc` |
@@ -78,6 +77,10 @@ imports de todo o `lib/` a cada execução da suíte.
 
 `guardian` e `child_mode` são funcionalidades de composição: montam telas com partes das
 outras e por isso ficam no topo do grafo de dependências.
+
+O endereço do servidor não é uma funcionalidade: é fixo no código (`AppConfig.serverUrl`) e
+chega às funcionalidades pelo `ServerEndpoint` do núcleo. A antiga `server_config`, que deixava
+configurar o endereço no aparelho, foi removida em 23/11/2026.
 
 A diretriz cita `BlockingBloc` e `SettingsBloc` entre os exemplos de divisão. Aqui essas
 responsabilidades ficaram em BLoCs menores, um por tela: as restrições são editadas por

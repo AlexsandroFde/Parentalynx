@@ -32,9 +32,9 @@ Conferir que está no ar:
 curl http://localhost:8080/health
 ```
 
-Para testar com o app no emulador Android, o endereço do computador é `http://10.0.2.2:8080`.
-Em um aparelho físico na mesma rede, use o IP do computador. Builds de produção do app só aceitam
-HTTPS.
+O app usa o endereço fixo em `AppConfig.serverUrl` (`app/lib/app/config/app_config.dart`).
+Enquanto ele vale `http://10.0.2.2:8080`, o app no emulador Android fala com este servidor
+local. Builds de produção do app só aceitam HTTPS.
 
 ## Variáveis de ambiente
 
@@ -64,6 +64,16 @@ lidos. Trocar a chave não recifra os dados já gravados.
 ## Produção com Docker e HTTPS
 
 O `docker-compose.yml` sobe a API e o Caddy, que termina o HTTPS com certificado automático.
+
+Em um VPS Ubuntu ou Debian, `deploy/publicar.sh` faz a instalação e as atualizações a partir do
+seu computador, por SSH, e agenda o backup diário (`deploy/backup.sh`). Guia completo em
+[`docs/08-servidor-vps.md`](../docs/08-servidor-vps.md):
+
+```bash
+bash backend/deploy/publicar.sh root@IP_DO_VPS api.exemplo.com.br   # na raiz do repositório
+```
+
+À mão, em qualquer servidor com Docker:
 
 1. Aponte o DNS do domínio para o servidor e libere as portas 80 e 443.
 2. `cp .env.example .env` e preencha `DOMAIN` e `DATA_ENCRYPTION_KEY`.

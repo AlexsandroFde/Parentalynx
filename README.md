@@ -77,6 +77,8 @@ Para testar sem um segundo aparelho, o backend traz um simulador de aparelho da 
 6. [Privacidade, segurança e LGPD](docs/06-privacidade-lgpd.md)
 7. [Testes e validação](docs/07-testes.md): o que foi testado automaticamente, o que foi validado
    em emulador e o que ainda depende de aparelhos físicos.
+8. [Servidor em um VPS](docs/08-servidor-vps.md): domínio, HTTPS, publicação por script,
+   atualização e backups.
 
 ## Limites que você precisa conhecer
 

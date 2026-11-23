@@ -1,27 +1,28 @@
 # Acesso, configurações e primeiro uso
 
-Telas: boas-vindas (escolha do papel do aparelho), folha do servidor, porta de entrada do
+Telas: boas-vindas (escolha do papel do aparelho), porta de entrada do
 responsável, criar conta, entrar, recuperar acesso, chave de recuperação, painel bloqueado,
 pedido de senha para operações administrativas, aba Mais, conta e senha (nome, nova chave),
 trocar senha, excluir conta, sessões conectadas, bloqueio do painel, dados e privacidade e
 registro de alterações. Perfil: responsável (as boas-vindas valem para os dois aparelhos).
 
-Funcionalidades: `onboarding`, `server_config`, `authentication`, `settings` e `user_role` (sem
-tela própria).
+Funcionalidades: `onboarding`, `authentication`, `settings` e `user_role` (sem tela própria).
+
+Desde 23/11/2026 o endereço do servidor é fixo no código e o app não oferece a troca. A folha
+do servidor e as linhas "Servidor" das boas-vindas e da porta de entrada saíram do app. Os itens
+2, 5, 6 e 8 da tabela abaixo ficam como registro da avaliação.
 
 ## Heurísticas consideradas
 
 - **H1 Visibilidade do estado:** toda operação mostra andamento no lugar em que foi pedida
   (botão ocupado, indicador na linha da sessão sendo encerrada, do nome sendo salvo e do ajuste
-  de privacidade); a folha do servidor diz "Conferindo se há um servidor ParentaLynx nesse
-  endereço…"; as confirmações aparecem só depois de concluídas e dizem o efeito ("Senha alterada.
+  de privacidade); as confirmações aparecem só depois de concluídas e dizem o efeito ("Senha alterada.
   Os outros celulares conectados precisam entrar de novo."); pendências da aba Mais aparecem com
   ícone em tom de atenção e o texto do que falta.
 - **H2 Mundo real:** "papel deste aparelho" (e não "modo"), "Tentativa recusada", "Acesso à
   conta" no lugar de códigos internos do registro, IP rotulado, explicações de cada tempo de
   bloqueio.
-- **H3 Controle e liberdade:** trocar o servidor na porta de entrada, trocar o papel do
-  aparelho, "Entrar com outra conta" no painel bloqueado, cancelar em todos os diálogos, folha
+- **H3 Controle e liberdade:** trocar o papel do aparelho, "Entrar com outra conta" no painel bloqueado, cancelar em todos os diálogos, folha
   com "Fechar", desistir de reduzir o histórico.
 - **H4 Consistência:** formulários com `AppTextField`/`AppPasswordField`, diálogos com campo no
   mesmo padrão do `showConfirmDialog`, listas em `AppListGroup`, erros em `AppBanner` com título
@@ -31,7 +32,7 @@ tela própria).
   destrutiva com consequência (sair, encerrar sessão, entrar com outra conta, reduzir histórico),
   palavra digitada para excluir a conta, botões ocupados contra toque duplo.
 - **H6 Reconhecimento:** de quem é a conta no painel bloqueado, na aba Mais, na confirmação de
-  saída e na exclusão; servidor em uso visível antes da escolha; valor atual de cada ajuste.
+  saída e na exclusão; servidor em uso na aba Mais; valor atual de cada ajuste.
 - **H7 Eficiência:** prazos de histórico em atalhos (chips), "próximo" do teclado que segue de
   campo em campo, atalhos de "Apagar dados" direto para Aparelhos e Conta.
 - **H8 Estética e minimalismo:** marca no primeiro acesso, hierarquia por cabeçalho e seções,
@@ -47,13 +48,13 @@ tela própria).
 | # | Tela | Problema | Heurística | Gravidade | Solução | Verificação |
 | --- | --- | --- | --- | --- | --- | --- |
 | 1 | Boas-vindas | Ícone genérico de família em quadrado azul e cartões com borda: aparência de modelo pronto. | H8, H4 | Média | `BrandLockup`, cabeçalho "Primeiro acesso" e as duas escolhas em um `AppListGroup`. | `onboarding_welcome`, `onboarding_welcome_escuro` |
-| 2 | Boas-vindas | O servidor só aparecia como "Configurar servidor" no rodapé; sem ele, tocar em um papel abria a folha de surpresa. | H1, H5 | Média | Seção "Servidor" com o endereço em uso ou "Servidor não configurado" + "Pendente", antes da escolha. | `sem servidor configurado pede o endereco antes de escolher` |
+| 2 | Boas-vindas | O servidor só aparecia como "Configurar servidor" no rodapé; sem ele, tocar em um papel abria a folha de surpresa. | H1, H5 | Média | Seção "Servidor" com o endereço em uso ou "Servidor não configurado" + "Pendente", antes da escolha. | Removido em 23/11/2026 (endereço fixo no código) |
 | 3 | Boas-vindas | Falha ao gravar o papel aparecia só em aviso passageiro, com a mensagem crua. | H9 | Média | `AppBanner` "Não foi possível definir o papel deste aparelho" + motivo, até a próxima tentativa. | `falha do lado nativo e mostrada e o modo nao muda` |
-| 4 | Boas-vindas | Indicador da escolha em andamento sem nome para o leitor de tela. | H1 | Baixa | Indicador "Gravando a escolha"; a outra opção e o servidor ficam inativos. | `boas-vindas segue as diretrizes de acessibilidade` |
-| 5 | Folha do servidor | Campo sem marca de obrigatório e sem formato; erro "Não foi possível falar com o servidor nesse endereço" + texto técnico, sem dizer se algo mudou. | H5, H9 | Média | `AppTextField` obrigatório com o formato no apoio; durante a conferência o apoio diz o que está acontecendo; erros por tipo (sem conexão, outro servidor) com o que fazer e "Nada foi alterado." | `server_config_test` (dois casos), `folha do servidor: explica o formato e mostra a falha sem gravar`, `onboarding_server_sheet` |
-| 6 | Folha do servidor | Sem botão de fechar visível. | H3 | Baixa | `AppSheetFrame` com "Fechar". | `onboarding_server_sheet` |
+| 4 | Boas-vindas | Indicador da escolha em andamento sem nome para o leitor de tela. | H1 | Baixa | Indicador "Gravando a escolha"; a outra opção fica inativa. | `boas-vindas segue as diretrizes de acessibilidade` |
+| 5 | Folha do servidor | Campo sem marca de obrigatório e sem formato; erro "Não foi possível falar com o servidor nesse endereço" + texto técnico, sem dizer se algo mudou. | H5, H9 | Média | `AppTextField` obrigatório com o formato no apoio; durante a conferência o apoio diz o que está acontecendo; erros por tipo (sem conexão, outro servidor) com o que fazer e "Nada foi alterado." | Removido em 23/11/2026 (endereço fixo no código) |
+| 6 | Folha do servidor | Sem botão de fechar visível. | H3 | Baixa | `AppSheetFrame` com "Fechar". | Removido em 23/11/2026 (endereço fixo no código) |
 | 7 | Porta de entrada | Escudo genérico, passos desenhados à mão, botão contornado. | H4, H8 | Baixa | Marca, `AppButton` primário e secundário, `StepList` "Como começar". | `guardian_sign_in`, `guardian_sign_in_escuro` |
-| 8 | Porta de entrada | Servidor digitado errado só era corrigido voltando à escolha de papel. | H3 | Média | Linha "Servidor" abre a folha ali mesmo (`ServerConfigBloc` na rota). | `porta de entrada mostra os caminhos, o servidor e a troca de papel` |
+| 8 | Porta de entrada | Servidor digitado errado só era corrigido voltando à escolha de papel. | H3 | Média | Linha "Servidor" abre a folha ali mesmo (`ServerConfigBloc` na rota). | Removido em 23/11/2026 (endereço fixo no código) |
 | 9 | Porta de entrada | Sessão encerrada e conta excluída com o mesmo aviso amarelo e texto vago. | H1, H9 | Média | `AppBanner` "Sessão encerrada" (atenção, com o motivo provável) ou "Conta excluída" (confirmação do que foi apagado). | `auth_flow_test` (aviso de sessão encerrada) |
 | 10 | Porta de entrada | "Voltar para a escolha de modo": termo diferente das boas-vindas e sem andamento. | H2, H4 | Baixa | "Trocar o papel deste aparelho", com indicador e falha que diz o que não foi feito. | `guardian_sign_in` |
 | 11 | Criar conta | Obrigatórios sem marca, e-mail sem exemplo. | H5 | Média | `isRequired`, exemplo `maria@exemplo.com`, apoio de cada campo. | `guardian_register` |

@@ -38,6 +38,18 @@ Conferir: `curl http://localhost:8080/health`.
 O build de produção do aplicativo só aceita endereços `https://`. O `docker-compose.yml` sobe a
 API e um proxy Caddy que obtém o certificado sozinho.
 
+**Em um VPS Ubuntu ou Debian**, um script faz tudo a partir do seu computador (instala o Docker,
+cria o `.env` com a chave, sobe os contêineres e agenda o backup):
+
+```bash
+bash backend/deploy/publicar.sh root@IP_DO_VPS api.exemplo.com.br
+```
+
+O passo a passo completo, com DNS, SSH, atualização e backups, está em
+[08-servidor-vps.md](08-servidor-vps.md).
+
+**Em outro servidor com Docker**, à mão:
+
 1. Aponte o DNS de um domínio para o servidor e libere as portas 80 e 443.
 2. Em `backend/`, copie `.env.example` para `.env` e preencha:
    - `DOMAIN`: o domínio público, por exemplo `controle.exemplo.com.br`.
@@ -49,9 +61,9 @@ API e um proxy Caddy que obtém o certificado sozinho.
 Guarde a `DATA_ENCRYPTION_KEY` fora do servidor. Sem ela, os campos cifrados do banco não podem
 ser lidos. O backup do banco está descrito em `backend/README.md`.
 
-> Os arquivos Docker foram escritos e revisados, mas não foram executados no ambiente de
-> desenvolvimento deste projeto (o Docker não estava em execução). Trate a primeira subida como um
-> teste.
+> Os arquivos Docker foram executados localmente (API e Caddy com certificado interno para
+> `localhost`). A emissão de certificado pela Let's Encrypt depende de um domínio público e não
+> foi testada. Detalhes em [08-servidor-vps.md](08-servidor-vps.md), "O que foi testado".
 
 ## 3. Compilar o aplicativo
 
@@ -71,15 +83,15 @@ flutter build apk --debug
 
 Saída: `app/build/app/outputs/flutter-apk/app-debug.apk`.
 
-O APK de depuração aceita HTTP sem TLS, para testes em rede local, e usa por padrão o endereço
-`http://10.0.2.2:8080`, que é o computador visto de dentro do emulador Android. Para um aparelho
-físico na mesma rede, informe o IP do computador:
+O endereço do servidor é fixo no código, em `AppConfig.serverUrl`
+(`app/lib/app/config/app_config.dart`). O app não oferece a troca, então nada é digitado nos
+aparelhos. Enquanto o servidor não está no VPS, o valor é `http://10.0.2.2:8080`, que é o
+computador visto de dentro do emulador Android. Com o servidor no ar, troque pelo domínio
+(`https://api.exemplo.com.br`) e compile de novo.
 
-```bash
-flutter build apk --debug --dart-define=API_BASE_URL=http://192.168.0.10:8080
-```
-
-O endereço também pode ser trocado no próprio app, em "Configurar servidor", na tela inicial.
+O APK de depuração aceita HTTP sem TLS, para testes em rede local. Para testar um aparelho
+físico contra o computador, troque o valor temporariamente pelo IP do computador
+(`http://192.168.0.10:8080`, por exemplo).
 
 ### 3.2 APK de produção
 
@@ -102,17 +114,19 @@ O endereço também pode ser trocado no próprio app, em "Configurar servidor", 
 
    `storeFile` é relativo à pasta `app/android`. No exemplo, o arquivo `.jks` fica em `app/`.
 
-3. Compile informando o endereço do servidor:
+3. Confira se `AppConfig.serverUrl` tem o endereço `https://` do servidor. O build de produção
+   só fala HTTPS: com o valor de testes (`http://10.0.2.2:8080`) o app não conecta.
+
+4. Compile:
 
    ```bash
-   flutter build apk --release --dart-define=API_BASE_URL=https://controle.exemplo.com.br
+   flutter build apk --release
    ```
 
    Saída: `app/build/app/outputs/flutter-apk/app-release.apk`.
 
 Sem o `key.properties`, o build de produção é assinado com a chave de depuração. Ele serve para
-testar, mas não deve ser distribuído. Sem `API_BASE_URL`, o app pede o endereço do servidor na
-primeira abertura.
+testar, mas não deve ser distribuído.
 
 Para publicar na loja, gere o pacote com `flutter build appbundle --release` e veja as exigências
 do Google Play na seção 7.
@@ -213,8 +227,8 @@ Nada disso foi submetido à loja neste projeto.
 
 | Sintoma | Causa provável e solução |
 | --- | --- |
-| "Não foi possível falar com o servidor nesse endereço" | Endereço errado, servidor fora do ar ou, no build de produção, endereço sem `https://`. |
-| No emulador, o app não acha o servidor local | Use `http://10.0.2.2:8080`, não `localhost`. |
+| O app não consegue falar com o servidor | Servidor fora do ar, `AppConfig.serverUrl` errado ou, no build de produção, endereço sem `https://`. Abra `ENDERECO/health` no navegador do celular. |
+| No emulador, o app não acha o servidor local | `AppConfig.serverUrl` precisa ser `http://10.0.2.2:8080`, não `localhost`. |
 | A opção de acessibilidade aparece desabilitada | Android 13 ou superior: libere as "configurações restritas" (seção 4). |
 | O controle para depois de um tempo com a tela apagada | Economia de bateria do fabricante. Conceda "bateria sem restrição" e o início automático. |
 | O painel mostra "proteção degradada" | Alguma permissão foi desligada no aparelho da criança. Abra a Área do responsável e refaça as permissões. |

@@ -71,14 +71,14 @@ lib/
     json/                   leitura tipada de JSON (só a camada de dados usa)
     logging/                registro estruturado
     navigation/             ações de abertura vindas do lado nativo
-    network/                cliente da API, WebSocket, endereço do servidor, credenciais
+    network/                cliente da API, WebSocket, endereço do servidor (fixo), credenciais
     platform/               código gerado pelo Pigeon e adaptadores da ponte
     security/               política de senha, TOTP, código de vinculação
     storage/                armazenamento seguro e preferências locais
     time/ utils/            relógio, formatação, valor observável
   shared/                   Design System (tokens, temas, componentes) e serviços de interface
   features/
-    user_role/  server_config/  onboarding/  authentication/  device_sync/
+    user_role/  onboarding/  authentication/  device_sync/
     child_device/  device_policy/  screen_time/  schedules/  app_management/
     blocking/  activity_reports/  notifications/  device_linking/  settings/
     guardian/  child_mode/  managed_browser/
