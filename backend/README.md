@@ -73,6 +73,9 @@ seu computador, por SSH, e agenda o backup diário (`deploy/backup.sh`). Guia co
 bash backend/deploy/publicar.sh root@IP_DO_VPS api.exemplo.com.br   # na raiz do repositório
 ```
 
+Depois da primeira instalação, o workflow `.github/workflows/deploy-backend.yml` publica sozinho
+a cada push na `main` que altere `backend/` (configuração na seção 6 do guia).
+
 À mão, em qualquer servidor com Docker:
 
 1. Aponte o DNS do domínio para o servidor e libere as portas 80 e 443.

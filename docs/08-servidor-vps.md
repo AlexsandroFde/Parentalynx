@@ -109,11 +109,54 @@ A assinatura do APK de produção está em [04-instalacao.md](04-instalacao.md),
 
 ## 6. Atualizar o servidor
 
-Depois de confirmar as alterações:
+### Automático, a cada push
+
+O workflow `.github/workflows/deploy-backend.yml` roda a cada push na `main` que altere
+`backend/`. Ele roda os testes do backend e, se passarem, chama o `publicar.sh` contra a VM.
+Alterações só no app ou na documentação não disparam o deploy. Também dá para rodar à mão em
+Actions, "Deploy do backend", "Run workflow".
+
+A primeira instalação continua manual (seção 4), porque ela mostra a chave de cifra, que não
+pode aparecer num log. Depois dela, configure uma vez:
+
+1. Crie uma chave só para o deploy, no Git Bash. Não use a sua chave pessoal: esta vai ficar
+   guardada no GitHub e pode ser revogada sem afetar o seu acesso.
+
+   ```bash
+   ssh-keygen -t ed25519 -N "" -C "github-actions-deploy" -f ~/.ssh/parentalynx-deploy
+   ssh USUARIO@IP_DO_VPS 'cat >> ~/.ssh/authorized_keys' < ~/.ssh/parentalynx-deploy.pub
+   ```
+
+2. Pegue a identidade da VM, a mesma que o seu PC aceitou na primeira conexão:
+
+   ```bash
+   ssh-keygen -F IP_DO_VPS -f ~/.ssh/known_hosts | grep -v '^#'
+   ```
+
+3. No GitHub, em Settings, Secrets and variables, Actions, "New repository secret", crie:
+
+   | Segredo | Valor |
+   | --- | --- |
+   | `VPS_HOST` | IP público da VM |
+   | `VPS_USER` | usuário do SSH (`ubuntu` na Oracle, `root` na maioria dos provedores) |
+   | `VPS_SSH_KEY` | conteúdo inteiro de `~/.ssh/parentalynx-deploy` (a chave privada, sem `.pub`) |
+   | `VPS_KNOWN_HOSTS` | a linha do passo 2 |
+
+Para revogar o acesso do GitHub, apague a linha `github-actions-deploy` do
+`~/.ssh/authorized_keys` da VM.
+
+Se o IP da VM mudar, atualize `VPS_HOST` e `VPS_KNOWN_HOSTS`. Sem algum dos segredos, o
+workflow para com uma mensagem dizendo qual falta.
+
+### À mão
+
+Depois de fazer o commit:
 
 ```bash
 bash backend/deploy/publicar.sh root@IP_DO_VPS
 ```
+
+### Nos dois casos
 
 O domínio só é preciso na primeira vez. A API fica fora do ar por alguns segundos durante a
 troca. O banco e os certificados ficam em volumes do Docker e não são tocados. A cada
@@ -207,5 +250,7 @@ o pacote `unattended-upgrades` já vem ativo.
   instalação do `cron` e agendamento do backup.
 - A instalação do Docker pelo repositório oficial foi feita de verdade no mesmo Ubuntu 24.04.
 
-Não foram testados: a emissão de certificado pela Let's Encrypt (precisa de domínio público), a
+- O passo de SSH do workflow de deploy foi executado localmente, com e sem os segredos.
+
+Não foram testados: o workflow rodando no GitHub, a emissão de certificado pela Let's Encrypt (precisa de domínio público), a
 publicação em um VPS real e o procedimento de restauração da seção 7.

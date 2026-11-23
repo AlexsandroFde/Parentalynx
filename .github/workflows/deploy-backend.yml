@@ -1,0 +1,83 @@
+# Publica o backend na VM a cada push na main que altere backend/.
+#
+# Roda os testes do backend e, se passarem, chama backend/deploy/publicar.sh contra a VM por SSH.
+# A primeira instalacao e feita a mao (ela cria a chave de cifra e a mostra uma vez, o que nao
+# pode acontecer num log). Configuracao dos segredos: docs/08-servidor-vps.md, secao 6.
+
+name: Deploy do backend
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+# Um deploy por vez. Um push novo espera o anterior terminar em vez de interromper no meio.
+concurrency:
+  group: deploy-backend
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    name: Testes do backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  deploy:
+    name: Publicar na VM
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configurar o acesso SSH
+        env:
+          SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          KNOWN_HOSTS: ${{ secrets.VPS_KNOWN_HOSTS }}
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          for name in SSH_KEY KNOWN_HOSTS VPS_HOST VPS_USER; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Falta um segredo do deploy ($name). Veja docs/08-servidor-vps.md, seção 6."
+              exit 1
+            fi
+          done
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # A identidade da VM vem do segredo: o SSH recusa a conexao se ela mudar.
+          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host vps
+            HostName $VPS_HOST
+            User $VPS_USER
+            IdentityFile ~/.ssh/deploy_key
+            IdentitiesOnly yes
+            StrictHostKeyChecking yes
+          EOF
+
+      - name: Publicar
+        run: bash backend/deploy/publicar.sh vps
+
+      - name: Apagar a chave do runner
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
