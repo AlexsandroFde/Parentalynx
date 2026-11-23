@@ -62,10 +62,15 @@ jobs:
             fi
           done
           install -m 700 -d ~/.ssh
-          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
+          # Segredos colados no navegador pelo Windows podem chegar com CRLF, que o OpenSSH nao le.
+          printf '%s\n' "$SSH_KEY" | tr -d '\r' > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
+          if ! ssh-keygen -y -P "" -f ~/.ssh/deploy_key > /dev/null 2>&1; then
+            echo "::error::VPS_SSH_KEY não é uma chave privada válida sem senha. Cole o conteúdo inteiro de ~/.ssh/parentalynx-deploy (o arquivo sem .pub), da linha BEGIN até a linha END."
+            exit 1
+          fi
           # A identidade da VM vem do segredo: o SSH recusa a conexao se ela mudar.
-          printf '%s\n' "$KNOWN_HOSTS" > ~/.ssh/known_hosts
+          printf '%s\n' "$KNOWN_HOSTS" | tr -d '\r' > ~/.ssh/known_hosts
           cat > ~/.ssh/config <<EOF
           Host vps
             HostName $VPS_HOST
