@@ -2,6 +2,7 @@ node_modules
 data
 test
 scripts
+deploy
 .env
 *.log
 *.md

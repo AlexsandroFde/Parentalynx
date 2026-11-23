@@ -2,6 +2,17 @@
 #
 # Antes de subir, copie .env.example para .env e preencha DOMAIN e DATA_ENCRYPTION_KEY.
 #   docker compose up -d --build
+# Em um VPS, deploy/publicar.sh faz isso e o resto (ver docs/08-servidor-vps.md).
+
+# Nome fixo do projeto: os volumes (banco e certificados) nao mudam se a pasta mudar de nome.
+name: parentalynx
+
+# Logs com tamanho limitado, para nao encher o disco de um VPS pequeno.
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 
 services:
   api:
@@ -19,6 +30,7 @@ services:
       - api_data:/data
     expose:
       - "8080"
+    logging: *logging
 
   caddy:
     image: caddy:2-alpine
@@ -30,10 +42,13 @@ services:
     ports:
       - "80:80"
       - "443:443"
+      # HTTP/3. Sem esta porta liberada o Caddy continua atendendo por HTTP/2.
+      - "443:443/udp"
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
       - caddy_config:/config
+    logging: *logging
 
 volumes:
   api_data:
