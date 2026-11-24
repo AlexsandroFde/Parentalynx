@@ -93,9 +93,11 @@ caracteres do português.
 
 ### Marca
 
-O símbolo é a cabeça de um lince em silhueta (orelhas com tufos, colar de pelos nas bochechas e
-olhos âmbar) sobre um quadrado arredondado de petróleo (`BrandMark`). Usa cores fixas, iguais
-nos temas claro e escuro, para ser sempre reconhecido.
+O símbolo é a cabeça de um lince em silhueta branca (orelhas com tufos, colar de pelos nas
+bochechas, olhos vazados com pupilas em fenda e sobrancelhas âmbar) sobre um quadrado
+arredondado de petróleo. O ícone do app e o `BrandMark` desenham as mesmas formas, em vetor; o
+ícone tem também uma versão de uma cor só para os ícones temáticos do Android. Usa cores fixas,
+iguais nos temas claro e escuro, para ser sempre reconhecido.
 
 ### Iconografia
 

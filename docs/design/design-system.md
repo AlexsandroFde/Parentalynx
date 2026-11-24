@@ -188,7 +188,7 @@ perfil (`context.shapes`): controles 8 / 12, contêineres 12 / 16, folhas 16 / 2
 | `HelpButton` / `showHelpSheet` | Ajuda contextual ao lado do que ela explica. |
 | `AppChartStyle.of(context)` | Cores e textos dos gráficos. |
 | `ChildPageBody`, `ChildHeader`, `BulletLine` | Estrutura das telas da criança. |
-| `BrandMark`, `BrandLockup` | Símbolo e nome do app. |
+| `BrandMark`, `BrandLockup` | Símbolo e nome do app. O símbolo tem as mesmas formas do ícone do app (`BrandShapes`): ao redesenhá-lo, os vetores do Android e `BrandShapes` mudam juntos (`brand_mark_test.dart` confere). |
 | `AppIcons` | Todos os ícones, por significado. |
 
 ## 4. Padrões de tela
